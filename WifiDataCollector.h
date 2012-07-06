@@ -6,7 +6,7 @@
 typedef QHash<QString,QString> QStringHash;
 
 class WifiDataResult
-{
+{	
 public:
 	WifiDataResult()
 		: essid("")
@@ -26,6 +26,7 @@ public:
 	bool valid;
 	
 	QString toString() const;
+	void loadRawData(QStringHash rawData);
 };
 
 QDebug operator<<(QDebug dbg, const WifiDataResult &result);
@@ -35,17 +36,19 @@ class WifiDataCollector
 public:
 	WifiDataCollector();
 	
-	QList<WifiDataResult> scanWifi();
+	QList<WifiDataResult> scanWifi(QString debugTextFile="");
 	
-	double dbmToPercent(int dbm);
-
 	bool auditIwlistBinary();
 	QString findWlanIf();
+
+	static double dbmToPercent(int dbm);
 
 protected:
 	QString getIwlistOutput(QString interface = "");
 	
 	WifiDataResult parseRawBlock(QString buffer);
+	
+	QString readTextFile(QString file);
 	
 	
 };

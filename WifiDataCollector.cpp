@@ -39,13 +39,21 @@ WifiDataCollector::WifiDataCollector()
 	auditIwlistBinary();
 }
 
-QList<WifiDataResult> WifiDataCollector::scanWifi()
+QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
 {
-	QString buffer = getIwlistOutput();
-
+	QString buffer;
 	QList<WifiDataResult> results;
+	 
+	if(!debugTextFile.isEmpty())
+		buffer = readTextFile(debugTextFile);
+	else
+		buffer = getIwlistOutput();
+
 	if(buffer.isEmpty() || buffer.contains("No scan results"))
+	{
+		qDebug() << "WifiDataCollector::scanWifi(): No scan results";
 		return results; // return empty list
+	}
 		
 	QStringList rawBlocks = buffer.split(" Cell ");
 	
@@ -185,22 +193,6 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	if(interface.isEmpty())
 		interface = findWlanIf();
 	
-//	/// JUST FOR DEVELOPMENT
-//	
-// 	// Load text file
-// 	QString fileName = "scan3.txt";
-// 	QFile file(fileName);
-// 	if(!file.open(QIODevice::ReadOnly))
-// 	{
-// 		QMessageBox::critical(0,QObject::tr("Can't Read File"),QString(QObject::tr("Unable to open %1")).arg(fileName));
-// 		return "";
-// 	}
-// 
-// 	QTextStream stream(&file);
-// 	QString fileContents = stream.readAll();
-// 	
-// 	return fileContents;
-	
 	QProcess proc;
 	proc.start(IWLIST_BINARY, QStringList() << interface << "scan");
 	if(!proc.waitForFinished(10000))
@@ -211,6 +203,24 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	
 	QString fileContents = proc.readAllStandardOutput();
 	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of " IWLIST_BINARY ": "<<fileContents;
+	
+	return fileContents;
+}
+
+QString WifiDataCollector::readTextFile(QString fileName)
+{
+	/// JUST FOR DEVELOPMENT
+	
+	// Load text file
+	QFile file(fileName);
+	if(!file.open(QIODevice::ReadOnly))
+	{
+		QMessageBox::critical(0,QObject::tr("Can't Read File"),QString(QObject::tr("Unable to open %1")).arg(fileName));
+		return "";
+	}
+
+	QTextStream stream(&file);
+	QString fileContents = stream.readAll();
 	
 	return fileContents;
 }
@@ -302,15 +312,20 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 	
 	//qDebug() << "WifiDataCollector::parseRawBlock: raw values: "<<values;
 	
-	result.rawData = values;
-	result.valid = true;
-	
-	// Now parse values in 'values' and populate result
-	result.essid = values["essid"].replace("\"","");
-	result.mac   = values["address"];
-	result.dbm   = values["signal level"].replace(" dBm","").toInt();
-	result.chan  = values["frequency"].replace(" GHz","").toDouble();
-	result.value = dbmToPercent(result.dbm);
+	result.loadRawData(values);
 	
 	return result;
+}
+
+void WifiDataResult::loadRawData(QStringHash values)
+{
+	rawData = values;
+	valid = true;
+	
+	// Parse values in 'values' and populate result
+	essid = values["essid"].replace("\"","");
+	mac   = values["address"];
+	dbm   = values["signal level"].replace(" dBm","").toInt();
+	chan  = values["frequency"].replace(" GHz","").toDouble();
+	value = WifiDataCollector::dbmToPercent(dbm);
 }
