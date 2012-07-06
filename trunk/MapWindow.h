@@ -20,14 +20,19 @@ protected:
 class SigMapValue
 {
 public:
-	SigMapValue(QPointF p, double v)
+	SigMapValue(QPointF p, QList<WifiDataResult> results)
 		: point(p)
-		, value(v)
+ 		, scanResults(results)
 		, consumed(false)
 		 {}
 		
 	QPointF point;
-	double value;
+	//double value;
+	
+	QList<WifiDataResult> scanResults;
+	
+	bool hasAp(QString mac);
+	double signalForAp(QString mac, bool returnDbmValue=false);
 	
 	bool consumed;
 };
@@ -46,15 +51,18 @@ protected:
 	friend class MapGraphicsView; // for access to:
 	void invalidateLongPress();
 	
+	void saveResults(QString filename);
+	void loadResults(QString filename);
+	
 private slots:
 	void longPressTimeout();
 	void renderSigMap();
 	
 private:
-	void addSignalMarker(QPointF point, double value);
-	SigMapValue *findNearest(SigMapValue *);
-	QColor colorForSignal(double sig);
-	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy);
+	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
+	SigMapValue *findNearest(SigMapValue *, QString apMac);
+	QColor colorForSignal(double sig, QString apMac);
+	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 
 private:
 	QPointF m_pressPnt;
@@ -64,9 +72,14 @@ private:
 		
 	QGraphicsPixmapItem *m_sigMapItem;
 	QPixmap m_bgPixmap;
-	QList<QColor> m_colorList;
+	//QList<QColor> m_colorList;
 	
 	WifiDataCollector m_scanIf;
+	
+	QHash<QString,QList<QColor > > m_colorListForMac;
+	QList<qreal> m_huesUsed;
+	
+	QHash<QString,QPointF> m_apLocations;
 };
 
 
