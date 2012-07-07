@@ -1,6 +1,6 @@
 /*
  * This file is auto-generated.  DO NOT MODIFY.
- * Original file: C:\\Users\\JosiahBryan\\Devel\\livepro\\switchmon\\androidapp\\android\\src\\org\\kde\\necessitas\\ministro\\IMinistro.aidl
+ * Original file: C:\\Users\\JosiahBryan\\Devel\\wifisigmap\\androidapp\\android\\src\\org\\kde\\necessitas\\ministro\\IMinistro.aidl
  */
 package org.kde.necessitas.ministro;
 public interface IMinistro extends android.os.IInterface
