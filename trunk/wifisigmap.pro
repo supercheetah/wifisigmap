@@ -4,17 +4,10 @@ RCC_DIR = .build
 UI_DIR = .build
 
 TEMPLATE = app
-TARGET = 
+TARGET = wifisigmap
 DEPENDPATH += .
 INCLUDEPATH += .
 
-RESOURCES = resources.qrc
+include(wifisigmap.pri)
 
-# Input
-HEADERS += \
-	MapWindow.h \
-	WifiDataCollector.h
-SOURCES += \
-	main.cpp \
-	MapWindow.cpp \
-	WifiDataCollector.cpp
+SOURCES += main.cpp
