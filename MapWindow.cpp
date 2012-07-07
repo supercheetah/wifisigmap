@@ -67,6 +67,78 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 }
 
 
+// #define CUSTOM_MSG_HANDLER
+// 
+// #if defined(CUSTOM_MSG_HANDLER)
+// 
+// 	#if defined(Q_OS_WIN)
+// 	extern Q_CORE_EXPORT void qWinMsgHandler(QtMsgType t, const char* str);
+// 	#endif
+// 
+// 	static QtMsgHandler qt_origMsgHandler = 0;
+// 
+// 	void myMessageOutput(QtMsgType type, const char *msg)
+// 	{
+// 		#if defined(Q_OS_WIN)
+// 		if (!qt_origMsgHandler)
+// 			qt_origMsgHandler = qWinMsgHandler;
+// 		#endif
+// 
+// 		switch (type)
+// 		{
+// 			case QtDebugMsg:
+// 				//AppSettings::sendCheckin("/core/debug",QString(msg));
+// 				if(qt_origMsgHandler)
+// 					qt_origMsgHandler(type,msg);
+// 				else
+// 					fprintf(stderr, "Debug: %s\n", msg);
+// 				break;
+// 			case QtWarningMsg:
+// 				//AppSettings::sendCheckin("/core/warn",QString(msg));
+// 				if(qt_origMsgHandler)
+// 					qt_origMsgHandler(QtDebugMsg,msg);
+// 				else
+// 					fprintf(stderr, "Warning: %s\n", msg);
+// 				break;
+// 			case QtCriticalMsg:
+// 	// 			if(qt_origMsgHandler)
+// 	// 				qt_origMsgHandler(type,msg);
+// 	// 			else
+// 	// 				fprintf(stderr, "Critical: %s\n", msg);
+// 	// 			break;
+// 			case QtFatalMsg:
+// 				AppSettings::sendCheckin("/core/fatal",QString(msg));
+// 				if(qt_origMsgHandler)
+// 				{
+// 					qt_origMsgHandler(QtDebugMsg,msg);
+// 					//qt_origMsgHandler(type,msg);
+// 				}
+// 				else
+// 				{
+// 
+// 					fprintf(stderr, "Fatal: %s\n", msg);
+// 				}
+// 				//QMessageBox::critical(0,"Fatal Error",msg);
+// 				//qt_origMsgHandler(QtDebugMsg,msg);
+// 				/*
+// 				if(strstr(msg,"out of memory, returning null image") != NULL)
+// 				{
+// 					QPixmapCache::clear();
+// 					qt_origMsgHandler(QtDebugMsg, "Attempted to clear QPixmapCache, continuing");
+// 					return;
+// 				}
+// 				*/
+// 				abort();
+// 		}
+// 	}
+// #endif // CUSTOM_MSG_HANDLER
+// 
+// void AppSettings::initApp(const QString& appName)
+// {
+// 	#if defined(CUSTOM_MSG_HANDLER)
+// 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
+// 	#endif
+
 MapWindow::MapWindow(QWidget *parent)
 	: QWidget(parent)
 {
@@ -211,6 +283,20 @@ void MapGraphicsScene::clear()
 	m_sigValues.clear();
 	QGraphicsScene::clear();
 	
+	m_bgFilename = ""; //"phc-floorplan/phc-floorplan-blocks.png";
+	m_bgPixmap = QPixmap(2000,2000); //QApplication::desktop()->screenGeometry().size());
+	m_bgPixmap.fill(Qt::white);
+	QPainter p(&m_bgPixmap);
+	p.setPen(QPen(Qt::gray,3.0));
+	for(int x=0; x<m_bgPixmap.width(); x+=64)
+	{
+		p.drawLine(x,0,x,m_bgPixmap.height());
+		for(int y=0; y<m_bgPixmap.height(); y+=64)
+		{
+			p.drawLine(0,y,m_bgPixmap.width(),y);
+		}
+	}
+	
 	m_bgPixmapItem = addPixmap(m_bgPixmap);
 	m_bgPixmapItem->setZValue(0);
 	
@@ -235,23 +321,11 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	//setBackgroundBrush(QImage("PCI-PlantLayout-20120705-2048px-adjusted.png"));
 	//m_bgPixmap = QPixmap("PCI-PlantLayout-20120705-2048px-adjusted.png");
 	
-	m_bgFilename = "phc-floorplan/phc-floorplan-blocks.png";
-	m_bgPixmap = QPixmap(m_bgFilename);
-
-	if(m_bgPixmap.isNull())
-	{
-		m_bgPixmap = QPixmap(QApplication::desktop()->screenGeometry().size());
-		m_bgPixmap.fill(Qt::white);
-	}
-	
-	m_bgPixmapItem = addPixmap(m_bgPixmap);
-	m_bgPixmapItem->setZValue(0);
-	
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
 	m_longPressTimer.setInterval(1000);
 	m_longPressTimer.setSingleShot(true);
 	
-	addSigMapItem();
+	clear(); // sets up background and other misc items
 
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
