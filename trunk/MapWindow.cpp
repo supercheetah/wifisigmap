@@ -403,6 +403,9 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	clear(); // sets up background and other misc items
 
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
+
+	/// NOTE Just For Testing!
+	setBgFile("/tmp/phclayout.png");
 	
 // 	QSizeF sz = m_bgPixmap.size();
 // 	double w = sz.width();
@@ -499,6 +502,8 @@ void MapGraphicsScene::longPressTimeout()
 			/// Scan for APs nearby and prompt user to choose AP
 			
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
+			QApplication::processEvents();
+
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
 			
@@ -568,6 +573,8 @@ void MapGraphicsScene::longPressTimeout()
 		{
 			// scan for APs nearby
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
+			QApplication::processEvents();
+
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
 			
