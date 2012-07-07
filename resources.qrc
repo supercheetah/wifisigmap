@@ -1,0 +1,7 @@
+ <!DOCTYPE RCC><RCC version="1.0">
+ <qresource>
+	<file>data/images/ap-marker.png</file>
+	<file>data/android/iwlist</file>
+	<file>data/android/iwconfig</file>
+ </qresource>
+ </RCC>

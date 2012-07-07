@@ -8,6 +8,8 @@ TARGET =
 DEPENDPATH += .
 INCLUDEPATH += .
 
+RESOURCES = resources.qrc
+
 # Input
 HEADERS += \
 	MapWindow.h \
