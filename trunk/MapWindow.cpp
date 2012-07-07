@@ -268,12 +268,11 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 {
 	m_apLocations[mac] = point;
 	
-	// TODO move image to resources file
-	QImage markerGroup("ap-marker.png");
+	QImage markerGroup(":/data/images/ap-marker.png");
 	
 	markerGroup = addDropShadow(markerGroup, (double)(markerGroup.width()/2));
 		
-	markerGroup.save("apMarkerDebug.png");
+	//markerGroup.save("apMarkerDebug.png");
 	
 	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
 	
@@ -632,7 +631,7 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	
 	markerGroup = addDropShadow(markerGroup, (double)iconSize / 2.);
 		
-	markerGroup.save("markerGroupDebug.jpg");
+	//markerGroup.save("markerGroupDebug.jpg");
 	
 	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
 	
@@ -797,7 +796,7 @@ void MapGraphicsScene::renderSigMap()
 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
 	}
 	
-	mapImg.save("mapImg.jpg");
+	//mapImg.save("mapImg.jpg");
 	
 	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
@@ -828,7 +827,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		sigPainter.end();
 		
 		// just for debugging (that's why the img is 10px high - so it is easier to see in this output)
-		signalLevelImage.save(tr("signalLevelImage-%1.png").arg(apMac));
+		//signalLevelImage.save(tr("signalLevelImage-%1.png").arg(apMac));
 		
 		QRgb* scanline = (QRgb*)signalLevelImage.scanLine(0);
 		for(int i=0; i<100; i++)
