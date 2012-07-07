@@ -293,6 +293,8 @@ bool fillTriColor(QImage *img, QVector<QPointF> points, QList<QColor> colors)
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
 {
+	srand ( time(NULL) );
+	
 	setCacheMode(CacheBackground);
 	//setViewportUpdateMode(BoundingRectViewportUpdate);
 	//setRenderHint(QPainter::Antialiasing);
@@ -447,24 +449,42 @@ void MapGraphicsScene::longPressTimeout()
 	{
 		//const int range = 40;
 		//int sig = (int)(rand() % range);
-		int sig = 100-(i*3*10);
+		
+		QString apMac = QString("TE:ST:MA:C1:23:0%1").arg(i);
+		
+		QPointF center = m_apLocations[apMac];
+		double dx = m_pressPnt.x() - center.x();
+		double dy = m_pressPnt.y() - center.y();
+		double distFromCenter = sqrt(dx*dx + dy*dy);
+		
+		double rangeMax = 2694.0; // TODO - This is the diagnal size of the test background
+		
+		double fakeSignalLevel = distFromCenter / (rangeMax * .35); // reduce for lower falloff
+		
+		const float range = 15.;
+		float rv = ((float)(rand() % (int)range) - (range/2.)) / 100.; // Add a random +/- 5% to the value to prevent deadlocking
 	
-		if(sig > 5)
+		fakeSignalLevel += rv; // add jitter
+		
+		fakeSignalLevel = 1 - fakeSignalLevel; // invert level so further away from center is lower signal
+	
+		qDebug() << "MapGraphicsScene::longPressTimeout(): AP#"<<i<<": "<<apMac<<": dist: "<<distFromCenter<<", rv:"<<rv<<", fakeSignalLevel:"<<fakeSignalLevel;
+		
+		if(fakeSignalLevel > .05)
 		{
 			WifiDataResult result;
-			result.value = ((double)sig)/100.;
+			result.value = fakeSignalLevel;
 			result.essid = "Testing123";
-			result.mac = QString("TE:ST:MA:C1:23:0%1").arg(i);
+			result.mac = apMac;
 			result.valid = true;
 			result.chan = (double)i;
-			result.dbm = sig - 100;
+			result.dbm = (int)(fakeSignalLevel*100) - 100;
 			results << result;
 		}
 	}
 			
 	addSignalMarker(m_pressPnt, results);
 	QTimer::singleShot(0, this, SLOT(renderSigMap()));
-
 }
 
 
@@ -808,6 +828,7 @@ void MapGraphicsScene::renderSigMap()
 		rg.setFocalPoint(center);
 		rg.setRadius(maxDistFromCenter);
 		
+		p.setOpacity(.75);
 		p.setBrush(QBrush(rg));
 		//p.setBrush(Qt::green);
 		p.setPen(QPen(Qt::black,1.5));
@@ -868,12 +889,17 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		// paint the gradient
 		QImage signalLevelImage(100,10,QImage::Format_ARGB32_Premultiplied);
 		QPainter sigPainter(&signalLevelImage);
-		sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
 		QLinearGradient fade(QPoint(0,0),QPoint(100,0));
-		fade.setColorAt( 0.3, Qt::black  );
-		fade.setColorAt( 1.0, Qt::white  );
-		sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+// 		fade.setColorAt( 0.3, Qt::black  );
+// 		fade.setColorAt( 1.0, Qt::white  );
+		fade.setColorAt( 0.3, Qt::red    );
+		fade.setColorAt( 0.7, Qt::yellow );
+		fade.setColorAt( 1.0, Qt::green  );
 		sigPainter.fillRect( signalLevelImage.rect(), fade );
+		sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+		sigPainter.setCompositionMode(QPainter::CompositionMode_Difference);
+		sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
+		
 		sigPainter.end();
 		
 		// just for debugging (that's why the img is 10px high - so it is easier to see in this output)

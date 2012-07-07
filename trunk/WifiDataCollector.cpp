@@ -81,8 +81,8 @@ double WifiDataCollector::dbmToPercent(int dbm)
 {
 	// TODO - evaluate and device a better algorithm for changing dbm->%
 	double dbmVal = (double)(dbm + 100.); // dBm is a neg #, like -95 dBm, so add 100 to flip it over zero
-	const double dbmMax  =  -50. + 100.; // these ranges TBD thru testing
-	const double dbmMin  = -120. + 100.;
+	const double dbmMax  =  -40. + 100.; // these ranges TBD thru testing
+	const double dbmMin  = -100. + 100.;
 	
 	double val = (dbmVal - dbmMin) / (dbmMax - dbmMin);
 	return val;
