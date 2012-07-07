@@ -15,7 +15,13 @@ Development Items Todo
 	- Actual code to interface UI with WifiDataCollector
 	- UI to for user to change color of the AP signal
 	- UI for user to remove signal reading/get info (e.g. popup of AP essid, etc)
+	- UI to browse for BG image
+		- Future idea:
+			- Specify scale, e.g. if bg image is from google maps, etc.
 	- Test build an Android version
 
+Later:
+	- Possible idea if needed/demand:
+		- UI/code to provide a URL for a bg image and download URL for use as bg
 	
 	

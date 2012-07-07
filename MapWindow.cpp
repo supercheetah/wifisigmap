@@ -52,6 +52,16 @@ void MapGraphicsView::mouseMoveEvent(QMouseEvent * mouseEvent)
 }
 
 
+void MapGraphicsScene::setMarkApMode(bool flag)
+{
+	m_markApMode = flag;
+	if(flag)
+		m_mapWindow->setStatusMessage("Touch and hold map to mark AP location");
+	else
+		m_mapWindow->flagApModeCleared(); // resets push button state as well
+}
+
+
 MapWindow::MapWindow(QWidget *parent)
 	: QWidget(parent)
 {
@@ -59,37 +69,160 @@ MapWindow::MapWindow(QWidget *parent)
 	setupUi();
 }
 
+#define makeButton(layout,title,slot) \
+	{ QPushButton *btn = new QPushButton(title); \
+		connect(btn, SIGNAL(clicked()), this, slot); \
+		layout->addWidget(btn); \
+	} 
+	
 void MapWindow::setupUi()
 {
 	QVBoxLayout *vbox = new QVBoxLayout(this);
 	
-	//QGraphicsView *gv = new QGraphicsView();
+	QHBoxLayout *hbox;
+	hbox = new QHBoxLayout();
+	
+	makeButton(hbox,"New",SLOT(clearSlot()));
+	makeButton(hbox,"Load",SLOT(loadSlot()));
+	makeButton(hbox,"Save",SLOT(saveSlot()));
+	makeButton(hbox,"Background...",SLOT(chooseBgSlot()));
+	
+	vbox->addLayout(hbox);
+	
 	MapGraphicsView *gv = new MapGraphicsView();
-	//gv->setDragMode(QGraphicsView::ScrollHandDrag);
 	vbox->addWidget(gv);
 	
-	m_scene = new MapGraphicsScene();
+	m_scene = new MapGraphicsScene(this);
 	gv->setScene(m_scene);
+	
+	hbox = new QHBoxLayout();
+	m_apButton = new QPushButton("Mark AP");
+	m_apButton->setCheckable(true);
+	m_apButton->setChecked(false);
+	connect(m_apButton, SIGNAL(toggled(bool)), m_scene, SLOT(setMarkApMode(bool)));
+	hbox->addWidget(m_apButton);
+	
+	m_statusMsg = new QLabel("");
+	hbox->addWidget(m_statusMsg);
+	
+	hbox->addStretch(1);
+	
+	
+	vbox->addLayout(hbox);
+}
+
+void MapWindow::setStatusMessage(const QString& msg)
+{
+	m_statusMsg->setText("<b>"+msg+"</b>");
+}
+
+void MapWindow::flagApModeCleared()
+{
+	setStatusMessage("");
+	m_apButton->setChecked(false);
+}
+
+void MapWindow::chooseBgSlot()
+{
+	QString curFile = m_scene->currentBgFilename();
+	if(curFile.trimmed().isEmpty())
+		curFile = QSettings("wifisigmap").value("last-bg-file","").toString();
+
+	QString fileName = QFileDialog::getOpenFileName(this, tr("Choose Background"), curFile, tr("Image Files (*.png *.jpg *.bmp *.svg *.xpm *.gif);;Any File (*.*)"));
+	if(fileName != "")
+	{
+		QSettings("wifisigmap").setValue("last-bg-file",fileName);
+		m_scene->setBgFile(fileName);
+	}
+}
+
+void MapWindow::loadSlot()
+{
+	QString curFile = m_scene->currentMapFilename();
+	if(curFile.trimmed().isEmpty())
+		curFile = QSettings("wifisigmap").value("last-map-file","").toString();
+
+	QString fileName = QFileDialog::getOpenFileName(this, tr("Open Results"), curFile, tr("Wifi Signal Map (*.wmz);;Any File (*.*)"));
+	if(fileName != "")
+	{
+		QSettings("wifisigmap").setValue("last-map-file",fileName);
+		m_scene->loadResults(fileName);
+// 		if(openFile(fileName))
+// 		{
+// 			return;
+// 		}
+// 		else
+// 		{
+// 			QMessageBox::critical(this,tr("File Does Not Exist"),tr("Sorry, but the file you chose does not exist. Please try again."));
+// 		}
+	}
+}
+
+void MapWindow::saveSlot()
+{
+	QString curFile = m_scene->currentMapFilename();
+	if(curFile.trimmed().isEmpty())
+		curFile = QSettings("wifisigmap").value("last-map-file","").toString();
+
+	QString fileName = QFileDialog::getSaveFileName(this, tr("Save Results"), curFile, tr("Wifi Signal Map (*.wmz);;Any File (*.*)"));
+	if(fileName != "")
+	{
+		QFileInfo info(fileName);
+		//if(info.suffix().isEmpty())
+			//fileName += ".dviz";
+		QSettings("wifisigmap").setValue("last-map-file",fileName);
+		m_scene->saveResults(fileName);
+// 		return true;
+	}
+
+}
+
+void MapWindow::clearSlot()
+{
+	m_scene->clear();
 }
 
 
-MapGraphicsScene::MapGraphicsScene()
+void MapGraphicsScene::clear()
+{
+	m_sigValues.clear();
+	QGraphicsScene::clear();
+	
+	m_bgPixmapItem = addPixmap(m_bgPixmap);
+	m_bgPixmapItem->setZValue(0);
+	
+	addSigMapItem();
+	
+	m_currentMapFilename = "";
+}
+
+void MapGraphicsScene::setBgFile(QString filename)
+{
+	m_bgFilename = filename;
+	m_bgPixmap = QPixmap(m_bgFilename);
+	
+	m_bgPixmapItem->setPixmap(m_bgPixmap);
+}
+
+MapGraphicsScene::MapGraphicsScene(MapWindow *map)
+	: m_markApMode(false)
+	, m_develTestMode(false)
+	, m_mapWindow(map)
 {
 	//setBackgroundBrush(QImage("PCI-PlantLayout-20120705-2048px-adjusted.png"));
 	//m_bgPixmap = QPixmap("PCI-PlantLayout-20120705-2048px-adjusted.png");
-	m_bgPixmap = QPixmap("phc-floorplan/phc-floorplan-blocks.png");
-	QGraphicsItem *item = addPixmap(m_bgPixmap);
-	item->setZValue(0);
+	
+	m_bgFilename = "phc-floorplan/phc-floorplan-blocks.png";
+	m_bgPixmap = QPixmap(m_bgFilename);
+	
+	m_bgPixmapItem = addPixmap(m_bgPixmap);
+	m_bgPixmapItem->setZValue(0);
 	
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
 	m_longPressTimer.setInterval(1000);
 	m_longPressTimer.setSingleShot(true);
 	
-	QPixmap empty(m_bgPixmap.size());
-	empty.fill(Qt::transparent);
-	m_sigMapItem = addPixmap(empty);
-	m_sigMapItem->setZValue(1);
-	m_sigMapItem->setOpacity(0.75);
+	addSigMapItem();
 	
 	QSizeF sz = m_bgPixmap.size();
 	double w = sz.width();
@@ -113,6 +246,16 @@ MapGraphicsScene::MapGraphicsScene()
 	
 }
 
+
+void MapGraphicsScene::addSigMapItem()
+{
+	QPixmap empty(m_bgPixmap.size());
+	empty.fill(Qt::transparent);
+	m_sigMapItem = addPixmap(empty);
+	m_sigMapItem->setZValue(1);
+	m_sigMapItem->setOpacity(0.75);
+}
+	
 void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
 	if(m_longPressTimer.isActive())
@@ -145,60 +288,72 @@ void MapGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent * mouseEvent)
 
 void MapGraphicsScene::longPressTimeout()
 {
-	/// This is just development code - need to integrate with WifiDataCollector
-// 	bool ok;
-// 	int i = QInputDialog::getInt(0, tr("Input Strength"),
-// 					tr("Strength (%):"), 25, 0, 100, 1, &ok);
-// 	if(ok)
-// 	{
-// 		addSignalMarker(m_pressPnt, ((double)i)/100.);
-// 		QTimer::singleShot(0, this, SLOT(renderSigMap()));
-// 	}
-
-	QList<WifiDataResult> results;
-	for(int i=0; i<3; i++)
+	if(!m_develTestMode)
 	{
-		//const int range = 40;
-		//int sig = (int)(rand() % range);
-		
-		QString apMac = QString("TE:ST:MA:C1:23:0%1").arg(i);
-		
-		QPointF center = m_apLocations[apMac];
-		double dx = m_pressPnt.x() - center.x();
-		double dy = m_pressPnt.y() - center.y();
-		double distFromCenter = sqrt(dx*dx + dy*dy);
-		
-		double rangeMax = 2694.0; // TODO - This is the diagnal size of the test background
-		
-		double fakeSignalLevel = distFromCenter / (rangeMax * .25); // reduce for lower falloff
-		
-		const float range = 15.;
-		float rv = ((float)(rand() % (int)range) - (range/2.)) / 100.; // Add a random +/- 5% to the value to prevent deadlocking
-	
-		fakeSignalLevel += rv; // add jitter
-		
-		fakeSignalLevel = 1 - fakeSignalLevel; // invert level so further away from center is lower signal
-	
-		qDebug() << "MapGraphicsScene::longPressTimeout(): AP#"<<i<<": "<<apMac<<": dist: "<<distFromCenter<<", rv:"<<rv<<", fakeSignalLevel:"<<fakeSignalLevel;
-		
-		if(fakeSignalLevel > .05)
+		if(m_markApMode)
 		{
-			if(fakeSignalLevel > 1.)
-				fakeSignalLevel = 1.;
-				
-			WifiDataResult result;
-			result.value = fakeSignalLevel;
-			result.essid = "Testing123";
-			result.mac = apMac;
-			result.valid = true;
-			result.chan = (double)i;
-			result.dbm = (int)(fakeSignalLevel*100) - 100;
-			results << result;
+			// scan for APs nearby and prompt user to choose AP
+			
+			// If user chooses AP, call addApMarker(QString mac, QPoint location);
+			
+			
+		}
+		else
+		{
+			// scan for APs
+			// call addSignalMarker() with presspnt
+			QTimer::singleShot(0, this, SLOT(renderSigMap()));
 		}
 	}
+	else
+	{
+		/// This is just development code - need to integrate with WifiDataCollector
+	
+		QList<WifiDataResult> results;
+		for(int i=0; i<3; i++)
+		{
+			//const int range = 40;
+			//int sig = (int)(rand() % range);
 			
-	addSignalMarker(m_pressPnt, results);
-	QTimer::singleShot(0, this, SLOT(renderSigMap()));
+			QString apMac = QString("TE:ST:MA:C1:23:0%1").arg(i);
+			
+			QPointF center = m_apLocations[apMac];
+			double dx = m_pressPnt.x() - center.x();
+			double dy = m_pressPnt.y() - center.y();
+			double distFromCenter = sqrt(dx*dx + dy*dy);
+			
+			double rangeMax = 2694.0; // TODO - This is the diagnal size of the test background
+			
+			double fakeSignalLevel = distFromCenter / (rangeMax * .25); // reduce for lower falloff
+			
+			const float range = 15.;
+			float rv = ((float)(rand() % (int)range) - (range/2.)) / 100.;
+		
+			fakeSignalLevel += rv; // add jitter
+			
+			fakeSignalLevel = 1 - fakeSignalLevel; // invert level so further away from center is lower signal
+		
+			qDebug() << "MapGraphicsScene::longPressTimeout(): AP#"<<i<<": "<<apMac<<": dist: "<<distFromCenter<<", rv:"<<rv<<", fakeSignalLevel:"<<fakeSignalLevel;
+			
+			if(fakeSignalLevel > .05)
+			{
+				if(fakeSignalLevel > 1.)
+					fakeSignalLevel = 1.;
+					
+				WifiDataResult result;
+				result.value = fakeSignalLevel;
+				result.essid = "Testing123";
+				result.mac = apMac;
+				result.valid = true;
+				result.chan = (double)i;
+				result.dbm = (int)(fakeSignalLevel*100) - 100;
+				results << result;
+			}
+		}
+				
+		addSignalMarker(m_pressPnt, results);
+		QTimer::singleShot(0, this, SLOT(renderSigMap()));
+	}
 }
 
 
@@ -432,43 +587,6 @@ double SigMapValue::signalForAp(QString mac, bool returnDbmValue)
 }
 
 
-SigMapValue *MapGraphicsScene::findNearest(SigMapValue *match, QString apMac)
-{
-	if(!match)
-		return 0;
-		
-	SigMapValue *nearest = 0;
-	double minDist = (double)INT_MAX;
-	
-	foreach(SigMapValue *val, m_sigValues)
-	{
-		if(val->consumed || !val->hasAp(apMac))
-			continue;
-			
-		double dx = val->point.x() - match->point.x();
-		double dy = val->point.y() - match->point.y(); 
-		double dist = dx*dx + dy*dy; // dont need true dist, so dont sqrt
-		if(dist < minDist)
-		{
-			nearest = val;
-			minDist = dist;
-		}
-	}
-	
-	if(nearest)
-		nearest->consumed = true;
-	
-	return nearest;
-	
-}
-
-// static QString MapGraphicsScene_SigMapValue_apMac = "";
-// bool MapGraphicsScene_SigMapValue_compare(SigMapValue *a, SigMapValue *b)
-// {
-// 	return (a && b) ? a->signalForAp(MapGraphicsScene_SigMapValue_apMac) < b->signalForAp(MapGraphicsScene_SigMapValue_apMac) : true;
-// }
-
-
 void MapGraphicsScene::renderSigMap()
 {
 	QSize origSize = m_bgPixmap.size();
@@ -494,19 +612,9 @@ void MapGraphicsScene::renderSigMap()
 				apMacToEssid.insert(result.mac, result.essid);
 	
 	qDebug() << "MapGraphicsScene::renderSigMap(): Unique MACs: "<<apMacToEssid.keys()<<", mac->essid: "<<apMacToEssid;
-	
-// 	QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
-// 			rg.setColorAt(0, centerColor/*.lighter(100)*/);
-// 			rg.setColorAt(1, centerColor.darker(500));
-// 			p.setPen(Qt::black);
-// 			p.setBrush(QBrush(rg));
-// 			
 
 	foreach(QString apMac, apMacToEssid.keys())
 	{
-// 		MapGraphicsScene_SigMapValue_apMac = mac;
-// 		qSort(m_sigValues.begin(), m_sigValues.end(), MapGraphicsScene_SigMapValue_compare);
-		
 		QPointF center = m_apLocations[apMac];
 		
 		QRadialGradient rg;

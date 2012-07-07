@@ -23,25 +23,34 @@ public:
 	SigMapValue(QPointF p, QList<WifiDataResult> results)
 		: point(p)
  		, scanResults(results)
-		, consumed(false)
-		 {}
+		{}
 		
 	QPointF point;
-	//double value;
 	
 	QList<WifiDataResult> scanResults;
 	
 	bool hasAp(QString mac);
 	double signalForAp(QString mac, bool returnDbmValue=false);
-	
-	bool consumed;
 };
+
+class MapWindow;
 
 class MapGraphicsScene : public QGraphicsScene
 {
 	Q_OBJECT
 public:
-	MapGraphicsScene();
+	MapGraphicsScene(MapWindow *mapWindow);
+	
+	QString currentMapFilename() { return m_currentMapFilename; }
+	QString currentBgFilename() { return m_bgFilename; }
+	
+	void clear();
+	
+public slots:
+	void saveResults(QString filename);
+	void loadResults(QString filename);
+	void setBgFile(QString filename);
+	void setMarkApMode(bool flag=true);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -51,18 +60,16 @@ protected:
 	friend class MapGraphicsView; // for access to:
 	void invalidateLongPress();
 	
-	void saveResults(QString filename);
-	void loadResults(QString filename);
-	
 private slots:
 	void longPressTimeout();
 	void renderSigMap();
 	
 private:
 	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
-	SigMapValue *findNearest(SigMapValue *, QString apMac);
 	QColor colorForSignal(double sig, QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
+	
+	void addApMarker(QString mac, QPoint location);
 
 private:
 	QPointF m_pressPnt;
@@ -70,8 +77,11 @@ private:
 	
 	QList<SigMapValue*> m_sigValues;
 		
+	void addSigMapItem();
 	QGraphicsPixmapItem *m_sigMapItem;
+	QString m_bgFilename;
 	QPixmap m_bgPixmap;
+	QGraphicsPixmapItem *m_bgPixmapItem;
 	//QList<QColor> m_colorList;
 	
 	WifiDataCollector m_scanIf;
@@ -80,6 +90,14 @@ private:
 	QList<qreal> m_huesUsed;
 	
 	QHash<QString,QPointF> m_apLocations;
+	
+	bool m_markApMode;
+	
+	bool m_develTestMode;
+	
+	QString m_currentMapFilename;
+	
+	MapWindow *m_mapWindow;
 };
 
 
@@ -92,8 +110,21 @@ public:
 protected:
 	void setupUi();
 	
+	friend class MapGraphicsScene; // friend for access to the following (and flagApModeCleared())
+	void setStatusMessage(const QString&);
+	
+protected slots:
+	void saveSlot();
+	void loadSlot();
+	void chooseBgSlot();
+	void clearSlot();
+	
+	void flagApModeCleared();
+
 private:
-	MapGraphicsScene *m_scene;	
+	MapGraphicsScene *m_scene;
+	QLabel *m_statusMsg;
+	QPushButton *m_apButton;
 
 };
 
