@@ -204,6 +204,13 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 #ifdef Q_OS_ANDROID
 	if(interface.isEmpty())
 		interface = "tiwlan0";
+
+	// Must scan as root first to force the wifi card to re-scan the area
+	// HOWEVER, this doesn't always *print* all the access points that it finds.
+	// So, we scan here, ignore output, then scan again (as normal user), which
+	// *does* print out all the results, but doesn't force a re-scan (normal
+	// users use the cached results in the kernel)
+	system("su -c '" IWLIST_BINARY " scan'; sleep 1");
 #endif
 
 	QStringList scanArgs = QStringList() << interface << "scan";
@@ -235,7 +242,8 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	
 	QString fileContents = proc.readAllStandardOutput();
 	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of " IWLIST_BINARY ": "<<fileContents;
-	
+	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
+
 	return fileContents;
 }
 
