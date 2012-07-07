@@ -1,6 +1,9 @@
 #include "MapWindow.h"
 
-#define DEBUG_WIFI_FILE "scan3.txt"
+//#define DEBUG_WIFI_FILE "scan3.txt"
+
+// Empty #define makes it use live data
+#define DEBUG_WIFI_FILE
 
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
@@ -48,7 +51,7 @@ void MapGraphicsView::scaleView(qreal scaleFactor)
 
 void MapGraphicsView::mouseMoveEvent(QMouseEvent * mouseEvent)
 {
-	dynamic_cast<MapGraphicsScene*>(scene())->invalidateLongPress();
+	qobject_cast<MapGraphicsScene*>(scene())->invalidateLongPress();
 		
 	QGraphicsView::mouseMoveEvent(mouseEvent);
 }
@@ -384,7 +387,8 @@ void MapGraphicsScene::longPressTimeout()
 						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
 						
 						// Render map overlay (because the AP may be tied to an existing scan result)
-						QTimer::singleShot(0, this, SLOT(renderSigMap()));
+						QTimer::singleShot(0, this, SLOT(-()));
+						//renderSigMap();
 					}
 				}
 				else
@@ -412,6 +416,7 @@ void MapGraphicsScene::longPressTimeout()
 				
 				// Render map overlay
 				QTimer::singleShot(0, this, SLOT(renderSigMap()));
+				//renderSigMap();
 				
 				QStringList notFound;
 				foreach(WifiDataResult result, results)
@@ -721,6 +726,11 @@ double SigMapValue::signalForAp(QString mac, bool returnDbmValue)
 void MapGraphicsScene::renderSigMap()
 {
 	QSize origSize = m_bgPixmap.size();
+	//if(origSize.isEmpty())
+#ifdef Q_OS_ANDROID
+		origSize = QApplication::desktop()->screenGeometry().size();
+#endif
+
 // 	QSize renderSize = origSize;
 // 	// Scale size down 1/3rd just so the renderTriangle() doesn't have to fill as many pixels
 // 	renderSize.scale((int)(origSize.width() * .33), (int)(origSize.height() * .33), Qt::KeepAspectRatio);
@@ -796,8 +806,8 @@ void MapGraphicsScene::renderSigMap()
 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
 	}
 	
-	//mapImg.save("mapImg.jpg");
-	
+	//mapImg.save("/tmp/mapImg.jpg");
+
 	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
 }

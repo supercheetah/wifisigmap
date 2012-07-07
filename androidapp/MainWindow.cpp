@@ -7,7 +7,7 @@
 
 MainWindow::MainWindow()
 	: QWidget()
-	, m_switchMon(0)
+	, m_map(0)
 {
 	m_map = new MapWindow(this);
 	m_map->setGeometry(QApplication::desktop()->screenGeometry());

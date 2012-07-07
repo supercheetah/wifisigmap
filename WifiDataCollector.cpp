@@ -1,18 +1,22 @@
 #include "WifiDataCollector.h"
 
+#ifdef Q_OS_ANDROID
+
+    #define IWCONFIG_BINARY "/tmp/iwconfig"
+    #define IWLIST_BINARY   "/tmp/iwlist"
+
+    // TODO - Add these binaries to the .qrc file (heck, *create* the qrc file!)
+    #define INTERNAL_IWCONFIG_BINARY ":/data/android/iwconfig"
+    #define INTERNAL_IWLIST_BINARY   ":/data/android/iwlist"
+#else
 #ifdef Q_OS_LINUX
+
 	#define IWCONFIG_BINARY "iwconfig"
 	#define IWLIST_BINARY   "iwlist"
 	
 	#define INTERNAL_IWCONFIG_BINARY ""
 	#define INTERNAL_IWLIST_BINARY   ""
-#else
-	#define IWCONFIG_BINARY "/tmp/iwconfig"
-	#define IWLIST_BINARY   "/tmp/iwlist"
-	
-	// TODO - Add these binaries to the .qrc file (heck, *create* the qrc file!)
-	#define INTERNAL_IWCONFIG_BINARY ":/data/android/iwconfig"
-	#define INTERNAL_IWLIST_BINARY   ":/data/android/iwlist"
+#endif
 #endif
 
 QString WifiDataResult::toString() const
@@ -48,6 +52,10 @@ QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
 		buffer = readTextFile(debugTextFile);
 	else
 		buffer = getIwlistOutput();
+
+	qDebug() << "WifiDataCollector::scanWifi(): Raw buffer: "<<buffer;
+
+	//QMessageBox::information(0, "Debug", QString("Raw buffer: %1").arg(buffer));
 
 	if(buffer.isEmpty() || buffer.contains("No scan results"))
 	{
@@ -94,7 +102,7 @@ double WifiDataCollector::dbmToPercent(int dbm)
 */ 
 bool WifiDataCollector::auditIwlistBinary()
 {
-#ifdef Q_OS_LINUX
+#ifndef Q_OS_ANDROID
 	return true;
 #endif
 	
@@ -193,13 +201,37 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	if(interface.isEmpty())
 		interface = findWlanIf();
 	
+#ifdef Q_OS_ANDROID
+	if(interface.isEmpty())
+		interface = "tiwlan0";
+#endif
+
+	QStringList scanArgs = QStringList() << interface << "scan";
+
+	//QMessageBox::information(0, "Debug", QString("Scan args: %1").arg(scanArgs.join(" ")));
+
 	QProcess proc;
-	proc.start(IWLIST_BINARY, QStringList() << interface << "scan");
+	proc.start(IWLIST_BINARY, scanArgs);
+
+	if (!proc.waitForStarted()) {
+	    qDebug() << "********************** Scanner start failed! " << proc.errorString();
+	    QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
+	}
+
+
+	if (!proc.waitForFinished(-1)) {
+	    qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
+	    QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
+	}
+	/*
+
 	if(!proc.waitForFinished(10000))
 	{
 		qDebug() << "WifiDataCollector::getIwlistOutput(): Error: Timeout while waiting for " IWLIST_BINARY " to finish.";
+		QMessageBox::information(0, "Debug", IWLIST_BINARY " timeout");
 		return "";
 	}
+	*/
 	
 	QString fileContents = proc.readAllStandardOutput();
 	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of " IWLIST_BINARY ": "<<fileContents;

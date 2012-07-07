@@ -4,6 +4,9 @@ INCLUDEPATH += .
 # For some reason, Necessitas isn't adding the proper include path for qtmultimediakit automatically
 #INCLUDEPATH += C:\Users\JosiahBryan\Devel\necessitas\Android\Qt\480\armeabi\include\QtMultimediaKit
 
+# This define used in WifiDataCollector
+DEFINES += Q_OS_ANDROID
+
 # Input
 HEADERS += \
 	MainWindow.h
@@ -69,6 +72,8 @@ OTHER_FILES += \
     android/src/org/kde/necessitas/ministro/IMinistroCallback.aidl \
     android/src/org/kde/necessitas/origo/QtActivity.java \
     android/src/org/kde/necessitas/origo/QtApplication.java \
+    android/version.xml \
     android/version.xml
+
 
 
