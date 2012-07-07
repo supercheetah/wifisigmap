@@ -116,6 +116,8 @@ void MapWindow::setupUi()
 	m_statusClearTimer.setSingleShot(true);
 	
 	vbox->addLayout(hbox);
+
+	gv->setFocus();
 }
 
 void MapWindow::setStatusMessage(const QString& msg, int timeout)
@@ -235,6 +237,12 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 	m_bgFilename = "phc-floorplan/phc-floorplan-blocks.png";
 	m_bgPixmap = QPixmap(m_bgFilename);
+
+	if(m_bgPixmap.isNull())
+	{
+		m_bgPixmap = QPixmap(QApplication::desktop()->screenGeometry().size());
+		m_bgPixmap.fill(Qt::white);
+	}
 	
 	m_bgPixmapItem = addPixmap(m_bgPixmap);
 	m_bgPixmapItem->setZValue(0);
@@ -244,6 +252,8 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	m_longPressTimer.setSingleShot(true);
 	
 	addSigMapItem();
+
+	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
 // 	QSizeF sz = m_bgPixmap.size();
 // 	double w = sz.width();
@@ -264,6 +274,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 // 	renderSigMap();
 	
 	//m_scanIf.scanWifi();
+
 	
 }
 
@@ -387,7 +398,7 @@ void MapGraphicsScene::longPressTimeout()
 						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
 						
 						// Render map overlay (because the AP may be tied to an existing scan result)
-						QTimer::singleShot(0, this, SLOT(-()));
+						QTimer::singleShot(0, this, SLOT(renderSigMap()));
 						//renderSigMap();
 					}
 				}
@@ -726,8 +737,9 @@ double SigMapValue::signalForAp(QString mac, bool returnDbmValue)
 void MapGraphicsScene::renderSigMap()
 {
 	QSize origSize = m_bgPixmap.size();
-	//if(origSize.isEmpty())
+
 #ifdef Q_OS_ANDROID
+	if(origSize.isEmpty())
 		origSize = QApplication::desktop()->screenGeometry().size();
 #endif
 
