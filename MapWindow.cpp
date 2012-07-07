@@ -1,9 +1,14 @@
 #include "MapWindow.h"
 
-//#define DEBUG_WIFI_FILE "scan3.txt"
+#ifdef Q_OS_ANDROID
+	// Empty #define makes it use live data
+	#define DEBUG_WIFI_FILE
+#else
+	#define DEBUG_WIFI_FILE "scan3.txt"
+#endif
 
-// Empty #define makes it use live data
-#define DEBUG_WIFI_FILE
+/// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
+#define Q_OS_ANDROID
 
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
@@ -26,9 +31,40 @@ MapGraphicsView::MapGraphicsView()
 	setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
 	setOptimizationFlags(QGraphicsView::DontSavePainterState);
 	
-// 	// Magic numbers - just fitting approx to view
-// 	scaleView(1.41421);
-// 	scaleView(1.41421);
+	#ifdef Q_OS_ANDROID
+	setFrameStyle(QFrame::NoFrame);
+	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	#endif
+}
+
+void MapGraphicsView::zoomIn()
+{
+	scaleView(qreal(1.2));
+}
+
+void MapGraphicsView::zoomOut()
+{
+	scaleView(1 / qreal(1.2));
+}
+
+void MapGraphicsView::keyPressEvent(QKeyEvent *event)
+{
+	if(event->modifiers() & Qt::ControlModifier)
+	{
+		switch (event->key())
+		{
+			case Qt::Key_Plus:
+				scaleView(qreal(1.2));
+				break;
+			case Qt::Key_Minus:
+			case Qt::Key_Equal:
+				scaleView(1 / qreal(1.2));
+				break;
+			default:
+				QGraphicsView::keyPressEvent(event);
+		}
+	}
 }
 
 
@@ -146,14 +182,19 @@ MapWindow::MapWindow(QWidget *parent)
 	setupUi();
 }
 
-#define makeButton(layout,title,slot) \
+#define makeButton2(object,layout,title,slot) \
 	{ QPushButton *btn = new QPushButton(title); \
-		connect(btn, SIGNAL(clicked()), this, slot); \
+		connect(btn, SIGNAL(clicked()), object, slot); \
 		layout->addWidget(btn); \
 	} 
 	
+#define makeButton(layout,title,slot) \
+	makeButton2(this,layout,title,slot) 
+	
 void MapWindow::setupUi()
 {
+	m_gv = new MapGraphicsView();
+	
 	QVBoxLayout *vbox = new QVBoxLayout(this);
 	
 	QHBoxLayout *hbox;
@@ -162,15 +203,22 @@ void MapWindow::setupUi()
 	makeButton(hbox,"New",SLOT(clearSlot()));
 	makeButton(hbox,"Load",SLOT(loadSlot()));
 	makeButton(hbox,"Save",SLOT(saveSlot()));
+	
+	#ifndef Q_OS_ANDROID
+	// Disable on android because until I rewrite the file browser dialog,
+	// the file browser is pretty much useless
 	makeButton(hbox,"Background...",SLOT(chooseBgSlot()));
+	#endif
+	
+	makeButton2(m_gv, hbox, "+", SLOT(zoomIn()));
+	makeButton2(m_gv, hbox, "-", SLOT(zoomOut()));
 	
 	vbox->addLayout(hbox);
 	
-	MapGraphicsView *gv = new MapGraphicsView();
-	vbox->addWidget(gv);
+	vbox->addWidget(m_gv);
 	
 	m_scene = new MapGraphicsScene(this);
-	gv->setScene(m_scene);
+	m_gv->setScene(m_scene);
 	
 	hbox = new QHBoxLayout();
 	m_apButton = new QPushButton("Mark AP");
@@ -189,12 +237,16 @@ void MapWindow::setupUi()
 	
 	vbox->addLayout(hbox);
 
-	gv->setFocus();
+	m_gv->setFocus();
 }
 
 void MapWindow::setStatusMessage(const QString& msg, int timeout)
 {
+	#ifdef Q_OS_ANDROID
+	m_statusMsg->setText("<font size='-1'>"+msg+"</b>");
+	#else
 	m_statusMsg->setText("<b>"+msg+"</b>");
+	#endif
 	
 	if(timeout>0)
 	{
@@ -233,6 +285,15 @@ void MapWindow::chooseBgSlot()
 
 void MapWindow::loadSlot()
 {
+	/// TODO just for debugging till the filedialog works better on android
+	#ifdef Q_OS_ANDROID
+	setStatusMessage(tr("Loading..."));
+	m_scene->loadResults("/tmp/test.wmz");
+	setStatusMessage(tr("<font color='green'>Loaded /tmp/test.wmz</font>"), 3000);
+	return;
+	#endif
+	
+	
 	QString curFile = m_scene->currentMapFilename();
 	if(curFile.trimmed().isEmpty())
 		curFile = QSettings("wifisigmap").value("last-map-file","").toString();
@@ -240,6 +301,7 @@ void MapWindow::loadSlot()
 	QString fileName = QFileDialog::getOpenFileName(this, tr("Open Results"), curFile, tr("Wifi Signal Map (*.wmz);;Any File (*.*)"));
 	if(fileName != "")
 	{
+		setStatusMessage(tr("Loading..."));
 		QSettings("wifisigmap").setValue("last-map-file",fileName);
 		m_scene->loadResults(fileName);
 // 		if(openFile(fileName))
@@ -250,11 +312,20 @@ void MapWindow::loadSlot()
 // 		{
 // 			QMessageBox::critical(this,tr("File Does Not Exist"),tr("Sorry, but the file you chose does not exist. Please try again."));
 // 		}
+		setStatusMessage(tr("<font color='green'>Loaded %1</font>").arg(fileName), 3000);
 	}
 }
 
 void MapWindow::saveSlot()
 {
+	/// TODO just for debugging till the filedialog works better on android
+	#ifdef Q_OS_ANDROID
+	setStatusMessage(tr("Saving..."));
+	m_scene->saveResults("/tmp/test.wmz");
+	setStatusMessage(tr("<font color='green'>Saved /tmp/test.wmz</font>"), 3000);
+	return;
+	#endif
+	
 	QString curFile = m_scene->currentMapFilename();
 	if(curFile.trimmed().isEmpty())
 		curFile = QSettings("wifisigmap").value("last-map-file","").toString();
@@ -262,12 +333,15 @@ void MapWindow::saveSlot()
 	QString fileName = QFileDialog::getSaveFileName(this, tr("Save Results"), curFile, tr("Wifi Signal Map (*.wmz);;Any File (*.*)"));
 	if(fileName != "")
 	{
+		setStatusMessage(tr("Saving..."));
+		
 		QFileInfo info(fileName);
 		//if(info.suffix().isEmpty())
 			//fileName += ".dviz";
 		QSettings("wifisigmap").setValue("last-map-file",fileName);
 		m_scene->saveResults(fileName);
 // 		return true;
+		setStatusMessage(tr("<font color='green'>Saved %1</font>").arg(fileName), 3000);
 	}
 
 }
@@ -280,6 +354,7 @@ void MapWindow::clearSlot()
 
 void MapGraphicsScene::clear()
 {
+	m_apLocations.clear();
 	m_sigValues.clear();
 	QGraphicsScene::clear();
 	
@@ -423,7 +498,9 @@ void MapGraphicsScene::longPressTimeout()
 		{
 			/// Scan for APs nearby and prompt user to choose AP
 			
+			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
+			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
 			
 			if(results.isEmpty())
 			{
@@ -490,7 +567,9 @@ void MapGraphicsScene::longPressTimeout()
 		/// Not in "mark AP" mode - regular scan mode, so scan and add store results
 		{
 			// scan for APs nearby
+			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
+			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
 			
 			if(results.size() > 0)
 			{
@@ -958,24 +1037,148 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 	return colorList[colorIdx];
 }
 
+
+QString qPointFToString(QPointF point)
+{
+	return QString("%1,%2").arg(point.x()).arg(point.y());
+}
+
+QPointF qPointFFromString(QString string)
+{
+	QStringList list = string.split(",");
+	if(list.length() < 2)
+		return QPointF();
+	return QPointF(list[0].toDouble(),list[1].toDouble());
+}
+
 void MapGraphicsScene::saveResults(QString filename)
 {
 	QSettings data(filename, QSettings::IniFormat);
 		
-	//beginWriteArray
+	qDebug() << "MapGraphicsScene::saveResults(): Saving to: "<<filename;
 	
-	// TODO
+	// Store bg filename
+	data.setValue("background", m_bgFilename);
 	
+	int idx = 0;
+	
+	// Save AP locations
+	data.beginWriteArray("ap-locations");
+	foreach(QString apMac, m_apLocations.keys())
+	{
+		QPointF center = m_apLocations[apMac];
+		QList<QColor> colorList = m_colorListForMac.value(apMac);
+		
+		data.setArrayIndex(idx++);
+		data.setValue("mac", apMac);
+		data.setValue("center", qPointFToString(center));
+		
+		int colorIdx = 0;
+		data.beginWriteArray("colors");
+		foreach(QColor color, colorList)
+		{
+			data.setArrayIndex(colorIdx++);
+			data.setValue("color", color.name());
+		}
+		data.endArray();
+	}
+	data.endArray();
+		
+	// Save signal readings
+	//m_sigValues << new SigMapValue(point, results);
+	idx = 0;
+	data.beginWriteArray("readings");
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		data.setArrayIndex(idx++);
+		data.setValue("point", qPointFToString(val->point));
+		
+		int resultIdx = 0;
+		data.beginWriteArray("signals");
+		foreach(WifiDataResult result, val->scanResults)
+		{
+			data.setArrayIndex(resultIdx++);
+			foreach(QString key, result.rawData.keys())
+			{
+				data.setValue(key, result.rawData.value(key));
+			}
+		}
+		data.endArray();
+	}
+	data.endArray();
 }
 
 void MapGraphicsScene::loadResults(QString filename)
 {
 	QSettings data(filename, QSettings::IniFormat);
+	qDebug() << "MapGraphicsScene::loadResults(): Loading from: "<<filename;
+	
+	clear(); // clear and reset the map
+	
+	// Load background file
+	QString bg = data.value("background").toString();
+	if(!bg.isEmpty())
+		setBgFile(bg);	
+	
+	// Load ap locations
+	int numApLocations = data.beginReadArray("ap-locations");
+	for(int i=0; i<numApLocations; i++)
+	{
+		data.setArrayIndex(i);
 		
-	//beginReadArray
+		QString apMac = data.value("mac").toString();
+		QPointF center = qPointFFromString(data.value("center").toString());
+		addApMarker(center, apMac);
 	
-	// TODO
+		QList<QColor> colorList;
+		
+		int numColors = data.beginReadArray("colors");
+		for(int j=0; j<numColors; j++)
+		{
+			data.setArrayIndex(j);
+			QString color = data.value("color").toString();
+			colorList << QColor(color);
+			
+		}
+		data.endArray();
+		
+		m_colorListForMac[apMac] = colorList;
+	}
+	data.endArray();
 	
+	// Load signal readings
+	int numReadings = data.beginReadArray("readings");
+	for(int i=0; i<numReadings; i++)
+	{
+		data.setArrayIndex(i);
+		QPointF point = qPointFFromString(data.value("point").toString());
+		
+		int numSignals = data.beginReadArray("signals");
+		
+		QList<WifiDataResult> results;
+		for(int j=0; j<numSignals; j++)
+		{
+			data.setArrayIndex(j);
+			QStringList keys = data.childKeys();
+			QStringHash rawData;
+			
+			foreach(QString key, keys)
+			{
+				rawData[key] = data.value(key).toString();
+			}
+			
+			WifiDataResult result;
+			result.loadRawData(rawData);
+			results << result;
+		}
+		data.endArray();
+		
+		addSignalMarker(point, results);
+	}
+	data.endArray();
+	
+	// Call for render of map overlay
+	QTimer::singleShot(0, this, SLOT(renderSigMap()));
 }
 
 

@@ -26,15 +26,16 @@ Later:
 	
 	
 Android TODO:
-    - Test with map
-    - Fix rendering of markerGroups
-    - New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)
-    - Move buttons for "load/save/bg" to a popup menu
-    - Elimate scrollbars on QGraphicsView
-    - Need better integration with native theme on Android (e.g. buttons don't look right)
-    - Need new filebrowser dialog (current one is next to useless)
-    - Definetly need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
-    - Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
-    - Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
-    - Added a "spinner" around the fingertip during longpress to show action
-    - Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
+	- Test with map
+	#- Fix rendering of markerGroups
+	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)
+	- Move buttons for "load/save/bg" to a popup menu
+	- Elimate scrollbars on QGraphicsView
+	- Need better integration with native theme on Android (e.g. buttons don't look right)
+	- Need new filebrowser dialog (current one is next to useless)
+	- Definetly need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
+	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
+	- Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
+	- Added a "spinner" around the fingertip during longpress to show action
+	- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
+	- Draw grid numbers in default background
