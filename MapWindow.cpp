@@ -1,5 +1,7 @@
 #include "MapWindow.h"
 
+#include <QTcpSocket>
+
 #ifdef Q_OS_ANDROID
 	// Empty #define makes it use live data
 	#define DEBUG_WIFI_FILE
@@ -103,81 +105,87 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 }
 
 
-// #define CUSTOM_MSG_HANDLER
-// 
-// #if defined(CUSTOM_MSG_HANDLER)
-// 
-// 	#if defined(Q_OS_WIN)
-// 	extern Q_CORE_EXPORT void qWinMsgHandler(QtMsgType t, const char* str);
-// 	#endif
-// 
-// 	static QtMsgHandler qt_origMsgHandler = 0;
-// 
-// 	void myMessageOutput(QtMsgType type, const char *msg)
-// 	{
-// 		#if defined(Q_OS_WIN)
-// 		if (!qt_origMsgHandler)
-// 			qt_origMsgHandler = qWinMsgHandler;
-// 		#endif
-// 
-// 		switch (type)
-// 		{
-// 			case QtDebugMsg:
-// 				//AppSettings::sendCheckin("/core/debug",QString(msg));
-// 				if(qt_origMsgHandler)
-// 					qt_origMsgHandler(type,msg);
-// 				else
-// 					fprintf(stderr, "Debug: %s\n", msg);
-// 				break;
-// 			case QtWarningMsg:
-// 				//AppSettings::sendCheckin("/core/warn",QString(msg));
-// 				if(qt_origMsgHandler)
-// 					qt_origMsgHandler(QtDebugMsg,msg);
-// 				else
-// 					fprintf(stderr, "Warning: %s\n", msg);
-// 				break;
-// 			case QtCriticalMsg:
-// 	// 			if(qt_origMsgHandler)
-// 	// 				qt_origMsgHandler(type,msg);
-// 	// 			else
-// 	// 				fprintf(stderr, "Critical: %s\n", msg);
-// 	// 			break;
-// 			case QtFatalMsg:
-// 				AppSettings::sendCheckin("/core/fatal",QString(msg));
-// 				if(qt_origMsgHandler)
-// 				{
-// 					qt_origMsgHandler(QtDebugMsg,msg);
-// 					//qt_origMsgHandler(type,msg);
-// 				}
-// 				else
-// 				{
-// 
-// 					fprintf(stderr, "Fatal: %s\n", msg);
-// 				}
-// 				//QMessageBox::critical(0,"Fatal Error",msg);
-// 				//qt_origMsgHandler(QtDebugMsg,msg);
-// 				/*
-// 				if(strstr(msg,"out of memory, returning null image") != NULL)
-// 				{
-// 					QPixmapCache::clear();
-// 					qt_origMsgHandler(QtDebugMsg, "Attempted to clear QPixmapCache, continuing");
-// 					return;
-// 				}
-// 				*/
-// 				abort();
-// 		}
-// 	}
-// #endif // CUSTOM_MSG_HANDLER
-// 
-// void AppSettings::initApp(const QString& appName)
-// {
-// 	#if defined(CUSTOM_MSG_HANDLER)
-// 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
-// 	#endif
+#define CUSTOM_MSG_HANDLER
+
+#if defined(CUSTOM_MSG_HANDLER)
+
+	#if defined(Q_OS_WIN)
+	extern Q_CORE_EXPORT void qWinMsgHandler(QtMsgType t, const char* str);
+	#endif
+
+	static QTcpSocket *qt_debugSocket = 0;
+	static QtMsgHandler qt_origMsgHandler = 0;
+
+	void myMessageOutput(QtMsgType type, const char *msg)
+	{
+		#if defined(Q_OS_WIN)
+		if (!qt_origMsgHandler)
+			qt_origMsgHandler = qWinMsgHandler;
+		#endif
+
+		switch (type)
+		{
+			case QtDebugMsg:
+				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				//AppSettings::sendCheckin("/core/debug",QString(msg));
+				if(qt_origMsgHandler)
+					qt_origMsgHandler(type,msg);
+				else
+					fprintf(stderr, "Debug: %s\n", msg);
+				break;
+			case QtWarningMsg:
+				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				//AppSettings::sendCheckin("/core/warn",QString(msg));
+				if(qt_origMsgHandler)
+					qt_origMsgHandler(QtDebugMsg,msg);
+				else
+					fprintf(stderr, "Warning: %s\n", msg);
+				break;
+			case QtCriticalMsg:
+				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+	// 			if(qt_origMsgHandler)
+	// 				qt_origMsgHandler(type,msg);
+	// 			else
+	// 				fprintf(stderr, "Critical: %s\n", msg);
+	// 			break;
+			case QtFatalMsg:
+				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				//AppSettings::sendCheckin("/core/fatal",QString(msg));
+				if(qt_origMsgHandler)
+				{
+					qt_origMsgHandler(QtDebugMsg,msg);
+					//qt_origMsgHandler(type,msg);
+				}
+				else
+				{
+
+					fprintf(stderr, "Fatal: %s\n", msg);
+				}
+				//QMessageBox::critical(0,"Fatal Error",msg);
+				//qt_origMsgHandler(QtDebugMsg,msg);
+				/*
+				if(strstr(msg,"out of memory, returning null image") != NULL)
+				{
+					QPixmapCache::clear();
+					qt_origMsgHandler(QtDebugMsg, "Attempted to clear QPixmapCache, continuing");
+					return;
+				}
+				*/
+				abort();
+		}
+	}
+#endif // CUSTOM_MSG_HANDLER
+
 
 MapWindow::MapWindow(QWidget *parent)
 	: QWidget(parent)
 {
+	#ifdef CUSTOM_MSG_HANDLER
+		qt_debugSocket = new QTcpSocket(this);
+		qt_debugSocket->connectToHost("192.168.0.105", 3729);
+		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
+	#endif
+	
 	setWindowTitle("WiFi Signal Mapper");
 	setupUi();
 }
