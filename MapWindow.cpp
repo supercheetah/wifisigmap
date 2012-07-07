@@ -626,8 +626,12 @@ QImage ImageFilters::blurred(const QImage& image, const QRect& /*rect*/, int rad
 
 void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
 {	
-	
+#ifdef Q_OS_ANDROID
+	const int iconSize = 64;
+#else
 	const int iconSize = 32;
+#endif
+
 	const double iconSizeHalf = ((double)iconSize)/2.;
 		
 	int numResults = results.size();
@@ -653,7 +657,12 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	memset(markerGroup.bits(), 0, markerGroup.byteCount());//markerGroup.fill(Qt::green);
 	QPainter p(&markerGroup);
 	
-	QFont font("", (int)(iconSize *.33), QFont::Bold);
+#ifdef Q_OS_ANDROID
+	QFont font("", 6, QFont::Bold);
+#else
+	QFont font("", (int)(iconSize*.33), QFont::Bold);
+#endif
+
 	p.setFont(font);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
 
@@ -693,8 +702,8 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 			// Calculate text location centered in icon
 			QRect textRect = p.boundingRect(0, 0, INT_MAX, INT_MAX, Qt::AlignLeft, sigString);
 			int textX = (int)(iconRect.width()/2  - textRect.width()/2  + iconSize*.1); // .1 is just a cosmetic adjustment to center it better
-			int textY = (int)(iconRect.height()/2 - textRect.height()/2 + font.pointSizeF()*1.3); // 1.3 is just a cosmetic adjustment to center it better
-			
+			int textY = (int)(iconRect.height()/2 - textRect.height()/2 + font.pointSizeF() + 16);
+
 			// Outline text in black
 			p.setPen(Qt::black);
 			p.drawText(textX-1, textY-1, sigString);

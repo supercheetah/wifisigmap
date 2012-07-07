@@ -5,7 +5,7 @@ INCLUDEPATH += .
 #INCLUDEPATH += C:\Users\JosiahBryan\Devel\necessitas\Android\Qt\480\armeabi\include\QtMultimediaKit
 
 # This define used in WifiDataCollector
-DEFINES += Q_OS_ANDROID
+#DEFINES += Q_OS_ANDROID
 
 # Input
 HEADERS += \
