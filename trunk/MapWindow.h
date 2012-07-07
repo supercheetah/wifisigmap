@@ -10,8 +10,13 @@ class MapGraphicsView : public QGraphicsView
 public:
 	MapGraphicsView();
 	void scaleView(qreal scaleFactor);
+
+public slots:
+	void zoomIn();
+	void zoomOut();
 	
 protected:
+	void keyPressEvent(QKeyEvent *event);
 	void mouseMoveEvent(QMouseEvent * mouseEvent);
 	void wheelEvent(QWheelEvent *event);
 	//void drawBackground(QPainter *painter, const QRectF &rect);
@@ -125,6 +130,7 @@ protected slots:
 	void clearStatusMessage();
 
 private:
+	MapGraphicsView *m_gv;
 	MapGraphicsScene *m_scene;
 	QLabel *m_statusMsg;
 	QPushButton *m_apButton;
