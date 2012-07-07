@@ -1,5 +1,7 @@
 #include "MapWindow.h"
 
+#define DEBUG_WIFI_FILE "scan3.txt"
+
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
 {
@@ -107,13 +109,29 @@ void MapWindow::setupUi()
 	
 	hbox->addStretch(1);
 	
+	connect(&m_statusClearTimer, SIGNAL(timeout()), this, SLOT(clearStatusMessage()));
+	m_statusClearTimer.setSingleShot(true);
 	
 	vbox->addLayout(hbox);
 }
 
-void MapWindow::setStatusMessage(const QString& msg)
+void MapWindow::setStatusMessage(const QString& msg, int timeout)
 {
 	m_statusMsg->setText("<b>"+msg+"</b>");
+	
+	if(timeout>0)
+	{
+		if(m_statusClearTimer.isActive())
+			m_statusClearTimer.stop();
+			
+		m_statusClearTimer.setInterval(timeout);
+		m_statusClearTimer.start();
+	}
+}
+
+void MapWindow::clearStatusMessage()
+{
+	setStatusMessage("");
 }
 
 void MapWindow::flagApModeCleared()
@@ -224,14 +242,14 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 	addSigMapItem();
 	
-	QSizeF sz = m_bgPixmap.size();
-	double w = sz.width();
-	double h = sz.height();
+// 	QSizeF sz = m_bgPixmap.size();
+// 	double w = sz.width();
+// 	double h = sz.height();
 	
 	// TODO just for debugging - TODO add in mode so user can specify AP locations
-	m_apLocations["TE:ST:MA:C1:23:00"] = QPointF(w*.1, h*.8);
-	m_apLocations["TE:ST:MA:C1:23:01"] = QPointF(w*.6, h*.6);
-	m_apLocations["TE:ST:MA:C1:23:02"] = QPointF(w*.8, h*.1);
+// 	addApMarker(QPointF(w*.1, h*.8), "TE:ST:MA:C1:23:00");
+// 	addApMarker(QPointF(w*.6, h*.6), "TE:ST:MA:C1:23:01");
+// 	addApMarker(QPointF(w*.8, h*.1), "TE:ST:MA:C1:23:02");
 	
 // 	addSignalMarker(QPointF(w*.50, h*.50), .99);
 // 	addSignalMarker(QPointF(w*.75, h*.25), .5);
@@ -244,6 +262,30 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 	//m_scanIf.scanWifi();
 	
+}
+
+void MapGraphicsScene::addApMarker(QPointF point, QString mac)
+{
+	m_apLocations[mac] = point;
+	
+	// TODO move image to resources file
+	QImage markerGroup("ap-marker.png");
+	
+	markerGroup = addDropShadow(markerGroup, (double)(markerGroup.width()/2));
+		
+	markerGroup.save("apMarkerDebug.png");
+	
+	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
+	
+	double w2 = (double)(markerGroup.width())/2.;
+	double h2 = (double)(markerGroup.height())/2.;
+	QPointF pnt(point.x()-w2,point.y()-h2);
+	item->setPos(QPointF(pnt));
+	
+// 	item->setFlag(QGraphicsItem::ItemIsMovable);
+// 	item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+// 	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+	item->setZValue(99);
 }
 
 
@@ -292,17 +334,101 @@ void MapGraphicsScene::longPressTimeout()
 	{
 		if(m_markApMode)
 		{
-			// scan for APs nearby and prompt user to choose AP
+			/// Scan for APs nearby and prompt user to choose AP
 			
-			// If user chooses AP, call addApMarker(QString mac, QPoint location);
+			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
 			
-			
+			if(results.isEmpty())
+			{
+				m_mapWindow->flagApModeCleared();
+				m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
+			}
+			else
+			{
+				QStringList items;
+				foreach(WifiDataResult result, results)
+					items << QString("%1%: %2 - %3").arg(QString().sprintf("%02d", (int)(result.value*100))).arg(result.mac/*.left(6)*/).arg(result.essid);
+				
+				qSort(items.begin(), items.end());
+				
+				// Reverse order so strongest appears on top
+				QStringList tmp;
+				for(int i=items.size()-1; i>-1; i--)
+					tmp.append(items[i]);
+				items = tmp;
+
+				
+				bool ok;
+				QString item = QInputDialog::getItem(0, tr("Found APs"),
+									tr("AP:"), items, 0, false, &ok);
+				if (ok && !item.isEmpty())
+				{
+					QStringList pair = item.split(" ");
+					if(pair.size() < 2) // problem getting MAC
+						ok = false;
+					else
+					{
+						// If user chooses AP, call addApMarker(QString mac, QPoint location);
+						QString mac = pair[1];
+						
+						// Find result just to tell user ESSID
+						WifiDataResult matchingResult;
+						foreach(WifiDataResult result, results)
+							if(result.mac == mac)
+								matchingResult = result;
+						
+						// Add to map and ap list
+						addApMarker(m_pressPnt, mac);
+						
+						// Update UI
+						m_mapWindow->flagApModeCleared();
+						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
+						
+						// Render map overlay (because the AP may be tied to an existing scan result)
+						QTimer::singleShot(0, this, SLOT(renderSigMap()));
+					}
+				}
+				else
+					ok = false;
+				
+				if(!ok)
+				{
+					m_mapWindow->flagApModeCleared();
+					m_mapWindow->setStatusMessage(tr("User canceled"), 3000);
+				}
+			}
 		}
 		else
+		/// Not in "mark AP" mode - regular scan mode, so scan and add store results
 		{
-			// scan for APs
-			// call addSignalMarker() with presspnt
-			QTimer::singleShot(0, this, SLOT(renderSigMap()));
+			// scan for APs nearby
+			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
+			
+			if(results.size() > 0)
+			{
+				// call addSignalMarker() with presspnt
+				addSignalMarker(m_pressPnt, results);
+				
+				m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
+				
+				// Render map overlay
+				QTimer::singleShot(0, this, SLOT(renderSigMap()));
+				
+				QStringList notFound;
+				foreach(WifiDataResult result, results)
+					if(!m_apLocations.contains(result.mac))
+						notFound << QString("<font color='%1'>%2</font> (<i>%3</i>)")
+							.arg(colorForSignal(result.value, result.mac).name())
+							.arg(result.mac.right(6))
+							.arg(result.essid); // last two octets of mac should be enough
+						
+				if(notFound.size() > 0)
+					m_mapWindow->setStatusMessage(tr("Ok, but %2 APs need marked: %1").arg(notFound.join(", ")).arg(notFound.size()), 10000);
+			}
+			else
+			{
+				m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
+			}
 		}
 	}
 	else
@@ -504,8 +630,29 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	
 	p.end();
 	
+	markerGroup = addDropShadow(markerGroup, (double)iconSize / 2.);
+		
+	markerGroup.save("markerGroupDebug.jpg");
+	
+	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
+	
+	double w2 = (double)(markerGroup.width())/2.;
+	double h2 = (double)(markerGroup.height())/2.;
+	QPointF pnt(point.x()-w2,point.y()-h2);
+	item->setPos(QPointF(pnt));
+	
+// 	item->setFlag(QGraphicsItem::ItemIsMovable);
+// 	item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+// 	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+	item->setZValue(99);
+	
+	m_sigValues << new SigMapValue(point, results);
+
+}
+
+QImage MapGraphicsScene::addDropShadow(QImage markerGroup, double shadowSize)
+{
 	// Add in drop shadow
-	double shadowSize = (double)iconSize / 2.;
 	if(shadowSize > 0.0)
 	{
 // 		double shadowOffsetX = 0.0;
@@ -547,23 +694,8 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 		
 		markerGroup = tmpImage;
 	}
-		
-	markerGroup.save("markerGroupDebug.jpg");
 	
-	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
-	
-	double w2 = (double)(markerGroup.width())/2.;
-	double h2 = (double)(markerGroup.height())/2.;
-	QPointF pnt(point.x()-w2,point.y()-h2);
-	item->setPos(QPointF(pnt));
-	
-// 	item->setFlag(QGraphicsItem::ItemIsMovable);
-// 	item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
-// 	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-	item->setZValue(99);
-	
-	m_sigValues << new SigMapValue(point, results);
-
+	return markerGroup;
 }
 
 bool SigMapValue::hasAp(QString mac)
@@ -615,6 +747,12 @@ void MapGraphicsScene::renderSigMap()
 
 	foreach(QString apMac, apMacToEssid.keys())
 	{
+		if(!m_apLocations.contains(apMac))
+		{
+			qDebug() << "MapGraphicsScene::renderSigMap(): Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
+			continue;
+		}
+		
 		QPointF center = m_apLocations[apMac];
 		
 		QRadialGradient rg;
@@ -683,7 +821,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		fade.setColorAt( 0.7, Qt::yellow );
 		fade.setColorAt( 1.0, Qt::green  );
 		sigPainter.fillRect( signalLevelImage.rect(), fade );
-		sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+		//sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
 		sigPainter.setCompositionMode(QPainter::CompositionMode_Difference);
 		sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
 		

@@ -69,8 +69,10 @@ private:
 	QColor colorForSignal(double sig, QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	
-	void addApMarker(QString mac, QPoint location);
+	void addApMarker(QPointF location, QString mac);
 
+	QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
+	
 private:
 	QPointF m_pressPnt;
 	QTimer m_longPressTimer;
@@ -111,7 +113,7 @@ protected:
 	void setupUi();
 	
 	friend class MapGraphicsScene; // friend for access to the following (and flagApModeCleared())
-	void setStatusMessage(const QString&);
+	void setStatusMessage(const QString&, int timeout=-1);
 	
 protected slots:
 	void saveSlot();
@@ -120,12 +122,14 @@ protected slots:
 	void clearSlot();
 	
 	void flagApModeCleared();
+	void clearStatusMessage();
 
 private:
 	MapGraphicsScene *m_scene;
 	QLabel *m_statusMsg;
 	QPushButton *m_apButton;
 
+	QTimer m_statusClearTimer;
 };
 
 #endif
