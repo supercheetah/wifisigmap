@@ -27,10 +27,12 @@ class SigMapValue
 public:
 	SigMapValue(QPointF p, QList<WifiDataResult> results)
 		: point(p)
+		, consumed(false)
  		, scanResults(results)
 		{}
 		
 	QPointF point;
+	bool consumed;
 	
 	QList<WifiDataResult> scanResults;
 	
@@ -73,9 +75,12 @@ private:
 	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
+	void renderTriangle(QImage *img, QPointF center, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	
 	void addApMarker(QPointF location, QString mac);
 
+	//SigMapValue *findNearest(SigMapValue *match, QString apMac);
+	SigMapValue *findNearest(QPointF match, QString apMac);
 	QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
 	
 private:
