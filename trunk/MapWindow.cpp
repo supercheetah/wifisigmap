@@ -12,6 +12,300 @@
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
 //#define Q_OS_ANDROID
 
+
+//#define RENDER_MODE_TRIANGLES
+
+
+class TRGBFloat {
+public:
+	float R;
+	float G;
+	float B;
+};
+
+bool fillTriColor(QImage *img, QVector<QPointF> points, QList<QColor> colors)
+{
+	if(!img)
+		return false;
+		
+	if(img->format() != QImage::Format_ARGB32_Premultiplied &&
+	   img->format() != QImage::Format_ARGB32)
+		return false;
+		
+	double imgWidth  = img->width();
+	double imgHeight = img->height();
+	
+	/// The following routine translated from Delphi, originally found at:
+	// http://www.swissdelphicenter.ch/en/showcode.php?id=1780
+	
+	double  LX, RX, Ldx, Rdx, Dif1, Dif2;
+	
+	TRGBFloat LRGB, RRGB, RGB, RGBdx, LRGBdy, RRGBdy;
+		
+	QColor RGBT;
+	double y, x, ScanStart, ScanEnd;// : integer;
+	bool Right;
+	QPointF tmpPoint;
+	QColor tmpColor;
+	
+	
+	 // sort vertices by Y
+	int Vmax = 0;
+	if (points[1].y() > points[0].y())
+		Vmax = 1;
+	if (points[2].y() > points[Vmax].y())
+		 Vmax = 2;
+		 
+	if(Vmax != 2)
+	{
+		tmpPoint = points[2];
+		points[2] = points[Vmax];
+		points[Vmax] = tmpPoint;
+		
+		tmpColor = colors[2];
+		colors[2] = colors[Vmax];
+		colors[Vmax] = tmpColor;
+	}
+		
+	if(points[1].y() > points[0].y())
+		Vmax = 1;
+	else 
+		Vmax = 0;
+		
+	if(Vmax == 0)
+	{
+		tmpPoint = points[1];
+		points[1] = points[0];
+		points[0] = tmpPoint;
+		
+		tmpColor = colors[1];
+		colors[1] = colors[0];
+		colors[0] = tmpColor;
+	}
+	
+	Dif1 = points[2].y() - points[0].y();
+	if(Dif1 == 0)
+		Dif1 = 0.001; // prevent div by 0 error
+	
+	Dif2 = points[1].y() - points[0].y();
+	if(Dif2 == 0)
+		Dif2 = 0.001;
+
+	//work out if middle point is to the left or right of the line
+	// connecting upper and lower points
+	if(points[1].x() > (points[2].x() - points[0].x()) * Dif2 / Dif1 + points[0].x())
+		Right = true;
+	else	Right = false;
+	
+	   // calculate increments in x and colour for stepping through the lines
+	if(Right)
+	{
+		Ldx = (points[2].x() - points[0].x()) / Dif1;
+		Rdx = (points[1].x() - points[0].x()) / Dif2;
+		LRGBdy.B = (colors[2].blue()  - colors[0].blue())  / Dif1;
+		LRGBdy.G = (colors[2].green() - colors[0].green()) / Dif1;
+		LRGBdy.R = (colors[2].red()   - colors[0].red())   / Dif1;
+		RRGBdy.B = (colors[1].blue()  - colors[0].blue())  / Dif2;
+		RRGBdy.G = (colors[1].green() - colors[0].green()) / Dif2;
+		RRGBdy.R = (colors[1].red()   - colors[0].red())   / Dif2;
+	}
+	else
+	{
+		Ldx = (points[1].x() - points[0].x()) / Dif2;
+		Rdx = (points[2].x() - points[0].x()) / Dif1;
+		
+		RRGBdy.B = (colors[2].blue()  - colors[0].blue())  / Dif1;
+		RRGBdy.G = (colors[2].green() - colors[0].green()) / Dif1;
+		RRGBdy.R = (colors[2].red()   - colors[0].red())   / Dif1;
+		LRGBdy.B = (colors[1].blue()  - colors[0].blue())  / Dif2;
+		LRGBdy.G = (colors[1].green() - colors[0].green()) / Dif2;
+		LRGBdy.R = (colors[1].red()   - colors[0].red())   / Dif2;
+	}
+
+	LRGB.R = colors[0].red();
+	LRGB.G = colors[0].green();
+	LRGB.B = colors[0].blue();
+	RRGB = LRGB;
+	
+	LX = points[0].x() - 1; /* -1: fix for not being able to render in floating-point coorindates */
+	RX = points[0].x();
+	
+	// fill region 1
+	for(y = points[0].y(); y <= points[1].y() - 1; y++)
+	{	
+		// y clipping
+		if(y > imgHeight - 1)
+			break;
+			
+		if(y < 0)
+		{
+			LX = LX + Ldx;
+			RX = RX + Rdx;
+			LRGB.B = LRGB.B + LRGBdy.B;
+			LRGB.G = LRGB.G + LRGBdy.G;
+			LRGB.R = LRGB.R + LRGBdy.R;
+			RRGB.B = RRGB.B + RRGBdy.B;
+			RRGB.G = RRGB.G + RRGBdy.G;
+			RRGB.R = RRGB.R + RRGBdy.R;
+			continue;
+		}
+		
+		// Scan = ABitmap.ScanLine[y];
+		
+		// calculate increments in color for stepping through pixels
+		Dif1 = RX - LX + 1;
+		if(Dif1 == 0)
+			Dif1 = 0.001;
+		RGBdx.B = (RRGB.B - LRGB.B) / Dif1;
+		RGBdx.G = (RRGB.G - LRGB.G) / Dif1;
+		RGBdx.R = (RRGB.R - LRGB.R) / Dif1;
+		
+		// x clipping
+		if(LX < 0)
+		{
+			ScanStart = 0;
+			RGB.B = LRGB.B + (RGBdx.B * fabs(LX));
+			RGB.G = LRGB.G + (RGBdx.G * fabs(LX));
+			RGB.R = LRGB.R + (RGBdx.R * fabs(LX));
+		}
+		else
+		{
+			RGB = LRGB;
+			ScanStart = LX; //round(LX);
+		} 
+		
+		// Was RX-1 - inverted to fix not being able to render in floatingpoint coords
+		if(RX + 1 > imgWidth - 1)
+			ScanEnd = imgWidth - 1;
+		else	ScanEnd = RX + 1; //round(RX) - 1;
+		
+
+		// scan the line
+		QRgb* scanline = (QRgb*)img->scanLine((int)y);
+		for(x = ScanStart; x <= ScanEnd; x++)
+		{
+			scanline[(int)x] = qRgb((int)RGB.R, (int)RGB.G, (int)RGB.B);
+			
+			RGB.B = RGB.B + RGBdx.B;
+			RGB.G = RGB.G + RGBdx.G;
+			RGB.R = RGB.R + RGBdx.R;
+		}
+		
+		// increment edge x positions
+		LX = LX + Ldx;
+		RX = RX + Rdx;
+		
+		// increment edge colours by the y colour increments
+		LRGB.B = LRGB.B + LRGBdy.B;
+		LRGB.G = LRGB.G + LRGBdy.G;
+		LRGB.R = LRGB.R + LRGBdy.R;
+		RRGB.B = RRGB.B + RRGBdy.B;
+		RRGB.G = RRGB.G + RRGBdy.G;
+		RRGB.R = RRGB.R + RRGBdy.R;
+	}
+
+	
+	Dif1 = points[2].y() - points[1].y();
+	if(Dif1 == 0)
+		Dif1 = 0.001;
+		
+	// calculate new increments for region 2
+	if(Right)
+	{
+		Rdx = (points[2].x() - points[1].x()) / Dif1;
+		RX  = points[1].x();
+		RRGBdy.B = (colors[2].blue()  - colors[1].blue())  / Dif1;
+		RRGBdy.G = (colors[2].green() - colors[1].green()) / Dif1;
+		RRGBdy.R = (colors[2].red()   - colors[1].red())   / Dif1;
+		RRGB.R = colors[1].red();
+		RRGB.G = colors[1].green();
+		RRGB.B = colors[1].blue();
+	}
+	else
+	{
+		Ldx = (points[2].x() - points[1].x()) / Dif1;
+		LX  = points[1].x();
+		LRGBdy.B = (colors[2].blue()  - colors[1].blue())  / Dif1;
+		LRGBdy.G = (colors[2].green() - colors[1].green()) / Dif1;
+		LRGBdy.R = (colors[2].red()   - colors[1].red())   / Dif1;
+		LRGB.R = colors[1].red();
+		LRGB.G = colors[1].green();
+		LRGB.B = colors[1].blue();
+	}
+
+	// fill region 2
+	for(y = points[1].y(); y < points[2].y() - 1; y++)
+	{
+		// y clipping
+		if(y > imgHeight - 1)
+			break;
+		if(y < 0)
+		{
+			LX = LX + Ldx;
+			RX = RX + Rdx;
+			LRGB.B = LRGB.B + LRGBdy.B;
+			LRGB.G = LRGB.G + LRGBdy.G;
+			LRGB.R = LRGB.R + LRGBdy.R;
+			RRGB.B = RRGB.B + RRGBdy.B;
+			RRGB.G = RRGB.G + RRGBdy.G;
+			RRGB.R = RRGB.R + RRGBdy.R;
+			continue;
+		}
+		
+		//Scan := ABitmap.ScanLine[y];
+		
+		Dif1 = RX - LX + 1;
+		if(Dif1 == 0)
+			Dif1 = 0.001;
+		
+		RGBdx.B = (RRGB.B - LRGB.B) / Dif1;
+		RGBdx.G = (RRGB.G - LRGB.G) / Dif1;
+		RGBdx.R = (RRGB.R - LRGB.R) / Dif1;
+		
+		// x clipping
+		if(LX < 0)
+		{
+			ScanStart = 0;
+			RGB.B = LRGB.B + (RGBdx.B * fabs(LX));
+			RGB.G = LRGB.G + (RGBdx.G * fabs(LX));
+			RGB.R = LRGB.R + (RGBdx.R * fabs(LX));
+		}
+		else
+		{
+			RGB = LRGB;
+			ScanStart = LX; //round(LX);
+		}
+		
+		// Was RX-1 - inverted to fix not being able to render in floatingpoint coords
+		if(RX + 1 > imgWidth - 1)
+			ScanEnd = imgWidth - 1;
+		else 	ScanEnd = RX + 1; //round(RX) - 1;
+		
+		// scan the line
+		QRgb* scanline = (QRgb*)img->scanLine((int)y);
+		for(x = ScanStart; x < ScanEnd; x++)
+		{
+			scanline[(int)x] = qRgb((int)RGB.R, (int)RGB.G, (int)RGB.B);
+			
+			RGB.B = RGB.B + RGBdx.B;
+			RGB.G = RGB.G + RGBdx.G;
+			RGB.R = RGB.R + RGBdx.R;
+		}
+		
+		LX = LX + Ldx;
+		RX = RX + Rdx;
+		
+		LRGB.B = LRGB.B + LRGBdy.B;
+		LRGB.G = LRGB.G + LRGBdy.G;
+		LRGB.R = LRGB.R + LRGBdy.R;
+		RRGB.B = RRGB.B + RRGBdy.B;
+		RRGB.G = RRGB.G + RRGBdy.G;
+		RRGB.R = RRGB.R + RRGBdy.R;
+	}
+	
+	return true;
+}
+
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
 {
@@ -192,6 +486,9 @@ MapWindow::MapWindow(QWidget *parent)
 	
 	setWindowTitle("WiFi Signal Mapper");
 	setupUi();
+	
+	/// NOTE just for testing
+	m_scene->loadResults("wmz/phc-firsttest.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -922,6 +1219,36 @@ double SigMapValue::signalForAp(QString mac, bool returnDbmValue)
 	return 0.0;
 }
 
+SigMapValue *MapGraphicsScene::findNearest(QPointF match, QString apMac)
+{
+	if(match.isNull())
+		return 0;
+		
+	SigMapValue *nearest = 0;
+	double minDist = (double)INT_MAX;
+	
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		if(val->consumed || !val->hasAp(apMac))
+			continue;
+			
+		double dx = val->point.x() - match.x();
+		double dy = val->point.y() - match.y(); 
+		double dist = dx*dx + dy*dy; // dont need true dist, so dont sqrt
+		if(dist < minDist)
+		{
+			nearest = val;
+			minDist = dist;
+		}
+	}
+	
+	if(nearest)
+		nearest->consumed = true;
+	
+	return nearest;
+	
+}
+
 
 void MapGraphicsScene::renderSigMap()
 {
@@ -940,6 +1267,8 @@ void MapGraphicsScene::renderSigMap()
 // 	double dy = ((double)renderSize.height()) / ((double)origSize.height());
 // 	
 // 	QImage mapImg(renderSize, QImage::Format_ARGB32_Premultiplied);
+	double dx=1., dy=1.;
+	
 	QImage mapImg(origSize, QImage::Format_ARGB32_Premultiplied);
 	QPainter p(&mapImg);
 	p.fillRect(mapImg.rect(), Qt::transparent);
@@ -955,8 +1284,77 @@ void MapGraphicsScene::renderSigMap()
 	
 	qDebug() << "MapGraphicsScene::renderSigMap(): Unique MACs: "<<apMacToEssid.keys()<<", mac->essid: "<<apMacToEssid;
 
-	int idx = 0;
 	int numAps = apMacToEssid.keys().size();
+	int idx = 0;
+	
+	#ifdef RENDER_MODE_TRIANGLES
+	
+	foreach(QString apMac, apMacToEssid.keys())
+	{
+		QPointF center = m_apLocations[apMac];
+		
+		foreach(SigMapValue *val, m_sigValues)
+			val->consumed = false;
+		
+		// Find first two closest points to center [0]
+		// Make triangle
+		// Find next cloest point
+		// Make tri from last point, this point, center
+		// Go on till all points done
+		
+		// Render first traingle
+// 		SigMapValue *lastPnt = findNearest(center, apMac);
+// 		if(lastPnt)
+// 		{
+// 			QImage tmpImg(origSize, QImage::Format_ARGB32_Premultiplied);
+// 			QPainter p2(&tmpImg);
+// 			p2.fillRect(tmpImg.rect(), Qt::transparent);
+// 			p2.end();
+// 			
+// 			SigMapValue *nextPnt = findNearest(lastPnt->point, apMac);
+// 			renderTriangle(&tmpImg, center, lastPnt, nextPnt, dx,dy, apMac);
+// 			
+// 			// Store this point to close the map 
+// 			SigMapValue *endPoint = nextPnt;
+// 			
+// 			// Render all triangles inside
+// 			while((nextPnt = findNearest(lastPnt->point, apMac)) != NULL)
+// 			{
+// 				renderTriangle(&tmpImg, center, lastPnt, nextPnt, dx,dy, apMac);
+// 				lastPnt = nextPnt;
+// 				//lastPnt = 0;//DEBUG
+// 			}
+// 			
+// 			// Close the map
+// 			renderTriangle(&tmpImg, center, lastPnt, endPoint, dx,dy, apMac);
+// 			
+// 			p.setOpacity(1. / (double)(numAps) * (numAps - idx));
+// 			p.drawImage(0,0,tmpImg);
+// 		
+// 		}
+		
+		
+		QImage tmpImg(origSize, QImage::Format_ARGB32_Premultiplied);
+		QPainter p2(&tmpImg);
+		p2.fillRect(tmpImg.rect(), Qt::transparent);
+		p2.end();
+		
+		SigMapValue *lastPnt;
+		while((lastPnt = findNearest(center, apMac)) != NULL)
+		{
+			SigMapValue *nextPnt = findNearest(lastPnt->point, apMac);
+			renderTriangle(&tmpImg, center, lastPnt, nextPnt, dx,dy, apMac);
+		}
+		
+		p.setOpacity(.5); //1. / (double)(numAps) * (numAps - idx));
+		p.drawImage(0,0,tmpImg);
+	
+	
+		idx ++;
+	}
+	
+	#else
+	
 	foreach(QString apMac, apMacToEssid.keys())
 	{
 		if(!m_apLocations.contains(apMac))
@@ -1010,8 +1408,12 @@ void MapGraphicsScene::renderSigMap()
 		
 		idx ++;
 	}
+		
+	#endif
+
 	
 	//mapImg.save("/tmp/mapImg.jpg");
+	
 
 	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
@@ -1210,6 +1612,82 @@ void MapGraphicsScene::loadResults(QString filename)
 	
 	// Call for render of map overlay
 	QTimer::singleShot(0, this, SLOT(renderSigMap()));
+}
+
+
+
+void MapGraphicsScene::renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac)
+{
+	if(!a || !b || !c)
+		return;
+
+/*	QVector<QPointF> points = QVector<QPointF>()
+		<< QPointF(10, 10)
+		<< QPointF(imgWidth - 10, imgHeight / 2)
+		<< QPointF(imgWidth / 2,  imgHeight - 10);
+		
+	QList<QColor> colors = QList<QColor>()
+		<< Qt::red
+		<< Qt::green
+		<< Qt::blue;*/
+	
+	QVector<QPointF> points = QVector<QPointF>()
+		<< QPointF(a->point.x() * dx, a->point.y() * dy)
+		<< QPointF(b->point.x() * dx, b->point.y() * dy)
+		<< QPointF(c->point.x() * dx, c->point.y() * dy);
+		
+	QList<QColor> colors = QList<QColor>()
+		<< colorForSignal(a->signalForAp(apMac), apMac)
+		<< colorForSignal(b->signalForAp(apMac), apMac)
+		<< colorForSignal(c->signalForAp(apMac), apMac);
+
+	qDebug() << "MapGraphicsScene::renderTriangle[1]: "<<apMac<<": "<<points;
+	if(!fillTriColor(img, points, colors))
+		qDebug() << "MapGraphicsScene::renderTriangle[1]: "<<apMac<<": Not rendered";
+		
+// 	QPainter p(img);
+// 	//p.setBrush(colors[0]);
+// 	p.setPen(QPen(colors[2],3.0));
+// 	p.drawConvexPolygon(points);
+// 	p.end();
+
+}
+
+void MapGraphicsScene::renderTriangle(QImage *img, QPointF center, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac)
+{
+	if(!b || !c)
+		return;
+
+/*	QVector<QPointF> points = QVector<QPointF>()
+		<< QPointF(10, 10)
+		<< QPointF(imgWidth - 10, imgHeight / 2)
+		<< QPointF(imgWidth / 2,  imgHeight - 10);
+		
+	QList<QColor> colors = QList<QColor>()
+		<< Qt::red
+		<< Qt::green
+		<< Qt::blue;*/
+	
+	QVector<QPointF> points = QVector<QPointF>()
+		<< QPointF(center.x() * dx, center.y() * dy)
+		<< QPointF(b->point.x() * dx, b->point.y() * dy)
+		<< QPointF(c->point.x() * dx, c->point.y() * dy);
+		
+	QList<QColor> colors = QList<QColor>()
+		<< colorForSignal(1.0, apMac)
+		<< colorForSignal(b->signalForAp(apMac), apMac)
+		<< colorForSignal(c->signalForAp(apMac), apMac);
+
+	qDebug() << "MapGraphicsScene::renderTriangle[2]: "<<apMac<<": "<<points;
+	if(!fillTriColor(img, points, colors))
+		qDebug() << "MapGraphicsScene::renderTriangle[2]: "<<apMac<<": Not rendered";
+		
+// 	QPainter p(img);
+// 	//p.setBrush(colors[0]);
+// 	p.setPen(QPen(colors[2],3.0));
+// 	p.drawConvexPolygon(points);
+// 	p.end();
+
 }
 
 
