@@ -9,8 +9,8 @@
 	#define DEBUG_WIFI_FILE "scan3.txt"
 #endif
 
-/// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
-#define Q_OS_ANDROID
+///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
+//#define Q_OS_ANDROID
 
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
@@ -126,7 +126,8 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 		switch (type)
 		{
 			case QtDebugMsg:
-				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				if(qt_debugSocket->state() == QAbstractSocket::ConnectedState)
+					qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
 				//AppSettings::sendCheckin("/core/debug",QString(msg));
 				if(qt_origMsgHandler)
 					qt_origMsgHandler(type,msg);
@@ -134,7 +135,8 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 					fprintf(stderr, "Debug: %s\n", msg);
 				break;
 			case QtWarningMsg:
-				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				if(qt_debugSocket->state() == QAbstractSocket::ConnectedState)
+					qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
 				//AppSettings::sendCheckin("/core/warn",QString(msg));
 				if(qt_origMsgHandler)
 					qt_origMsgHandler(QtDebugMsg,msg);
@@ -142,14 +144,16 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 					fprintf(stderr, "Warning: %s\n", msg);
 				break;
 			case QtCriticalMsg:
-				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				if(qt_debugSocket->state() == QAbstractSocket::ConnectedState)
+					qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
 	// 			if(qt_origMsgHandler)
 	// 				qt_origMsgHandler(type,msg);
 	// 			else
 	// 				fprintf(stderr, "Critical: %s\n", msg);
 	// 			break;
 			case QtFatalMsg:
-				qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
+				if(qt_debugSocket->state() == QAbstractSocket::ConnectedState)
+					qt_debugSocket->write(QByteArray((QString(msg) + "\n").toAscii()));
 				//AppSettings::sendCheckin("/core/fatal",QString(msg));
 				if(qt_origMsgHandler)
 				{
@@ -449,6 +453,8 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 	//markerGroup.save("apMarkerDebug.png");
 	
 	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
+	
+	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	
 	double w2 = (double)(markerGroup.width())/2.;
 	double h2 = (double)(markerGroup.height())/2.;
@@ -796,8 +802,12 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 			// Calculate text location centered in icon
 			QRect textRect = p.boundingRect(0, 0, INT_MAX, INT_MAX, Qt::AlignLeft, sigString);
 			int textX = (int)(iconRect.width()/2  - textRect.width()/2  + iconSize*.1); // .1 is just a cosmetic adjustment to center it better
+			#ifdef Q_OS_ANDROID
 			int textY = (int)(iconRect.height()/2 - textRect.height()/2 + font.pointSizeF() + 16);
-
+			#else
+			int textY = (int)(iconRect.height()/2 - textRect.height()/2 + font.pointSizeF() * 1.33);
+			#endif
+			
 			// Outline text in black
 			p.setPen(Qt::black);
 			p.drawText(textX-1, textY-1, sigString);
@@ -827,6 +837,8 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	//markerGroup.save("markerGroupDebug.jpg");
 	
 	QGraphicsItem *item = addPixmap(QPixmap::fromImage(markerGroup));
+	
+	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	
 	double w2 = (double)(markerGroup.width())/2.;
 	double h2 = (double)(markerGroup.height())/2.;
@@ -943,6 +955,8 @@ void MapGraphicsScene::renderSigMap()
 	
 	qDebug() << "MapGraphicsScene::renderSigMap(): Unique MACs: "<<apMacToEssid.keys()<<", mac->essid: "<<apMacToEssid;
 
+	int idx = 0;
+	int numAps = apMacToEssid.keys().size();
 	foreach(QString apMac, apMacToEssid.keys())
 	{
 		if(!m_apLocations.contains(apMac))
@@ -986,13 +1000,15 @@ void MapGraphicsScene::renderSigMap()
 		rg.setFocalPoint(center);
 		rg.setRadius(maxDistFromCenter);
 		
-		p.setOpacity(.75);
+		p.setOpacity(1. / (double)(numAps) * (numAps - idx));
 		p.setBrush(QBrush(rg));
 		//p.setBrush(Qt::green);
 		p.setPen(QPen(Qt::black,1.5));
 		//p.drawEllipse(0,0,iconSize,iconSize);
 		p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+		
+		idx ++;
 	}
 	
 	//mapImg.save("/tmp/mapImg.jpg");
