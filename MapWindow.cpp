@@ -488,7 +488,8 @@ MapWindow::MapWindow(QWidget *parent)
 	setupUi();
 	
 	/// NOTE just for testing
-	m_scene->loadResults("wmz/phc-firsttest.wmz");
+	//m_scene->loadResults("wmz/phc-firsttest.wmz");
+	m_scene->loadResults("wmz/test.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -1141,6 +1142,7 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	double h2 = (double)(markerGroup.height())/2.;
 	QPointF pnt(point.x()-w2,point.y()-h2);
 	item->setPos(QPointF(pnt));
+//	item->setPos(point);
 	
 // 	item->setFlag(QGraphicsItem::ItemIsMovable);
 // 	item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
@@ -1369,9 +1371,9 @@ void MapGraphicsScene::renderSigMap()
 		double maxDistFromCenter = -1;
 		QPointF maxPoint; // not used yet, if at all...
 		
-		QColor color = colorForSignal(1.0, apMac);
-		rg.setColorAt(0., color);
-		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<1.0<<", color:"<<color;
+		QColor centerColor = colorForSignal(1.0, apMac);
+		rg.setColorAt(0., centerColor);
+		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<1.0<<", color:"<<centerColor;
 		
 		foreach(SigMapValue *val, m_sigValues)
 		{
@@ -1405,6 +1407,24 @@ void MapGraphicsScene::renderSigMap()
 		//p.drawEllipse(0,0,iconSize,iconSize);
 		p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+		
+		// Render lines to signal locations
+		p.setOpacity(.75);
+		p.setPen(QPen(centerColor, 1.5));
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(val->hasAp(apMac))
+			{
+// 				double sig = val->signalForAp(apMac);
+// 				QColor color = colorForSignal(sig, apMac);
+// 				rg.setColorAt(1-sig, color);
+// 				
+// 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
+				
+				p.drawLine(center, val->point);
+			}
+		}
+		
 		
 		idx ++;
 	}
