@@ -83,6 +83,8 @@ private:
 	SigMapValue *findNearest(QPointF match, QString apMac);
 	QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
 	
+	double getRenderLevel(double level,double angle,QPointF realPoint,QString apMac,QPointF center,double circleRadius);
+	
 private:
 	QPointF m_pressPnt;
 	QTimer m_longPressTimer;
