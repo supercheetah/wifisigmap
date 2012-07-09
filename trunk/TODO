@@ -1,7 +1,7 @@
 Stage: Alpha
 Development Items Todo
 	#- UI to mark AP locations
-		- Future idea: Calculate location of APs based on intersection of circles:
+		x- Future idea: Calculate location of APs based on intersection of circles:
 			http://paulbourke.net/geometry/2circle/
 			http://mathworld.wolfram.com/Circle-CircleIntersection.html
 			http://math.stackexchange.com/questions/38925/least-squares-intersection-of-three-circles
@@ -24,20 +24,23 @@ Later:
 	- Possible idea if needed/demand:
 		- UI/code to provide a URL for a bg image and download URL for use as bg
 	
+Bugs and Minor Items not specific to Android:
+	- Definetly need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
+	- Draw grid numbers in default background
+	#- Fix positions of markers - positions dont zoom promperly (shift during zoom)
+
 	
 Android TODO:
-	- Test with map
+	#- Test with map
 	#- Fix rendering of markerGroups
 	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)
 	- Move buttons for "load/save/bg" to a popup menu
-	- Elimate scrollbars on QGraphicsView
+	#- Elimate scrollbars on QGraphicsView
 	- Need better integration with native theme on Android (e.g. buttons don't look right)
 	- Need new filebrowser dialog (current one is next to useless)
 	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
-	- Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
+	#- Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
 	- Added a "spinner" around the fingertip during longpress to show action
 	- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
 	
-	- Definetly need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
-	- Draw grid numbers in default background
-	- Fix positions of markers - positions dont zoom promperly (shift during zoom_
+	
