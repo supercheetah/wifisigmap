@@ -29,12 +29,23 @@ public:
 		: point(p)
 		, consumed(false)
  		, scanResults(results)
+ 		// For rendering and internal use, not stored in datafile:
+ 		, renderDataDirty(true)
+ 		, renderCircleRadius(0.)
+ 		, renderLevel(0.)
+ 		, renderAngle(0.)
 		{}
 		
 	QPointF point;
 	bool consumed;
 	
 	QList<WifiDataResult> scanResults;
+	
+	bool renderDataDirty;
+	double renderCircleRadius;
+	double renderLevel;
+	double renderAngle;
+	
 	
 	bool hasAp(QString mac);
 	double signalForAp(QString mac, bool returnDbmValue=false);
@@ -53,11 +64,21 @@ public:
 	
 	void clear();
 	
+	enum RenderMode {
+		RenderRadial,
+		RenderCircles,
+		RenderTriangles,
+	};
+	
+	RenderMode renderMode() { return m_renderMode; }
+	
 public slots:
 	void saveResults(QString filename);
 	void loadResults(QString filename);
 	void setBgFile(QString filename);
 	void setMarkApMode(bool flag=true);
+	
+	void setRenderMode(RenderMode mode);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -100,6 +121,9 @@ private:
 	
 	WifiDataCollector m_scanIf;
 	
+	int m_colorCounter;
+	QList<QColor> m_masterColorsAvailable;
+	QHash<QString,QColor> m_apMasterColor;
 	QHash<QString,QList<QColor > > m_colorListForMac;
 	QList<qreal> m_huesUsed;
 	
@@ -112,6 +136,8 @@ private:
 	QString m_currentMapFilename;
 	
 	MapWindow *m_mapWindow;
+	
+	RenderMode m_renderMode;
 };
 
 
@@ -132,6 +158,7 @@ protected slots:
 	void loadSlot();
 	void chooseBgSlot();
 	void clearSlot();
+	void prefsSlot();
 	
 	void flagApModeCleared();
 	void clearStatusMessage();
