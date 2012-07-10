@@ -492,6 +492,7 @@ MapWindow::MapWindow(QWidget *parent)
 	/// NOTE just for testing
 	//m_scene->loadResults("wmz/phc-firsttest.wmz");
 	m_scene->loadResults("wmz/test.wmz");
+	//m_scene->loadResults("wmz/phcfirstrun.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -1305,7 +1306,7 @@ double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPo
 			calcPoint = val->point - realPoint;
 			double lineDist = sqrt(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
 			
-			double signalLevelDiff = (testLevel - signalLevel) * levelDiff / 100.;
+			double signalLevelDiff = (testLevel - signalLevel) * levelDiff / 100. * (1./(lineDist / 100.));
 			
 			qDebug() << "getRenderLevel: val "<<val->point<<", signal for "<<apMac<<": "<<(int)signalLevel<<"%, angleDiff:"<<angleDiff<<", levelDiff:"<<levelDiff<<", lineDist:"<<lineDist<<", signalLevelDiff:"<<signalLevelDiff;
 			
@@ -1534,17 +1535,20 @@ void MapGraphicsScene::renderSigMap()
 		
 		qDebug() << "center: "<<center;
 		
-		int levelInc = 100 / 8;// / 2;// steps;
+		int levelInc = 3; //100 / 1;// / 2;// steps;
 		
 		#define levelStepColor(level,step) QColor::fromHsv((int)qMin(359., step * angleStepSize), (int)qMin(255., level / 100. * 255), (int)qMin(255., level / 100. * 255))
 		
 		foreach(SigMapValue *val, m_sigValues)
 			val->consumed = false;
 	
+		p.setPen(QPen(centerColor.darker(), 4.0));
+		
 
-
+		QVector<QPointF> lastLevelPoints;
 		for(double level=levelInc; level<=100; level+=levelInc)
 		{
+			QVector<QPointF> thisLevelPoints;
 			QPointF lastPoint;
 			for(int step=0; step<steps; step++)
 			{
@@ -1554,16 +1558,18 @@ void MapGraphicsScene::renderSigMap()
 				
 				QPointF here = levelStep2Point(renderLevel,step);
 				
-// 				if(step == 0) // && renderLevel > levelInc)
-// 				{
-// 					QPointF realPoint = levelStep2Point(level,(steps-1));
-// 					
-// 					double renderLevel = getRenderLevel(level,(steps-1) * angleStepSize,realPoint,apMac,center,circleRadius);
-// 					lastPoint = levelStep2Point(renderLevel,(steps-1));
-// 				}
-				if(step != 0)
+				if(step == 0) // && renderLevel > levelInc)
 				{
-					QPointF lastStep = levelStep2Point(renderLevel,(step-1));
+					QPointF realPoint = levelStep2Point(level,(steps-1));
+					
+					double renderLevel = getRenderLevel(level,(steps-1) * angleStepSize,realPoint,apMac,center,circleRadius);
+					lastPoint = levelStep2Point(renderLevel,(steps-1));
+					thisLevelPoints << lastPoint;
+				}
+
+// 				if(step != 0)
+				{
+// 					QPointF lastStep = levelStep2Point(renderLevel,(step-1));
 // 					QPointF lastLevel = levelStep2Point((renderLevel-levelInc),step); 
 // 					QPointF nextLevelStep = levelStep2Point((renderLevel-levelInc),(step+1));
 // 					
@@ -1571,15 +1577,20 @@ void MapGraphicsScene::renderSigMap()
 // 						<< here //QPointF(x+64, y)
 // 						<< lastLevel //QPointF(x+64, y+64)
 // 						<< lastStep; //QPointF(x,    y+64);
-// 						
+						
 // 					QList<QColor> colors = QList<QColor>()
-// 						<< levelStepColor(renderLevel,step)
-// 						<< levelStepColor((renderLevel-levelInc),step)
-// 						<< levelStepColor(renderLevel,(step-1));
-// 				
-// 				
-// 					//fillTriColor(&mapImg, points, colors);
+// 						<< colorForSignal(level/100., apMac)
+// 						<< colorForSignal((level-levelInc)/100., apMac)
+// 						<< colorForSignal(level/100., apMac);
+				
+				
+//					p.setOpacity(.75);
+					p.setCompositionMode(QPainter::CompositionMode_Difference);
+					
+// 					p.setPen(QPen());
 // 					
+// 					//fillTriColor(&mapImg, points, colors);
+// 					p.setBrush(colorForSignal(level/100., apMac));
 // 					p.drawPolygon(points);
 // 					
 // 					QVector<QPointF> points2 = QVector<QPointF>()
@@ -1590,16 +1601,24 @@ void MapGraphicsScene::renderSigMap()
 // 					
 // 					QList<QColor> colors2 = QList<QColor>()
 // 						
-// 						<< levelStepColor(renderLevel,step)
-// 						<< levelStepColor((renderLevel-levelInc),step)
-// 						<< (step == steps ? levelStepColor((renderLevel-levelInc),1) : levelStepColor((renderLevel-levelInc),(step+1>=steps?steps:step+1)))
+// 						<< colorForSignal(level/100., apMac)
+// 						<< colorForSignal((level-levelInc)/100., apMac)
+// 						<< colorForSignal((level-levelInc)/100., apMac)
 // 						;
 // 				
 // 					//fillTriColor(&mapImg, points2, colors2);
 // 					
+// 					p.setBrush(colorForSignal((level)/100., apMac));
 // 					p.drawPolygon(points2);
+// 					
+ 					p.setOpacity(.5);
+// 					p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+					
+//					p.setPen(QPen(centerColor.darker(), 4.0));
+ 					p.setPen(QPen(colorForSignal((level)/100., apMac), (1.-(level/100.))*10.));
 
 					p.drawLine(lastPoint,here);
+					thisLevelPoints << here;
 // 					if(step == steps)
 // 					{
 // 						QPointF lastStep = levelStep2Point(renderLevel,(0));
@@ -1609,6 +1628,15 @@ void MapGraphicsScene::renderSigMap()
 				
 				lastPoint = here;
 			}
+			
+			if(level > levelInc)
+			{
+				lastLevelPoints << thisLevelPoints;
+				p.setBrush(colorForSignal((level)/100., apMac));
+				p.drawPolygon(lastLevelPoints);
+			}
+			
+			lastLevelPoints = thisLevelPoints;
 		}
 		
 	
@@ -1628,6 +1656,7 @@ void MapGraphicsScene::renderSigMap()
 // 				
 // 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
 				
+				p.setPen(QPen(centerColor, val->signalForAp(apMac) * 10.));
 				p.drawLine(center, val->point);
 				
 				/// TODO Use radial code below to draw the line to the center of the circle for *this* AP
@@ -1667,7 +1696,7 @@ void MapGraphicsScene::renderSigMap()
 	#endif
 
 	
-	//mapImg.save("/tmp/mapImg.jpg");
+	mapImg.save("/tmp/mapImg.jpg");
 	
 
 	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
@@ -1830,7 +1859,7 @@ void MapGraphicsScene::loadResults(QString filename)
 		}
 		data.endArray();
 		
-		m_colorListForMac[apMac] = colorList;
+		//m_colorListForMac[apMac] = colorList;
 	}
 	data.endArray();
 	
