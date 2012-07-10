@@ -21,7 +21,9 @@ RESOURCES = resources.qrc
 # Input
 HEADERS += \
 	MapWindow.h \
+	MapGraphicsScene.h \
 	WifiDataCollector.h
 SOURCES += \
 	MapWindow.cpp \
+	MapGraphicsScene.cpp \
 	WifiDataCollector.cpp
