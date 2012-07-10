@@ -2,8 +2,9 @@
 
 #include <QTcpSocket>
 
-static const double Pi = 3.14159265358979323846264338327950288419717;
- 
+static const double Pi  = 3.14159265358979323846264338327950288419717;
+static const double Pi2 = Pi * 2.;
+
 #ifdef Q_OS_ANDROID
 	// Empty #define makes it use live data
 	#define DEBUG_WIFI_FILE
@@ -14,9 +15,11 @@ static const double Pi = 3.14159265358979323846264338327950288419717;
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
 //#define Q_OS_ANDROID
 
-
 //#define RENDER_MODE_TRIANGLES
 
+//#define RENDER_MODE_CIRCLES
+		
+		
 
 class TRGBFloat {
 public:
@@ -491,8 +494,8 @@ MapWindow::MapWindow(QWidget *parent)
 	
 	/// NOTE just for testing
 	//m_scene->loadResults("wmz/phc-firsttest.wmz");
-	m_scene->loadResults("wmz/test.wmz");
-	//m_scene->loadResults("wmz/phcfirstrun.wmz");
+	//m_scene->loadResults("wmz/test.wmz");
+	m_scene->loadResults("wmz/phcfirstrun.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -743,6 +746,32 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 }
 
+// Convert an image to grayscale and return it as a new image
+QImage grayscaled(const QImage &image)
+{
+    QImage img = image;
+    int pixels = img.width() * img.height();
+    unsigned int *data = (unsigned int *)img.bits();
+    for (int i = 0; i < pixels; ++i) {
+        int val = qGray(data[i]);
+        data[i] = qRgba(val, val, val, qAlpha(data[i]));
+    }
+    return img;
+}
+
+// Tint an image with the specified color and return it as a new image
+QImage tinted(const QImage &image, const QColor &color, QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay)
+{
+    QImage resultImage(image.size(), QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&resultImage);
+    painter.drawImage(0, 0, grayscaled(image));
+    painter.setCompositionMode(mode);
+    painter.fillRect(resultImage.rect(), color);
+    painter.end();
+    resultImage.setAlphaChannel(image.alphaChannel());
+    return resultImage;
+}
+
 void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 {
 	m_apLocations[mac] = point;
@@ -753,6 +782,8 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 		
 	//markerGroup.save("apMarkerDebug.png");
 	
+	markerGroup = tinted(markerGroup, colorForSignal(1.0, mac));
+
 	QGraphicsPixmapItem *item = addPixmap(QPixmap::fromImage(markerGroup));
 	
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
@@ -1278,73 +1309,100 @@ SigMapValue *MapGraphicsScene::findNearest(QPointF match, QString apMac)
 
 double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPoint,QString apMac,QPointF center,double circleRadius)
 {	
-	double Pi2   = Pi* 2.;
-	
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		if(val->hasAp(apMac))
 		{
 		
+			// First, conver the location of this SigMapValue to an angle and "level" (0-100%) in relation to the center
 			QPointF calcPoint = val->point - center;
 			double testLevel = sqrt(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
 			double testAngle = atan2(calcPoint.y(), calcPoint.x());// * 180 / Pi;
 			
+			// Convert the angle from radians in the range of [-pi,pi] to degrees
 			testAngle = testAngle/Pi2 * 360;
-			if(testAngle < 0)
+			if(testAngle < 0) // compensate for invalid Quad IV angles in relation to points returned by sin(rads(angle)),cos(rads(angle))
 				testAngle += 360;
 		
+			// Conver the level to a 0-100% value
 			testLevel = (testLevel / circleRadius) * 100.;
 			
-			
+			// Get the level of signal read for the current AP at this locaiton
 			double signalLevel = val->signalForAp(apMac) * 100.;
 			
+			// Get the difference in angle for this reading from the current angle,
+			// and the difference in "level" of this reading from the current level.
+			// Because:
 			// Only values within X degrees and Y% of current point
 			// will affect this point
 			double angleDiff = fabs(testAngle - angle);
 			double levelDiff = fabs(testLevel - level);
 			
+			// Now, calculate the straight-line distance of this reading to the current point we're rendering
 			calcPoint = val->point - realPoint;
 			double lineDist = sqrt(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
 			
-			double signalLevelDiff = (testLevel - signalLevel) * levelDiff / 100. * (1./(lineDist / 100.));
+			// Calculate the value to adjust the render level by.
+			double signalLevelDiff = (testLevel - signalLevel) // Adjustment is based on the differences in the current render level vs the signal level read at this point 
+						* (levelDiff / 100.)	   // Apply a weight based on the difference in level (the location its read at vs the level we're rendering - points further away dont affect as much)
+						* (1./(lineDist / 200.));  // Apply a weight based on the straight-line difference from this location to the signal level
+						
+			// The whole theory we're working with here is that the rendering algorithm will go in a circle around the center,
+			// starting at level "0", with the idea that the "level" is the "ideal signal level" - incrementing outward with
+			// the level being expressed as a % of the circle radius. The rendering algo makes one complete circle at each 
+			// level, calculating the ideal point on the circle for each point at that level.
 			
-			qDebug() << "getRenderLevel: val "<<val->point<<", signal for "<<apMac<<": "<<(int)signalLevel<<"%, angleDiff:"<<angleDiff<<", levelDiff:"<<levelDiff<<", lineDist:"<<lineDist<<", signalLevelDiff:"<<signalLevelDiff;
+			// To express the signal readings, at each point on the circle on the current level, we calculate a "render level", wherein we adjust the current "level"
+			// (e.g. the radius, or distance for that point from the circle's center) based on the formula above.
+			
+			// The forumla above is designed to take into account the signal reading closest to the current point, moving the point closer to the circle's center or further away
+			// if the signal reading is stronger than "it should be" at that level or weaker"
+			
+			// By "stronger (or weaker) than it should be", we mean signal reading at X% from the circles center reads Y%, where ||X-Y|| > 0
+			
+			// To show the effect of the readings, we allow the signal markers to "warp" the circle - readings stronger than they should be closer to the circle
+			// will "pull in" the appros level (a 50% reading at 10% from the circle's center will "pull in" the "50% line")
+			
+			// Now, inorder to extrapolate the effect of the reading and interpolate it across multiple points in the circle, and to factor in the warping
+			// effect of nearby readings (e.g. to bend the lineds toward those values, should they deviate from their ideal readings on the circle),
+			// we apply several weights, based on the difference in distance from the circle's center the reading is vs the current level,
+			// as well as the straight-line distance from the reading in question to the current "ideal" rendering point.
+			
+			// Then we sum "adjustment value" (signalLevelDiff) changes onto the level value, so that oposing readings can cancel out each other appropriatly.
+			
+			// The result is a radial flow diagram, warped to approximately fit the signal readings, and appears to properly model apparent real-world signal propogations.
+			
+			// This rendering model can be tuned/tweaked in a number of locations:
+			//	- The "angleDiff" and "levelDiff" comparrison values, below - These specifiy the maximum allowable difference in 
+			//	  angle that the current SigMapValue and max allowable diff level that the SigMapValue can be inorder for it to have any influence whatosever on the current level
+			//	- The lineDist divisor above in the third parenthetical part of the signalLevelDiff equation - the value should be *roughly* what the max
+			//	  straight-line dist is that can be expected by allowing the given angleDiff/levelDiff (below) - though the value is inverted (1/x) in order to smooth
+			//	  the effects of this particular value on the overall adjustment
+			//	Additionally, rendering quality and speed can be affected in the renderSigMap function by adjusting:
+			//	- "int steps" variable (number of circular sections to render)
+			//	- "levelInc" variable - the size of steps from 0-100% to take (currently, it's set to .25, making 400 total steps from 0-100 - more steps, more detailed rendering
+			//	- You can also tweak the line width algorithm right before the call to p.drawLine, as well as the painter opacity to suit tastes
+					
+			//qDebug() << "getRenderLevel: val "<<val->point<<", signal for "<<apMac<<": "<<(int)signalLevel<<"%, angleDiff:"<<angleDiff<<", levelDiff:"<<levelDiff<<", lineDist:"<<lineDist<<", signalLevelDiff:"<<signalLevelDiff;
 			
 				
-			if(angleDiff < 90. &&
-			   levelDiff < 25.)
+			if(angleDiff < 180. &&
+			   levelDiff < 50.)
 			{
-				double oldLev = level;
+				//double oldLev = level;
 				level += signalLevelDiff;
 				
-				qDebug() << "\t - level:"<<level<<" (was:"<<oldLev<<"), signalLevelDiff:"<<signalLevelDiff; 
+				//qDebug() << "\t - level:"<<level<<" (was:"<<oldLev<<"), signalLevelDiff:"<<signalLevelDiff; 
 				
 				//qDebug() << "getRenderLevel: "<<center<<" -> "<<realPoint.toPoint()<<": \t " << (round(angle) - round(testAngle)) << " \t : "<<level<<" @ "<<angle<<", calc: "<<testLevel<<" @ "<<testAngle <<", "<<calcPoint;
 			}
 		}
 	}	
 	
+	if(level < 0)
+		level = 0;
+		
 	return level;
-	
-
-// 	foreach(SigMapValue *val, m_sigValues)
-// 		val->consumed = false;
-// 		
-// 	double dist = 0.;
-// 	 
-// 	while(dist < 10.)
-// 	{
-// 		SigMapValue *val = findNearest(realPoint, apMac);
-// 		
-// 		if(val)
-// 		{
-// 			double dx = val->point.x() - realPoint.x();
-// 			double dy = val->point.y() - realPoint.y();
-// 			dist = sqrt(dx*dx + dy*dy);
-// 		}
-// 	}
-// 	
-
 }
 
 void MapGraphicsScene::renderSigMap()
@@ -1480,7 +1538,8 @@ void MapGraphicsScene::renderSigMap()
 		}
 		
 		
-		double circleRadius = (1.0/maxSigValue) * maxDistFromCenter;
+		//double circleRadius = maxDistFromCenter;
+		double circleRadius = (1.0/maxSigValue) * .75 * maxDistFromCenter;
 		qDebug() << "MapGraphicsScene::renderSigMap(): circleRadius:"<<circleRadius<<", maxDistFromCenter:"<<maxDistFromCenter<<", maxSigValue:"<<maxSigValue;
 		
 		
@@ -1491,40 +1550,42 @@ void MapGraphicsScene::renderSigMap()
 		rg.setColorAt(0., centerColor);
 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<1.0<<", color:"<<centerColor;
 		
-// 		foreach(SigMapValue *val, m_sigValues)
-// 		{
-// 			if(val->hasAp(apMac))
-// 			{
-// 				double sig = val->signalForAp(apMac);
-// 				QColor color = colorForSignal(sig, apMac);
-// 				rg.setColorAt(1-sig, color);
-// 				
-// 				double dx = val->point.x() - center.x();
-// 				double dy = val->point.y() - center.y();
-// 				double distFromCenter = sqrt(dx*dx + dy*dy);
-// 				
-// 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
-// 				
-// 				
-// 			}
-// 		}
-// 		
-// 		rg.setCenter(center);
-// 		rg.setFocalPoint(center);
-// 		rg.setRadius(circleRadius);
-// 		
-// 		p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
-// 		p.setBrush(QBrush(rg));
-// 		//p.setBrush(Qt::green);
-// 		p.setPen(QPen(Qt::black,1.5));
-// 		//p.drawEllipse(0,0,iconSize,iconSize);
-// 		p.setCompositionMode(QPainter::CompositionMode_Difference);
-// 		p.drawEllipse(center, circleRadius, circleRadius);//maxDistFromCenter, maxDistFromCenter);
-// 		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+		#ifdef RENDER_MODE_CIRCLES
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(val->hasAp(apMac))
+			{
+				double sig = val->signalForAp(apMac);
+				QColor color = colorForSignal(sig, apMac);
+				rg.setColorAt(1-sig, color);
+				
+				double dx = val->point.x() - center.x();
+				double dy = val->point.y() - center.y();
+				double distFromCenter = sqrt(dx*dx + dy*dy);
+				
+				//qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
+				
+				
+			}
+		}
+		
+		rg.setCenter(center);
+		rg.setFocalPoint(center);
+		rg.setRadius(maxDistFromCenter);
+		
+		p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
+		p.setOpacity(1. / (double)(numAps) * (numAps - idx));
+		p.setBrush(QBrush(rg));
+		//p.setBrush(Qt::green);
+		p.setPen(QPen(Qt::black,1.5));
+		//p.drawEllipse(0,0,iconSize,iconSize);
+		//p.setCompositionMode(QPainter::CompositionMode_Xor);
+		p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
+		qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+		#else
 
 
-
-		int steps = 16;
+		int steps = 4 * 4 * 4;
 		double angleStepSize = 360. / ((double)steps);
 		
 		//int radius = 64*10/2;
@@ -1535,7 +1596,7 @@ void MapGraphicsScene::renderSigMap()
 		
 		qDebug() << "center: "<<center;
 		
-		int levelInc = 3; //100 / 1;// / 2;// steps;
+		double levelInc = .25; //100 / 1;// / 2;// steps;
 		
 		#define levelStepColor(level,step) QColor::fromHsv((int)qMin(359., step * angleStepSize), (int)qMin(255., level / 100. * 255), (int)qMin(255., level / 100. * 255))
 		
@@ -1548,6 +1609,7 @@ void MapGraphicsScene::renderSigMap()
 		QVector<QPointF> lastLevelPoints;
 		for(double level=levelInc; level<=100; level+=levelInc)
 		{
+			qDebug() << "level:"<<level;
 			QVector<QPointF> thisLevelPoints;
 			QPointF lastPoint;
 			for(int step=0; step<steps; step++)
@@ -1567,128 +1629,81 @@ void MapGraphicsScene::renderSigMap()
 					thisLevelPoints << lastPoint;
 				}
 
-// 				if(step != 0)
-				{
-// 					QPointF lastStep = levelStep2Point(renderLevel,(step-1));
-// 					QPointF lastLevel = levelStep2Point((renderLevel-levelInc),step); 
-// 					QPointF nextLevelStep = levelStep2Point((renderLevel-levelInc),(step+1));
-// 					
-// 					QVector<QPointF> points = QVector<QPointF>()
-// 						<< here //QPointF(x+64, y)
-// 						<< lastLevel //QPointF(x+64, y+64)
-// 						<< lastStep; //QPointF(x,    y+64);
-						
-// 					QList<QColor> colors = QList<QColor>()
-// 						<< colorForSignal(level/100., apMac)
-// 						<< colorForSignal((level-levelInc)/100., apMac)
-// 						<< colorForSignal(level/100., apMac);
-				
-				
-//					p.setOpacity(.75);
-					p.setCompositionMode(QPainter::CompositionMode_Difference);
+				p.setOpacity(.8); //1. / (double)(numAps) * (numAps - idx));
+				//p.setCompositionMode(QPainter::CompositionMode_Xor);
 					
-// 					p.setPen(QPen());
-// 					
-// 					//fillTriColor(&mapImg, points, colors);
-// 					p.setBrush(colorForSignal(level/100., apMac));
-// 					p.drawPolygon(points);
-// 					
-// 					QVector<QPointF> points2 = QVector<QPointF>()
-// 						<< here //QPointF(x+64, y)
-// 						<< lastLevel //QPointF(x+64, y+64)
-// 						<< nextLevelStep; //QPointF(x,    y+64);
-// 					
-// 					
-// 					QList<QColor> colors2 = QList<QColor>()
-// 						
-// 						<< colorForSignal(level/100., apMac)
-// 						<< colorForSignal((level-levelInc)/100., apMac)
-// 						<< colorForSignal((level-levelInc)/100., apMac)
-// 						;
-// 				
-// 					//fillTriColor(&mapImg, points2, colors2);
-// 					
-// 					p.setBrush(colorForSignal((level)/100., apMac));
-// 					p.drawPolygon(points2);
-// 					
- 					p.setOpacity(.5);
-// 					p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-					
-//					p.setPen(QPen(centerColor.darker(), 4.0));
- 					p.setPen(QPen(colorForSignal((level)/100., apMac), (1.-(level/100.))*10.));
+//				p.setPen(QPen(centerColor.darker(), 4.0));
+				p.setPen(QPen(colorForSignal((level)/100., apMac), (1.-(level/100.))*levelInc*5.));
 
-					p.drawLine(lastPoint,here);
-					thisLevelPoints << here;
-// 					if(step == steps)
-// 					{
-// 						QPointF lastStep = levelStep2Point(renderLevel,(0));
-// 						p.drawLine(lastStep,here);
-// 					}
-				}
+				p.drawLine(lastPoint,here);
+				thisLevelPoints << here;
 				
 				lastPoint = here;
 			}
 			
+			/*
 			if(level > levelInc)
 			{
 				lastLevelPoints << thisLevelPoints;
 				p.setBrush(colorForSignal((level)/100., apMac));
-				p.drawPolygon(lastLevelPoints);
+				//p.drawPolygon(lastLevelPoints);
 			}
+			*/
 			
 			lastLevelPoints = thisLevelPoints;
 		}
 		
 	
 		
-		p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-		
-		// Render lines to signal locations
-		p.setOpacity(.75);
-		p.setPen(QPen(centerColor, 1.5));
-		foreach(SigMapValue *val, m_sigValues)
-		{
-			if(val->hasAp(apMac))
-			{
-// 				double sig = val->signalForAp(apMac);
-// 				QColor color = colorForSignal(sig, apMac);
-// 				rg.setColorAt(1-sig, color);
+// 		p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+// 		
+// 		// Render lines to signal locations
+// 		p.setOpacity(.75);
+// 		p.setPen(QPen(centerColor, 1.5));
+// 		foreach(SigMapValue *val, m_sigValues)
+// 		{
+// 			if(val->hasAp(apMac))
+// 			{
+// // 				double sig = val->signalForAp(apMac);
+// // 				QColor color = colorForSignal(sig, apMac);
+// // 				rg.setColorAt(1-sig, color);
+// // 				
+// // 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
 // 				
-// 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
-				
-				p.setPen(QPen(centerColor, val->signalForAp(apMac) * 10.));
-				p.drawLine(center, val->point);
-				
-				/// TODO Use radial code below to draw the line to the center of the circle for *this* AP
-				/*
-				#ifdef Q_OS_ANDROID
-					const int iconSize = 64;
-				#else
-					const int iconSize = 32;
-				#endif
-			
-				const double iconSizeHalf = ((double)iconSize)/2.;
-					
-				int numResults = results.size();
-				double angleStepSize = 360. / ((double)numResults);
-				
-				QRectF boundingRect;
-				QList<QRectF> iconRects;
-				for(int resultIdx=0; resultIdx<numResults; resultIdx++)
-				{
-					double rads = ((double)resultIdx) * angleStepSize * 0.0174532925;
-					double iconX = iconSizeHalf/2 * numResults * cos(rads);
-					double iconY = iconSizeHalf/2 * numResults * sin(rads);
-					QRectF iconRect = QRectF(iconX - iconSizeHalf, iconY - iconSizeHalf, (double)iconSize, (double)iconSize);
-					iconRects << iconRect;
-					boundingRect |= iconRect;
-				}
-				
-				boundingRect.adjust(-1,-1,+2,+2);
-				*/
-			}
-		}
+// 				p.setPen(QPen(centerColor, val->signalForAp(apMac) * 10.));
+// 				//p.drawLine(center, val->point);
+// 				
+// 				/// TODO Use radial code below to draw the line to the center of the circle for *this* AP
+// 				/*
+// 				#ifdef Q_OS_ANDROID
+// 					const int iconSize = 64;
+// 				#else
+// 					const int iconSize = 32;
+// 				#endif
+// 			
+// 				const double iconSizeHalf = ((double)iconSize)/2.;
+// 					
+// 				int numResults = results.size();
+// 				double angleStepSize = 360. / ((double)numResults);
+// 				
+// 				QRectF boundingRect;
+// 				QList<QRectF> iconRects;
+// 				for(int resultIdx=0; resultIdx<numResults; resultIdx++)
+// 				{
+// 					double rads = ((double)resultIdx) * angleStepSize * 0.0174532925;
+// 					double iconX = iconSizeHalf/2 * numResults * cos(rads);
+// 					double iconY = iconSizeHalf/2 * numResults * sin(rads);
+// 					QRectF iconRect = QRectF(iconX - iconSizeHalf, iconY - iconSizeHalf, (double)iconSize, (double)iconSize);
+// 					iconRects << iconRect;
+// 					boundingRect |= iconRect;
+// 				}
+// 				
+// 				boundingRect.adjust(-1,-1,+2,+2);
+// 				*/
+// 			}
+// 		}
 		
+		#endif
 		
 		idx ++;
 	}
@@ -1705,15 +1720,23 @@ void MapGraphicsScene::renderSigMap()
 
 QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 {
-	//static int colorCounter = 16;
+	static int colorCounter = 0;
 	QList<QColor> colorList;
 	if(!m_colorListForMac.contains(apMac))
 	{
-		QColor baseColor = QColor::fromHsv(qrand() % 359, 255, 255);
+		static const QList<QColor> masterColors = QList<QColor>() << Qt::red << Qt::darkGreen << Qt::blue << Qt::yellow << Qt::darkCyan << Qt::magenta << Qt::darkMagenta << Qt::gray;
+		QColor baseColor;
+		if(colorCounter < masterColors.size()-1)
+			baseColor = masterColors[colorCounter++]; 
+		else
+			baseColor = QColor::fromHsv(qrand() % 359, 255, 255);
 		
 		// paint the gradient
 		QImage signalLevelImage(100,10,QImage::Format_ARGB32_Premultiplied);
 		QPainter sigPainter(&signalLevelImage);
+		
+		#ifdef RENDER_MODE_CIRCLES
+		
 		QLinearGradient fade(QPoint(0,0),QPoint(100,0));
 // 		fade.setColorAt( 0.3, Qt::black  );
 // 		fade.setColorAt( 1.0, Qt::white  );
@@ -1721,8 +1744,10 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		fade.setColorAt( 0.7, Qt::yellow );
 		fade.setColorAt( 1.0, Qt::green  );
 		sigPainter.fillRect( signalLevelImage.rect(), fade );
-		//sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
-		sigPainter.setCompositionMode(QPainter::CompositionMode_Difference);
+		sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+		#endif
+		
+		//sigPainter.setCompositionMode(QPainter::CompositionMode_Difference);
 		sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
 		
 		sigPainter.end();
