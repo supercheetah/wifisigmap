@@ -91,6 +91,7 @@ protected:
 	
 private slots:
 	void longPressTimeout();
+	void longPressCount();
 	void renderSigMap();
 	
 private:
@@ -110,6 +111,8 @@ private:
 private:
 	QPointF m_pressPnt;
 	QTimer m_longPressTimer;
+	QTimer m_longPressCountTimer;
+	int m_longPressCount;
 	
 	QList<SigMapValue*> m_sigValues;
 		

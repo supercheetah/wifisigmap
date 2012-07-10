@@ -95,7 +95,8 @@ MapWindow::MapWindow(QWidget *parent)
 	/// NOTE just for testing
 	//m_scene->loadResults("wmz/phc-firsttest.wmz");
 	//m_scene->loadResults("wmz/test.wmz");
-	m_scene->loadResults("wmz/phcfirstrun.wmz");
+	//m_scene->loadResults("wmz/phcfirstrun.wmz");
+	m_scene->loadResults("wmz/foobar.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \

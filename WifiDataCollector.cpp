@@ -1,23 +1,59 @@
 #include "WifiDataCollector.h"
 
+#include <QDir>
+
+//#define OLD_SCAN_METHOD
+
 #ifdef Q_OS_ANDROID
 
-    #define IWCONFIG_BINARY "/tmp/iwconfig"
-    #define IWLIST_BINARY   "/tmp/iwlist"
+    #define IWCONFIG_BINARY QString("%1/iwconfig").arg(QDir::tempPath());
+    #define IWLIST_BINARY   QString("%1/iwlist").arg(QDir::tempPath());
+    #define IWSCAN_SCRIPT   QString("%1/iwscan").arg(QDir::tempPath());
 
-    // TODO - Add these binaries to the .qrc file (heck, *create* the qrc file!)
     #define INTERNAL_IWCONFIG_BINARY ":/data/android/iwconfig"
     #define INTERNAL_IWLIST_BINARY   ":/data/android/iwlist"
+    #define INTERNAL_IWSCAN_SCRIPT   ":/data/android/iwscan.sh"
 #else
 #ifdef Q_OS_LINUX
 
 	#define IWCONFIG_BINARY "iwconfig"
 	#define IWLIST_BINARY   "iwlist"
+	#define IWSCAN_SCRIPT   "iwscan.sh"
 	
 	#define INTERNAL_IWCONFIG_BINARY ""
 	#define INTERNAL_IWLIST_BINARY   ""
+	#define INTERNAL_IWSCAN_SCRIPT   ""
 #endif
 #endif
+
+
+// #define ENABLE_WIRELESS_TOOLS
+// 
+// #ifdef ENABLE_WIRELESS_TOOLS
+// /* This method of including wireless tools is copied from iwmulticall.c */
+// 
+// /* We need the library */
+// #include "3rdparty/wireless-tools/iwlib.c"
+// 
+// /* Get iwconfig in there. Mandatory. */
+// #define main(args...) main_iwconfig(args)
+// #define iw_usage(args...) iwconfig_usage(args)
+// #define find_command(args...) iwconfig_find_command(args)
+// #include "3rdparty/wireless-tools/iwconfig.c"
+// #undef find_command
+// #undef iw_usage
+// #undef main
+// 
+// /* Get iwlist in there. Scanning support is pretty sweet. */
+// #define main(args...) main_iwlist(args)
+// #define iw_usage(args...) iwlist_usage(args)
+// #define find_command(args...) iwlist_find_command(args)
+// #include "3rdparty/wireless-tools/iwlist.c"
+// #undef find_command
+// #undef iw_usage
+// #undef main
+// 
+// #endif /* ENABLE_WIRELESS_TOOLS */
 
 QString WifiDataResult::toString() const
 {
@@ -43,6 +79,45 @@ WifiDataCollector::WifiDataCollector()
 	auditIwlistBinary();
 }
 
+class WifiResultAverage
+{
+public:
+	WifiResultAverage(WifiDataResult r)
+		: result(r)
+	{
+		ap       = r.mac;
+		valueSum = r.value;
+		dbmSum   = r.dbm;
+		count    = 1;
+	};
+	
+	void add(double v, int d)
+	{
+		valueSum += v;
+		dbmSum   += d;
+		count    ++;
+	}
+	
+	void add(WifiDataResult r) {
+		add(r.value, r.dbm); // we only store the first result
+	}
+	
+	double avgValue() {
+		return valueSum/(double)count; 
+	}
+	
+	double avgDbm() {
+		return ((double)dbmSum)/((double)count); 
+	}
+		
+	QString ap;
+	double dbmSum;
+	double valueSum;
+	int count;
+	WifiDataResult result;
+};
+
+
 QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
 {
 	QString buffer;
@@ -50,12 +125,28 @@ QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
 	 
 	if(!debugTextFile.isEmpty())
 		buffer = readTextFile(debugTextFile);
+#ifdef OLD_SCAN_METHOD
 	else
+	{
 		buffer = getIwlistOutput();
-
+	}
+#else
+	else
+	{
+		// The new method of scanning is very fast,
+		// so try to make sure we get *something*
+		int counter = 0;
+		while(counter ++ < 10 && 
+		     !buffer.contains(" Cell "))
+		      buffer = getIwlistOutput();
+	}
+#endif
+	
 	qDebug() << "WifiDataCollector::scanWifi(): Raw buffer: "<<buffer;
 
 	//QMessageBox::information(0, "Debug", QString("Raw buffer: %1").arg(buffer));
+
+#ifdef OLD_SCAN_METHOD
 
 	if(buffer.isEmpty() || buffer.contains("No scan results"))
 	{
@@ -80,6 +171,79 @@ QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
 		qDebug() << "WifiDataCollector::scanWifi(): Parsed result: "<<result;
 		results << result;
 	}
+#else
+	QStringList scanBuffers = buffer.split("# Scan");
+	qDebug() << "WifiDataCollector::scanWifi(): New Scan Method: Found "<<scanBuffers<<" scan results";
+	
+	int idx = 0;
+	foreach(QString scanBuffer, scanBuffers)
+	{
+		idx ++;
+		if(scanBuffer.isEmpty() || scanBuffer.contains("No scan results"))
+		{
+			//qDebug() << "WifiDataCollector::scanWifi(): No scan results";
+			//return results; // return empty list
+			qDebug() << "WifiDataCollector::scanWifi(): No scan results in buffer "<<idx;
+			continue;
+		}
+			
+		QStringList rawBlocks = scanBuffer.split(" Cell ");
+		
+		int blockIdx = 0;
+		foreach(QString block, rawBlocks)
+		{
+			blockIdx ++;
+			if(block.toLower().contains("scan completed"))
+			{
+				qDebug() << "WifiDataCollector::scanWifi(): No scan results in buffer "<<idx<<", block "<<blockIdx<<" (scan completed)";
+				continue;
+			}
+				
+			WifiDataResult result = parseRawBlock(block);
+			if(!result.valid)
+			{
+				qDebug() << "WifiDataCollector::scanWifi(): Error parsing raw block "<<blockIdx<<": "<<block;
+				continue;
+			}
+			
+			qDebug() << "WifiDataCollector::scanWifi(): New scan method, parsed result for block"<<blockIdx<<": "<<result; //<<", raw:"<<block;
+			results << result;
+		}
+	}
+	
+	// The "new" scanning method just scans X number of times, possibly duplicating APs
+	// So here we have to merge (average) the signal readings of any duplicate APs
+	
+	QHash<QString, WifiResultAverage*> resultMap;
+	
+	foreach(WifiDataResult r, results)
+	{
+		qDebug() << "WifiDataCollector::scanWifi(): Merging results, current: "<<r.mac<<", dbm:"<<r.dbm<<", val:"<<r.value;
+		if(!resultMap.contains(r.mac))
+			resultMap.insert(r.mac, new WifiResultAverage(r));
+		else
+			resultMap.value(r.mac)->add(r);
+	}
+	
+	results.clear();
+	foreach(WifiResultAverage *avg, resultMap.values())
+	{
+		WifiDataResult r = avg->result;
+		
+		// Update the value & dbm of this AP
+		r.value = avg->avgValue();
+		r.dbm   = (int)avg->avgDbm();
+		
+		// Since MapGraphicsScene *only* stores r.rawData, update the rawData with "fake" readings
+		r.rawData["signal level"] = QString("%1 dBm").arg((int)r.dbm);
+		
+		qDebug() << "WifiDataCollector::scanWifi(): Averaged MAC "<<r.mac<<": dBm: "<<r.dbm<<"dBm, value:"<<r.value;
+		
+		results << r;
+	}
+	
+#endif
+	
 	
 	return results;
 }
@@ -106,12 +270,12 @@ bool WifiDataCollector::auditIwlistBinary()
 	return true;
 #endif
 	
-	// Extract iwconfig/iwlist from internal Qt resource storage
+	// Extract ARM versions of iwconfig/iwlist and our iwscan.sh from internal Qt resource storage
 	if(!QFile::exists(IWCONFIG_BINARY))
 	{
 		if(!QFile(INTERNAL_IWCONFIG_BINARY).copy(IWCONFIG_BINARY))
 		{
-			QString errorMsg = "Error copying " INTERNAL_IWCONFIG_BINARY " to " IWCONFIG_BINARY ", app likely will not function.";
+			QString errorMsg = QString("Error copying " INTERNAL_IWLIST_BINARY " to %1, app likely will not function.").arg(IWCONFIG_BINARY);
 			qDebug() << "WifiDataCollector::auditIwlistBinary(): " << qPrintable(errorMsg);
 			QMessageBox::critical(0, "Setup Error", errorMsg);
 			return false;
@@ -126,7 +290,7 @@ bool WifiDataCollector::auditIwlistBinary()
 	{
 		if(!QFile(INTERNAL_IWLIST_BINARY).copy(IWLIST_BINARY))
 		{
-			QString errorMsg = "Error copying " INTERNAL_IWLIST_BINARY " to " IWLIST_BINARY ", app likely will not function.";
+			QString errorMsg = QString("Error copying " INTERNAL_IWLIST_BINARY " to %1, app likely will not function.").arg(IWLIST_BINARY);
 			qDebug() << "WifiDataCollector::auditIwlistBinary(): " << qPrintable(errorMsg);
 			QMessageBox::critical(0, "Setup Error", errorMsg);
 			return false;
@@ -137,19 +301,41 @@ bool WifiDataCollector::auditIwlistBinary()
 		}
 	}
 		
+	if(!QFile::exists(IWSCAN_SCRIPT))
+	{
+		if(!QFile(INTERNAL_IWSCAN_SCRIPT).copy(IWSCAN_SCRIPT))
+		{
+			QString errorMsg = QString("Error copying " INTERNAL_IWSCAN_SCRIPT " to %1, app likely will not function.").arg(IWSCAN_SCRIPT);
+			qDebug() << "WifiDataCollector::auditIwlistBinary(): " << qPrintable(errorMsg);
+			QMessageBox::critical(0, "Setup Error", errorMsg);
+			return false;
+		}
+		else
+		{
+			qDebug() << "WifiDataCollector::auditIwlistBinary(): Successfully extracted " INTERNAL_IWSCAN_SCRIPT " to " IWSCAN_SCRIPT; 
+		}
+	}
+	
 	// Check/set the executable bits on the iwlist/iwconfig binaries
 	if(!QFileInfo(IWCONFIG_BINARY).isExecutable())
 	{
 		//QFile(IWLIST_BINARY).setPermissions(QFile::ExeOwner | QFile::ExeUser | QFile::ExeGroup | QFile::ExeOther))
-		system("chmod 755 " IWCONFIG_BINARY);
-		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755 " IWCONFIG_BINARY;
+		system(qPrintable(QString("chmod 755 %1").arg(IWCONFIG_BINARY)));
+		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWCONFIG_BINARY;
 	}
 		
 	if(!QFileInfo(IWLIST_BINARY).isExecutable())
 	{
 		//QFile(IWLIST_BINARY).setPermissions(QFile::ExeOwner | QFile::ExeUser | QFile::ExeGroup | QFile::ExeOther))
-		system("chmod 755 " IWLIST_BINARY);
-		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755 " IWLIST_BINARY;
+		system(qPrintable(QString("chmod 755 %1").arg(IWLIST_BINARY)));
+		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWLIST_BINARY;
+	}
+	
+	if(!QFileInfo(IWSCAN_SCRIPT).isExecutable())
+	{
+		//QFile(IWLIST_BINARY).setPermissions(QFile::ExeOwner | QFile::ExeUser | QFile::ExeGroup | QFile::ExeOther))
+		system(qPrintable(QString("chmod 755 %1").arg(IWSCAN_SCRIPT)));
+		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWSCAN_SCRIPT;
 	}
 	
 	return true;
@@ -158,30 +344,16 @@ bool WifiDataCollector::auditIwlistBinary()
 /*! \brief Read 'iwconfig' and find the first interface with wireless extensions */
 QString WifiDataCollector::findWlanIf()
 {
-	/// JUST FOR DEVELOPMENT
-	
-	// Load text file
-// 	QString fileName = "iwcfg.txt";
-// 	QFile file(fileName);
-// 	if(!file.open(QIODevice::ReadOnly))
-// 	{
-// 		QMessageBox::critical(0,QObject::tr("Can't Read File"),QString(QObject::tr("Unable to open %1")).arg(fileName));
-// 		return "";
-// 	}
-// 
-// 	QTextStream stream(&file);
-// 	QString fileContents = stream.readAll();
-
 	QProcess proc;
 	proc.start(IWCONFIG_BINARY);
 	if(!proc.waitForFinished(10000))
 	{
-		qDebug() << "WifiDataCollector::findWlanIf(): Error: Timeout while waiting for " IWCONFIG_BINARY " to finish.";
+		qDebug() << "WifiDataCollector::findWlanIf(): Error: Timeout while waiting for" << IWCONFIG_BINARY << "to finish.";
 		return "";
 	}
 	
 	QString fileContents = proc.readAllStandardOutput();
-	qDebug() << "WifiDataCollector::findWlanIf(): Raw output of " IWCONFIG_BINARY ": "<<fileContents;
+	qDebug() << "WifiDataCollector::findWlanIf(): Raw output of" << IWCONFIG_BINARY << ": "<<fileContents;
 	
 	// Parse output (iwconfig is nice - it only prints wireless interfaces actually found to stdout)
 	QStringList tokens = fileContents.split(" ");
@@ -201,34 +373,52 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	if(interface.isEmpty())
 		interface = findWlanIf();
 	
-#ifdef Q_OS_ANDROID
-	if(interface.isEmpty())
-		interface = "tiwlan0";
+	#ifdef Q_OS_ANDROID
+		if(interface.isEmpty())
+			interface = "tiwlan0";
+	#endif
+	
+	#ifdef OLD_SCAN_METHOD
+	
+		#ifdef Q_OS_ANDROID
+			// Must scan as root first to force the wifi card to re-scan the area
+			// HOWEVER, this doesn't always *print* all the access points that it finds.
+			// So, we scan here, ignore output, then scan again (as normal user), which
+			// *does* print out all the results, but doesn't force a re-scan (normal
+			// users use the cached results in the kernel)
+			system(qPrintable(QString("su -c '%1 scan'; sleep 1").arg(IWLIST_BINARY)));
+		#endif
+		
+		QStringList scanArgs = QStringList() << interface << "scan";
+	
+		//QMessageBox::information(0, "Debug", QString("Scan args: %1").arg(scanArgs.join(" ")));
+	
+		QProcess proc;
+		proc.start(IWLIST_BINARY, scanArgs);
+	
+	#else
+	
+		int numScanAttempts = 3; // TODO: Configurable?
+		
+		QStringList scanArgs = QStringList() << interface << QString::number(numScanAttempts);
+		
+		//QMessageBox::information(0, "Debug", QString("Scan args: %1").arg(scanArgs.join(" ")));
+	
+		QProcess proc;
+		proc.start(IWSCAN_SCRIPT, scanArgs);
+	#endif
 
-	// Must scan as root first to force the wifi card to re-scan the area
-	// HOWEVER, this doesn't always *print* all the access points that it finds.
-	// So, we scan here, ignore output, then scan again (as normal user), which
-	// *does* print out all the results, but doesn't force a re-scan (normal
-	// users use the cached results in the kernel)
-	system("su -c '" IWLIST_BINARY " scan'; sleep 1");
-#endif
-
-	QStringList scanArgs = QStringList() << interface << "scan";
-
-	//QMessageBox::information(0, "Debug", QString("Scan args: %1").arg(scanArgs.join(" ")));
-
-	QProcess proc;
-	proc.start(IWLIST_BINARY, scanArgs);
-
-	if (!proc.waitForStarted()) {
-	    qDebug() << "********************** Scanner start failed! " << proc.errorString();
-	    QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
+	if (!proc.waitForStarted()) 
+	{
+		qDebug() << "********************** Scanner start failed! " << proc.errorString();
+		QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
 	}
 
 
-	if (!proc.waitForFinished(-1)) {
-	    qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
-	    QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
+	if (!proc.waitForFinished(-1))
+	{
+		qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
+		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
 	}
 	/*
 
@@ -241,7 +431,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	*/
 	
 	QString fileContents = proc.readAllStandardOutput();
-	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of " IWLIST_BINARY ": "<<fileContents;
+	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents;
 	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
 
 	return fileContents;

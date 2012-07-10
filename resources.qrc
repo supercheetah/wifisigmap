@@ -4,5 +4,6 @@
 	<file>data/images/stock-preferences.png</file>
 	<file>data/android/iwlist</file>
 	<file>data/android/iwconfig</file>
+	<file>data/android/iwscan.sh</file>
  </qresource>
  </RCC>
