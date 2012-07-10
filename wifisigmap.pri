@@ -18,6 +18,8 @@ QT += network
 
 RESOURCES = resources.qrc
 
+include(3rdparty/wireless-tools/wireless-tools.pri)
+
 # Input
 HEADERS += \
 	MapWindow.h \
