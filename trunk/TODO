@@ -44,3 +44,13 @@ Android TODO:
 	- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
 	
 	
+Ease of use items:
+	- Attempt rescan if no APs found (configurable from menu)
+	- Offer to NOT render circle (or delay rendering) during scan
+	- Update status when "rendering" so user can move
+	- Place temp marker during scanning at location
+	- NEED TO REMOVE MARKERS
+	- Fingertip spinner would be nice
+	- Dont cancel spin if move within +/- X pixels
+	- ERROR if can't save due to permissions
+	
