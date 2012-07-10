@@ -10,7 +10,7 @@ static const double Pi2 = Pi * 2.;
 	#define DEBUG_WIFI_FILE
 #else
 	// scan3.txt is just some sample data I captured for use in development
-	#define DEBUG_WIFI_FILE "scan3.txt"
+	#define DEBUG_WIFI_FILE "scan3-multi.txt"
 #endif
 
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
@@ -426,8 +426,12 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 
 
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
-	m_longPressTimer.setInterval(1000);
+	m_longPressTimer.setInterval(500);
 	m_longPressTimer.setSingleShot(true);
+	
+	connect(&m_longPressCountTimer, SIGNAL(timeout()), this, SLOT(longPressCount()));
+	m_longPressCountTimer.setInterval(m_longPressTimer.interval() / 10);
+	m_longPressCountTimer.setSingleShot(false);
 	
 	clear(); // sets up background and other misc items
 
@@ -576,9 +580,15 @@ void MapGraphicsScene::addSigMapItem()
 void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
 	if(m_longPressTimer.isActive())
+	{
 		m_longPressTimer.stop();
+		m_longPressCountTimer.stop();
+	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
+	
+	m_longPressCountTimer.start();
+	m_longPressCount = 0;
 	
 	QGraphicsScene::mousePressEvent(mouseEvent);
 }
@@ -586,7 +596,13 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 void MapGraphicsScene::invalidateLongPress()
 {
 	if(m_longPressTimer.isActive())
+	{
 		m_longPressTimer.stop();
+		m_longPressCountTimer.stop();
+		
+		m_mapWindow->setStatusMessage("");
+		QApplication::processEvents();
+	}
 }
 
 void MapGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent * mouseEvent)
@@ -598,10 +614,29 @@ void MapGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent * mouseEvent)
 
 void MapGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
-	invalidateLongPress();
+	invalidateLongPress(); //mouseEvent->lastScenePos());
 		
 	QGraphicsScene::mouseMoveEvent(mouseEvent);
 }
+
+void MapGraphicsScene::longPressCount()
+{
+	m_longPressCount ++;
+	int maxCount = m_longPressTimer.interval() / m_longPressCountTimer.interval();
+	double part  = ((double)m_longPressCount) / ((double)maxCount);
+	int percent = (int)(part * 100.); 
+	
+	if(percent > 100.) // we missed a cancel call somehwere...
+	{
+		m_longPressCountTimer.stop();
+	}
+	else
+	{
+		m_mapWindow->setStatusMessage(tr("Waiting %1%").arg(percent), m_longPressTimer.interval());
+		QApplication::processEvents();
+	}
+}
+
 
 void MapGraphicsScene::longPressTimeout()
 {
@@ -616,6 +651,7 @@ void MapGraphicsScene::longPressTimeout()
 
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
+			QApplication::processEvents();
 			
 			if(results.isEmpty())
 			{
@@ -664,7 +700,9 @@ void MapGraphicsScene::longPressTimeout()
 						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
 						
 						// Render map overlay (because the AP may be tied to an existing scan result)
+						#ifndef Q_OS_ANDROID
 						QTimer::singleShot(0, this, SLOT(renderSigMap()));
+						#endif
 						//renderSigMap();
 					}
 				}
@@ -687,6 +725,7 @@ void MapGraphicsScene::longPressTimeout()
 
 			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
+			QApplication::processEvents();
 			
 			if(results.size() > 0)
 			{
@@ -694,9 +733,12 @@ void MapGraphicsScene::longPressTimeout()
 				addSignalMarker(m_pressPnt, results);
 				
 				m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
+				QApplication::processEvents();
 				
 				// Render map overlay
+				#ifndef Q_OS_ANDROID
 				QTimer::singleShot(0, this, SLOT(renderSigMap()));
+				#endif
 				//renderSigMap();
 				
 				QStringList notFound;
@@ -708,7 +750,10 @@ void MapGraphicsScene::longPressTimeout()
 							.arg(result.essid); // last two octets of mac should be enough
 						
 				if(notFound.size() > 0)
+				{
 					m_mapWindow->setStatusMessage(tr("Ok, but %2 APs need marked: %1").arg(notFound.join(", ")).arg(notFound.size()), 10000);
+					QApplication::processEvents();
+				}
 			}
 			else
 			{
@@ -1634,8 +1679,15 @@ QPointF qPointFFromString(QString string)
 
 void MapGraphicsScene::saveResults(QString filename)
 {
+	QFileInfo info(filename);
+	if(info.exists() && !info.isWritable())
+	{
+		QMessageBox::critical(0, "Unable to Save", tr("Unable to save %1 - it's not writable!").arg(filename));
+		return;
+	}
+	
 	QSettings data(filename, QSettings::IniFormat);
-		
+	
 	qDebug() << "MapGraphicsScene::saveResults(): Saving to: "<<filename;
 	
 	// Store bg filename
@@ -1696,6 +1748,13 @@ void MapGraphicsScene::loadResults(QString filename)
 	
 	QSettings data(filename, QSettings::IniFormat);
 	qDebug() << "MapGraphicsScene::loadResults(): Loading from: "<<filename;
+	
+	QFileInfo info(filename);
+	if(info.exists() && !info.isWritable())
+	{
+		QMessageBox::warning(0, "Warning", tr("%1 is READ ONLY - you won't be able to save any changes!").arg(filename));
+	}
+	
 	
 	clear(); // clear and reset the map
 	
@@ -1846,4 +1905,3 @@ void MapGraphicsScene::renderTriangle(QImage *img, QPointF center, SigMapValue *
 // 	p.end();
 
 }
-
