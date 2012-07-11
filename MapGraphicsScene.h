@@ -52,6 +52,25 @@ public:
 	double signalForAp(QString mac, bool returnDbmValue=false);
 };
 
+class MapGraphicsScene;
+
+class SigMapRenderer : public QObject
+{
+	Q_OBJECT
+public:
+	SigMapRenderer(MapGraphicsScene* gs);
+
+public slots:
+	void render();
+
+signals:
+	void renderProgress(double); // 0.0-1.0
+	void renderComplete(QImage);
+
+protected:
+	MapGraphicsScene *m_gs;
+};
+
 class MapWindow;
 
 class MapGraphicsScene : public QGraphicsScene
@@ -59,6 +78,7 @@ class MapGraphicsScene : public QGraphicsScene
 	Q_OBJECT
 public:
 	MapGraphicsScene(MapWindow *mapWindow);
+	~MapGraphicsScene();
 	
 	QString currentMapFilename() { return m_currentMapFilename; }
 	QString currentBgFilename() { return m_bgFilename; }
@@ -92,9 +112,15 @@ protected:
 private slots:
 	void longPressTimeout();
 	void longPressCount();
-	void renderSigMap();
 	
-private:
+	void renderProgress(double);
+	void renderComplete(QImage mapImg);
+	
+	void scanFinished(QList<WifiDataResult>);
+	
+protected:
+	friend class SigMapRenderer;
+	
 	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
@@ -108,7 +134,7 @@ private:
 	
 	double getRenderLevel(double level,double angle,QPointF realPoint,QString apMac,QPointF center,double circleRadius);
 	
-private:
+protected:
 	QPointF m_pressPnt;
 	QTimer m_longPressTimer;
 	QTimer m_longPressCountTimer;
@@ -142,6 +168,14 @@ private:
 	MapWindow *m_mapWindow;
 	
 	RenderMode m_renderMode;
+	
+	SigMapRenderer *m_renderer;
+	QThread m_renderingThread;
+	QTimer m_renderTrigger;
+	void triggerRender();
+	
+	QGraphicsPixmapItem *m_userItem;
+	QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
 };
 
 #endif
