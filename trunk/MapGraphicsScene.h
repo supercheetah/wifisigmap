@@ -17,10 +17,14 @@ public slots:
 	void zoomOut();
 	
 protected:
+	void drawForeground(QPainter *p, const QRectF & rect);
+	
 	void keyPressEvent(QKeyEvent *event);
 	void mouseMoveEvent(QMouseEvent * mouseEvent);
 	void wheelEvent(QWheelEvent *event);
 	//void drawBackground(QPainter *painter, const QRectF &rect);
+	
+	double m_scaleFactor;
 };
 
 class SigMapValue
@@ -176,6 +180,8 @@ protected:
 	
 	QGraphicsPixmapItem *m_userItem;
 	QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
+	
+	QList<WifiDataResult> m_lastScanResults;
 };
 
 #endif

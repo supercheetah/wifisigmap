@@ -14,6 +14,18 @@ static const double Pi2 = Pi * 2.;
 	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRadial
 #endif
 
+#define qDrawTextC(p,x,y,string,c1,c2) 	\
+	p.setPen(c1);			\
+	p.drawText(x-1, y-1, string);	\
+	p.drawText(x+1, y-1, string);	\
+	p.drawText(x+1, y+1, string);	\
+	p.drawText(x-1, y+1, string);	\
+	p.setPen(c2);			\
+	p.drawText(x, y, string);	\
+	
+#define qDrawTextO(p,x,y,string) 	\
+	qDrawTextC(p,x,y,string,Qt::black,Qt::white);
+
 /// fillTriColor() is a routine I translated from Delphi, atrribution below. 
 
 class TRGBFloat {
@@ -313,6 +325,8 @@ MapGraphicsView::MapGraphicsView()
 {
 	srand ( time(NULL) );
 	
+	m_scaleFactor = 1.;
+	
 	setCacheMode(CacheBackground);
 	//setViewportUpdateMode(BoundingRectViewportUpdate);
 	//setRenderHint(QPainter::Antialiasing);
@@ -380,6 +394,8 @@ void MapGraphicsView::scaleView(qreal scaleFactor)
 	if (factor < 0.001 || factor > 100)
 		return;
 	
+	m_scaleFactor *= scaleFactor;
+	
 	scale(scaleFactor, scaleFactor);
 }
 
@@ -388,6 +404,47 @@ void MapGraphicsView::mouseMoveEvent(QMouseEvent * mouseEvent)
 	qobject_cast<MapGraphicsScene*>(scene())->invalidateLongPress();
 		
 	QGraphicsView::mouseMoveEvent(mouseEvent);
+}
+
+void MapGraphicsView::drawForeground(QPainter *p, const QRectF & upRect)
+{
+	MapGraphicsScene *gs = qobject_cast<MapGraphicsScene*>(scene());
+	if(!gs)
+		return;
+	 
+	int w = 150;
+	int h = 150;
+	int pad = 10;
+	
+	QRect rect(width() - w - pad, pad, w, h);
+		
+	p->save();
+	p->resetTransform();
+	
+	p->setPen(Qt::black);
+	p->fillRect(rect, QColor(0,0,0,150));
+	p->drawRect(rect);
+	
+	int fontSize = 10;// * (1/m_scaleFactor);
+	int margin = fontSize/2;
+	int y = margin;
+	
+	p->setFont(QFont("Monospace", fontSize, QFont::Bold));
+	
+	foreach(WifiDataResult result, gs->m_lastScanResults)
+	{
+		QColor color = gs->colorForSignal(1.0, result.mac).lighter(100);
+		QColor outline = Qt::white; //qGray(color.rgb()) < 60 ? Qt::white : Qt::black;
+		QPoint pnt(rect.topLeft() + QPoint(margin, y += fontSize*1.33));
+		qDrawTextC((*p), pnt.x(), pnt.y(), 
+			QString( "%1% %2"  )
+				.arg(QString().sprintf("%02d", (int)round(result.value * 100.)))
+				.arg(result.essid),
+			outline,
+			color);
+	}
+	
+	p->restore();
 }
 
 /// End MapGraphicsView implementation
@@ -534,6 +591,8 @@ void MapGraphicsScene::clear()
 	m_userItem->setVisible(false);
 	m_userItem->setZValue(150);
 	
+	
+	
 	m_currentMapFilename = "";
 }
 
@@ -615,11 +674,11 @@ void MapGraphicsScene::addSigMapItem()
 }
 
 
-// foreach(WifiDataResult result, results)
-// 					items << QString("%1%: %2 - %3").arg(QString().sprintf("%02d", (int)(result.value*100))).arg(result.mac/*.left(6)*/).arg(result.essid);
-
 void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
+	m_lastScanResults = results;
+	update(); // allow HUD to update
+	
 	QPointF userLocation  = QPointF(-1000,-1000);
 
 	if(m_apLocations.values().size() < 2)
@@ -699,8 +758,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QString ap1 = apsVisible[1];
 	//qDebug() << "MapGraphicsScene::scanFinished(): ap0: "<<ap0<<", ap1:"<<ap1; 
 	
-	double ratio0;
-	double ratio1;
+	double ratio0 = 0;
+	double ratio1 = 0;
 	
 	if(apRatioAvgs.isEmpty())
 	{
@@ -1149,15 +1208,6 @@ QImage ImageFilters::blurred(const QImage& image, const QRect& /*rect*/, int rad
 
 /// End ImageFilters implementation
 
-
-#define qDrawTextO(p,x,y,string) 	\
-	p.setPen(Qt::black);		\
-	p.drawText(x-1, y-1, string);	\
-	p.drawText(x+1, y-1, string);	\
-	p.drawText(x+1, y+1, string);	\
-	p.drawText(x-1, y+1, string);	\
-	p.setPen(Qt::white);		\
-	p.drawText(x, y, string);	\
 
 void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
 {	
@@ -1730,7 +1780,7 @@ void SigMapRenderer::render()
 						(levelNum/100.*circleRadius) * cos(((double)stepNum) * angleStepSize * 0.0174532925) + center.x(), \
 						(levelNum/100.*circleRadius) * sin(((double)stepNum) * angleStepSize * 0.0174532925) + center.y() )
 				
-				qDebug() << "center: "<<center;
+				//qDebug() << "center: "<<center;
 				
 				#ifdef Q_OS_ANDROID
 				const double levelInc = .50; //100 / 1;// / 2;// steps;
@@ -1884,12 +1934,26 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		} 
 		else
 		{
-			if(m_colorCounter < m_masterColorsAvailable.size()-1)
+			bool foundColor = false;
+			while(m_colorCounter ++ < m_masterColorsAvailable.size()-1)
 			{
-				baseColor = m_masterColorsAvailable[m_colorCounter++];
-				//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Using NEW base "<<baseColor<<" from m_masterColorsAvailable # "<<m_colorCounter;
+				baseColor = m_masterColorsAvailable[m_colorCounter];
+				
+				bool colorInUse = false;
+				foreach(QColor color, m_apMasterColor)
+					if(color == baseColor)
+						colorInUse = true;
+						
+				if(!colorInUse)
+				{
+					foundColor = true;
+					break;
+				}
 			}
-			else
+			
+			//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Using NEW base "<<baseColor<<" from m_masterColorsAvailable # "<<m_colorCounter;
+			
+			if(!foundColor)
 			{
 				baseColor = QColor::fromHsv(qrand() % 359, 255, 255);
 				//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Using NEW base "<<baseColor<<" (random HSV color)";
