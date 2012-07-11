@@ -188,7 +188,7 @@ void WifiDataCollector::scanWifi()
 
 	//QMessageBox::information(0, "Debug", QString("Raw buffer: %1").arg(buffer));
 
-	if(buffer.isEmpty() || buffer.contains("No scan results"))
+	if(buffer.isEmpty() || buffer.contains("No scan results") || buffer.contains("Operation not supported"))
 	{
 		qDebug() << "WifiDataCollector::scanWifi(): No scan results";
 		//return results; // return empty list
@@ -203,7 +203,7 @@ void WifiDataCollector::scanWifi()
 				continue;
 	
 			WifiDataResult result = parseRawBlock(block);
-			if(!result.valid)
+			if(!result.valid || result.mac.isEmpty())
 			{
 				qDebug() << "WifiDataCollector::scanWifi(): Error parsing raw block: "<<block;
 				continue;
@@ -368,7 +368,7 @@ bool WifiDataCollector::auditIwlistBinary()
 QString WifiDataCollector::findWlanIf()
 {
 	QProcess proc;
-	proc.setProcessChannelMode(QProcess::MergedChannels);
+//	proc.setProcessChannelMode(QProcess::MergedChannels);
 	proc.start(IWCONFIG_BINARY);
 	
 // 	if(!proc.waitForFinished(10000))
@@ -408,13 +408,14 @@ QString WifiDataCollector::findWlanIf()
 
 QString WifiDataCollector::getIwlistOutput(QString interface)
 {
-	if(interface.isEmpty())
-		interface = findWlanIf();
-
 	#ifdef Q_OS_ANDROID
 		if(interface.isEmpty())
 			interface = "tiwlan0";
+	#else
+		if(interface.isEmpty())
+			interface = findWlanIf();
 	#endif
+
 
 	#ifdef Q_OS_ANDROID
 		// Must scan as root first to force the wifi card to re-scan the area
@@ -422,7 +423,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		// So, we scan here, ignore output, then scan again (as normal user), which
 		// *does* print out all the results, but doesn't force a re-scan (normal
 		// users use the cached results in the kernel)
-		//system(qPrintable(QString("su -c '%1 scan'; sleep 1").arg(IWLIST_BINARY)));
+		system(qPrintable(QString("su -c '%1 scan'; sleep 1").arg(IWLIST_BINARY)));
 	#endif
 
 	QStringList scanArgs = QStringList() << interface << "scan";
@@ -430,16 +431,20 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	//QMessageBox::information(0, "Debug", QString("Scan args: %1").arg(scanArgs.join(" ")));
 
 	QProcess proc;
-	
-	QString command 
-		= QString("su -c '%1 %2 scan'")
+
+	/*
+	QStringList commandArgs = QStringList()
+		<< "-c" << QString("%1 %2 scan")
 			.arg(IWLIST_BINARY)
 			.arg(interface);
+	*/
 
-	qDebug() << "WifiDataCollector::getIwlistOutput(): Scan command: "<<command;
+
+	//qDebug() << "WifiDataCollector::getIwlistOutput(): su commandArgs: "<<commandArgs;
 
 	proc.setProcessChannelMode(QProcess::MergedChannels);
-	proc.start(command);
+	//proc.start("su", commandArgs);
+	proc.start(IWLIST_BINARY, scanArgs);
 	
 	if (!proc.waitForStarted())
 	{
@@ -464,7 +469,9 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	*/
 
 	QString fileContents = proc.readAllStandardOutput();
-	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents;
+	if(!fileContents.contains(" Cell "))
+		qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents.trimmed();
+
 	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
 
 	return fileContents;
@@ -583,7 +590,6 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 void WifiDataResult::loadRawData(QStringHash values)
 {
 	rawData = values;
-	valid = true;
 
 	// Parse values in 'values' and populate result
 	essid = values["essid"].replace("\"","");
@@ -591,4 +597,7 @@ void WifiDataResult::loadRawData(QStringHash values)
 	dbm   = values["signal level"].replace(" dBm","").toInt();
 	chan  = values["frequency"].replace(" GHz","").toDouble();
 	value = WifiDataCollector::dbmToPercent(dbm);
+
+	if(!mac.isEmpty())
+		valid = true;
 }

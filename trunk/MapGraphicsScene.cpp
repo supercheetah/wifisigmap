@@ -426,16 +426,30 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & upRect)
 	p->drawRect(rect);
 	
 	int fontSize = 10;// * (1/m_scaleFactor);
+#ifdef Q_OS_ANDROID
+	fontSize = 5;
+#endif
+
 	int margin = fontSize/2;
 	int y = margin;
+	int lineJump = fontSize * 1.33;
+
+#ifdef Q_OS_ANDROID
+	margin = fontSize;
+	y = margin;
+	lineJump = fontSize * 4;
+#endif
 	
 	p->setFont(QFont("Monospace", fontSize, QFont::Bold));
 	
 	foreach(WifiDataResult result, gs->m_lastScanResults)
 	{
 		QColor color = gs->colorForSignal(1.0, result.mac).lighter(100);
+#ifdef Q_OS_ANDROID
+		color = color.darker(300);
+#endif
 		QColor outline = Qt::white; //qGray(color.rgb()) < 60 ? Qt::white : Qt::black;
-		QPoint pnt(rect.topLeft() + QPoint(margin, y += fontSize*1.33));
+		QPoint pnt(rect.topLeft() + QPoint(margin, y += lineJump));
 		qDrawTextC((*p), pnt.x(), pnt.y(), 
 			QString( "%1% %2"  )
 				.arg(QString().sprintf("%02d", (int)round(result.value * 100.)))
@@ -684,7 +698,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	if(m_apLocations.values().size() < 2)
 	{
 		// Unable to calculate users location without at least two known APs
-		qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
+		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
 		return;
 	}
 	
@@ -711,7 +725,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	if(apsVisible.size() < 2)
 	{
 		// Must have two APs visible to calculate location
-		qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs visble, unable to guess user location";
+		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs visble, unable to guess user location";
 		return;
 	}
 	
@@ -763,7 +777,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	if(apRatioAvgs.isEmpty())
 	{
-		qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
+		//qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
+		return;
 	}
 	else
 	{
@@ -863,8 +878,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	//qDebug() << "MapGraphicsScene::scanFinished(): Calculated (x1,y1):"<<x1<<y1<<", (x2,y2):"<<x2<<y2<<", itemWorldRect:"<<itemWorldRect;
 	
 	QImage image(
-		(int)qMax(itemWorldRect.size().width(),  64.) + 10,
-		(int)qMax(itemWorldRect.size().height(), 64.) + 10,
+		(int)qMax((double)itemWorldRect.size().width(),  64.) + 10,
+		(int)qMax((double)itemWorldRect.size().height(), 64.) + 10,
 		QImage::Format_ARGB32_Premultiplied);
 
 // 	QSize origSize = m_bgPixmap.size();
@@ -1039,9 +1054,9 @@ void MapGraphicsScene::longPressTimeout()
 						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
 						
 						// Render map overlay (because the AP may be tied to an existing scan result)
-						#ifndef Q_OS_ANDROID
+						//#ifndef Q_OS_ANDROID
 						triggerRender();
-						#endif
+						//#endif
 						//renderSigMap();
 					}
 				}
@@ -1072,9 +1087,9 @@ void MapGraphicsScene::longPressTimeout()
 				m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
 				
 				// Render map overlay
-				#ifndef Q_OS_ANDROID
+				//#ifndef Q_OS_ANDROID
 				triggerRender();
-				#endif
+				//#endif
 				//renderSigMap();
 				
 				QStringList notFound;
@@ -1307,9 +1322,9 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 			textRect = p.boundingRect(0, 0, INT_MAX, INT_MAX, Qt::AlignLeft, essid);
 			textX = (int)(iconRect.width()/2  - textRect.width()/2  + font.pointSizeF()*.1); // .1 is just a cosmetic adjustment to center it better
 			#ifdef Q_OS_ANDROID
-			textY += font.pointSizeF();
+			textY += font.pointSizeF() * 2;
 			#else
-			textY += (int)(font.pointSizeF()*.95);
+			textY += (int)(font.pointSizeF()*0.95);
 			#endif
 			
 			qDrawTextO(p,textX,textY,essid);
