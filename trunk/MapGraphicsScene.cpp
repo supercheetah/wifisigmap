@@ -5,14 +5,6 @@
 static const double Pi  = 3.14159265358979323846264338327950288419717;
 static const double Pi2 = Pi * 2.;
 
-#ifdef Q_OS_ANDROID
-	// Empty #define makes it use live data
-	#define DEBUG_WIFI_FILE
-#else
-	// scan3.txt is just some sample data I captured for use in development
-	#define DEBUG_WIFI_FILE "scan3-multi.txt"
-#endif
-
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
 //#define Q_OS_ANDROID
 
@@ -410,6 +402,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	, m_develTestMode(false)
 	, m_mapWindow(map)
 	, m_renderMode(DEFAULT_RENDER_MODE)
+	, m_userItem(0)
 {
 	//setBackgroundBrush(QImage("PCI-PlantLayout-20120705-2048px-adjusted.png"));
 	//m_bgPixmap = QPixmap("PCI-PlantLayout-20120705-2048px-adjusted.png");
@@ -432,6 +425,21 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	connect(&m_longPressCountTimer, SIGNAL(timeout()), this, SLOT(longPressCount()));
 	m_longPressCountTimer.setInterval(m_longPressTimer.interval() / 10);
 	m_longPressCountTimer.setSingleShot(false);
+	
+	// Setup rendering thread
+	qDebug() << "MapGraphicsScene::MapGraphicsScene(): currentThreadId:"<<QThread::currentThreadId();
+	m_renderer = new SigMapRenderer(this);
+	m_renderer->moveToThread(&m_renderingThread);
+	connect(m_renderer, SIGNAL(renderProgress(double)), this, SLOT(renderProgress(double)));
+	connect(m_renderer, SIGNAL(renderComplete(QImage)), this, SLOT(renderComplete(QImage)));
+	m_renderingThread.start();
+	
+	connect(&m_renderTrigger, SIGNAL(timeout()), m_renderer, SLOT(render()));
+	m_renderTrigger.setInterval(50);
+	m_renderTrigger.setSingleShot(true); 
+	
+	// Received every time a scan is completed in continous mode (continuous mode being the default)
+	connect(&m_scanIf, SIGNAL(scanFinished(QList<WifiDataResult>)), this, SLOT(scanFinished(QList<WifiDataResult>)));
 	
 	clear(); // sets up background and other misc items
 
@@ -461,6 +469,23 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	//m_scanIf.scanWifi();
 
 	
+}
+
+MapGraphicsScene::~MapGraphicsScene()
+{
+	if(m_renderer)
+	{
+		m_renderingThread.quit();
+		delete m_renderer;
+		m_renderer = 0;
+	}
+}
+
+void MapGraphicsScene::triggerRender()
+{
+	if(m_renderTrigger.isActive())
+		m_renderTrigger.stop();
+	m_renderTrigger.start(0);
 }
 
 void MapGraphicsScene::setMarkApMode(bool flag)
@@ -496,6 +521,18 @@ void MapGraphicsScene::clear()
 	m_bgPixmapItem->setZValue(0);
 	
 	addSigMapItem();
+	
+	#ifdef Q_OS_ANDROID
+	QString size = "64x64";
+	#else
+	QString size = "32x32";
+	#endif
+	
+	QPixmap pix(tr(":/data/images/%1/stock-preferences.png").arg(size));
+	m_userItem = addPixmap(pix);
+	m_userItem->setOffset(-(pix.width()/2.),-(pix.height()/2.));
+	m_userItem->setVisible(false);
+	m_userItem->setZValue(150);
 	
 	m_currentMapFilename = "";
 }
@@ -576,6 +613,254 @@ void MapGraphicsScene::addSigMapItem()
 	m_sigMapItem->setZValue(1);
 	m_sigMapItem->setOpacity(0.75);
 }
+
+
+// foreach(WifiDataResult result, results)
+// 					items << QString("%1%: %2 - %3").arg(QString().sprintf("%02d", (int)(result.value*100))).arg(result.mac/*.left(6)*/).arg(result.essid);
+
+void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
+{
+	QPointF userLocation  = QPointF(-1000,-1000);
+
+	if(m_apLocations.values().size() < 2)
+	{
+		// Unable to calculate users location without at least two known APs
+		qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
+		return;
+	}
+	
+	QHash<QString,QString> apMacToEssid;
+	foreach(WifiDataResult result, results)
+		if(!apMacToEssid.contains(result.mac))
+			apMacToEssid.insert(result.mac, result.essid);
+	
+	QHash<QString,double> apMacToSignal;
+	foreach(WifiDataResult result, results)
+	{
+		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
+		if(!apMacToSignal.contains(result.mac) &&
+		    m_apLocations.contains(result.mac) &&
+		    !m_apLocations.value(result.mac).isNull())
+		{
+			apMacToSignal.insert(result.mac, result.value);
+			//qDebug() << "MapGraphicsScene::scanFinished(): \t result.mac:"<<result.mac<<", result.value:"<<result.value<<", m_apLocations.value(result.mac):"<<m_apLocations.value(result.mac);
+		}
+	}
+	
+	QStringList apsVisible = apMacToSignal.keys();
+	
+	if(apsVisible.size() < 2)
+	{
+		// Must have two APs visible to calculate location
+		qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs visble, unable to guess user location";
+		return;
+	}
+	
+	QHash<QString,int>    apRatioCount;
+	QHash<QString,double> apRatioSums;
+	QHash<QString,double> apRatioAvgs;
+	
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
+		foreach(QString apMac, apMacToEssid.keys())
+		{
+			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
+			if(val->hasAp(apMac))
+			{
+				QPointF delta = m_apLocations[apMac] - val->point;
+				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+				double dist = d;
+				d = d / val->signalForAp(apMac);
+				
+				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
+				
+				if(!apRatioSums.contains(apMac))
+				{
+					apRatioSums.insert(apMac, d);
+					apRatioCount.insert(apMac, 1);
+				}
+				else
+				{
+					apRatioSums[apMac] += d;
+					apRatioCount[apMac] ++;
+				}
+			}
+		}
+	}
+	
+	foreach(QString key, apRatioSums.keys())
+	{
+		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
+		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
+	}
+	
+	QString ap0 = apsVisible[0];
+	QString ap1 = apsVisible[1];
+	//qDebug() << "MapGraphicsScene::scanFinished(): ap0: "<<ap0<<", ap1:"<<ap1; 
+	
+	double ratio0;
+	double ratio1;
+	
+	if(apRatioAvgs.isEmpty())
+	{
+		qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
+	}
+	else
+	{
+		if(!apRatioAvgs.contains(ap0))
+		{
+			ratio0 = apRatioAvgs[apRatioAvgs.keys().first()];
+			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using";
+		}
+		else
+			ratio0 = apRatioAvgs[ap0];
+			
+		if(!apRatioAvgs.contains(ap1))
+		{
+			ratio1 = apRatioAvgs[apRatioAvgs.keys().first()];
+			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using";
+		}
+		else
+			ratio1 = apRatioAvgs[ap1];
+	}
+	
+	
+	QPointF p0 = m_apLocations[ap0];
+	QPointF p1 = m_apLocations[ap1];
+	//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
+		
+	double r0 = apMacToSignal[ap0] * ratio0;
+	double r1 = apMacToSignal[ap1] * ratio1;
+	
+	// Based following code on http://paulbourke.net/geometry/2circle/
+	// Test cases under "First calculate the distance d between the center of the circles. d = ||P1 - P0||."
+	QPointF delta = p1 - p0;
+	double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+	
+// 	qDebug() << "\t r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1<<", d:"<<d;
+// 	qDebug() << "\t ratio0 * apMacToSignal[ap0]:"<<ratio0<<apMacToSignal[ap0];
+// 	qDebug() << "\t ratio1 * apMacToSignal[ap1]:"<<ratio1<<apMacToSignal[ap1];
+	
+	if(d > r0 + r1)
+	{
+		// If d > r0 + r1 then there are no solutions, the circles are separate.
+		qDebug() << "MapGraphicsScene::scanFinished(): d > r0 + r1, there are no solutions, the circles are separate.";
+		//m_userItem->setVisible(false);
+		return;
+	}
+	
+	if(d < fabs(r0 - r1))
+	{
+		// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
+		qDebug() << "MapGraphicsScene::scanFinished(): d < |r0 - r1|, there are no solutions because one circle is contained within the other.";
+		//m_userItem->setVisible(false);
+		return;
+	}
+	else
+	{
+		//qDebug() << "MapGraphicsScene::scanFinished(): d > |r0 - r1|, sanity check stop";
+		//return;
+	}
+	
+	if(d == 0. && r0 == r1)
+	{
+		// If d = 0 and r0 = r1 then the circles are coincident and there are an infinite number of solutions.
+		qDebug() << "MapGraphicsScene::scanFinished(): d = 0 and r0 = r1, the circles are coincident and there are an infinite number of solutions.";
+		//m_userItem->setVisible(false);
+		return;
+	}
+	
+// 	// a = (r0^2 - r1^2 + d^2 ) / (2 d)
+// 	double a = ( (r0*r0) - (r1*r1) + (d*d) ) / (2 * d);
+// 	
+// 	// P2 = P0 + a ( P1 - P0 ) / d
+// 	QPointF p2 = p0 +  a * (p1 - p0) / d;
+// 	
+// 	// x3 = x2 +- h ( y1 - y0 ) / d
+// 	// y3 = y2 -+ h ( x1 - x0 ) / d
+// 	double y3 = p2.y() + 
+
+	/// From http://2000clicks.com/mathhelp/GeometryConicSectionCircleIntersection.aspx:
+	
+	// d^2 = (xB-xA)^2 + (yB-yA)^2 
+	// K = (1/4)sqrt(((rA+rB)^2-d^2)(d^2-(rA-rB)^2))
+	// x = (1/2)(xB+xA) + (1/2)(xB-xA)(rA^2-rB^2)/d^2 ± 2(yB-yA)K/d^2 
+	// y = (1/2)(yB+yA) + (1/2)(yB-yA)(rA^2-rB^2)/d^2 ± -2(xB-xA)K/d^2
+	
+	/// K = (1/4)sqrt(((rA+rB)^2-d^2)(d^2-(rA-rB)^2))
+	double K = .25 * sqrt( ((r0+r1)*(r0+r1) - d*d) * (d*d - (r0-r1) * (r0-r1)) );
+	
+	/// x = (1/2)(xB+xA) + (1/2)(xB-xA)(rA^2-rB^2)/d^2 ± 2(yB-yA)K/d^2
+	double x1 = .5 * (p1.x()+p0.x()) + .5 * (p1.x()-p0.x()) * (r0*r0-r1*r1) / (d*d) + 2 * (p1.y()-p0.y()) * K / (d*d);
+	double x2 = .5 * (p1.x()+p0.x()) + .5 * (p1.x()-p0.x()) * (r0*r0-r1*r1) / (d*d) - 2 * (p1.y()-p0.y()) * K / (d*d);
+	
+	/// y = (1/2)(yB+yA) + (1/2)(yB-yA)(rA^2-rB^2)/d^2 ± -2(xB-xA)K/d^2
+	double y1 = .5 * (p1.y()+p0.y()) + .5 * (p1.y()-p0.y()) * (r0*r0-r1*r1) / (d*d) + 2 * (p1.x()-p0.x()) * K / (d*d);
+	double y2 = .5 * (p1.x()+p0.y()) + .5 * (p1.y()-p0.y()) * (r0*r0-r1*r1) / (d*d) - 2 * (p1.x()-p0.x()) * K / (d*d);
+	
+	// Make an image to contain x1,y1 and x2,y2, or at least the user's icon
+	QRectF itemWorldRect(qMin(x1,x2),qMin(y1,y2),fabs(x2-x1),fabs(y2-y1));
+	//qDebug() << "MapGraphicsScene::scanFinished(): Calculated (x1,y1):"<<x1<<y1<<", (x2,y2):"<<x2<<y2<<", itemWorldRect:"<<itemWorldRect;
+	
+	QImage image(
+		(int)qMax(itemWorldRect.size().width(),  64.) + 10,
+		(int)qMax(itemWorldRect.size().height(), 64.) + 10,
+		QImage::Format_ARGB32_Premultiplied);
+
+// 	QSize origSize = m_bgPixmap.size();
+// 	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+		
+	memset(image.bits(), 0, image.byteCount());
+	
+	QPainter p(&image);
+	
+	//p.setPen(Qt::black);
+	
+	QRectF rect(QPointF(0,0),itemWorldRect.size());
+//	QRectF rect = itemWorldRect;
+	QPointF center = rect.center();
+	
+	#ifdef Q_OS_ANDROID
+	QString size = "64x64";
+	#else
+	QString size = "32x32";
+	#endif
+	
+	p.setPen(Qt::blue);
+	QPointF s1 = QPointF(x1 - itemWorldRect.left(), y1 - itemWorldRect.top());
+	QPointF s2 = QPointF(x2 - itemWorldRect.left(), y2 - itemWorldRect.top());
+// 	QPointF s1 = QPointF(x1,y1);
+// 	QPointF s2 = QPointF(x2,y2);
+	
+	//p.drawLine(s1,s2);
+	
+	QImage user(tr(":/data/images/%1/stock-media-rec.png").arg(size));
+	p.drawImage((s1+s2)/2., user);
+	
+	p.setBrush(Qt::blue);
+	p.drawRect(QRectF(s1.x()+3,s1.y()+3,6,6));
+	p.drawRect(QRectF(s2.x()-3,s2.y()-3,6,6));
+	
+// 	p.setBrush(QBrush());
+// 	//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
+// 	p.drawEllipse(p0, r0,r0);
+// 	p.drawEllipse(p1, r1,r1);
+// 	
+// 	p.drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
+// 	p.drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
+	
+	p.end();
+	
+	m_userItem->setPixmap(QPixmap::fromImage(image));
+	m_userItem->setOffset(-(image.width()/2), -(image.height()/2));
+	m_userItem->setPos(itemWorldRect.center());
+// 	m_userItem->setOffset(0,0); //-(image.width()/2), -(image.height()/2));
+// 	m_userItem->setPos(0,0); //itemWorldRect.center());
+	
+	m_userItem->setVisible(true);
+
+}
 	
 void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
@@ -601,7 +886,6 @@ void MapGraphicsScene::invalidateLongPress()
 		m_longPressCountTimer.stop();
 		
 		m_mapWindow->setStatusMessage("");
-		QApplication::processEvents();
 	}
 }
 
@@ -633,10 +917,8 @@ void MapGraphicsScene::longPressCount()
 	else
 	{
 		m_mapWindow->setStatusMessage(tr("Waiting %1%").arg(percent), m_longPressTimer.interval());
-		QApplication::processEvents();
 	}
 }
-
 
 void MapGraphicsScene::longPressTimeout()
 {
@@ -647,11 +929,9 @@ void MapGraphicsScene::longPressTimeout()
 			/// Scan for APs nearby and prompt user to choose AP
 			
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
-			QApplication::processEvents();
-
-			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
+			
+			QList<WifiDataResult> results = m_scanIf.scanResults();
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
-			QApplication::processEvents();
 			
 			if(results.isEmpty())
 			{
@@ -701,7 +981,7 @@ void MapGraphicsScene::longPressTimeout()
 						
 						// Render map overlay (because the AP may be tied to an existing scan result)
 						#ifndef Q_OS_ANDROID
-						QTimer::singleShot(0, this, SLOT(renderSigMap()));
+						triggerRender();
 						#endif
 						//renderSigMap();
 					}
@@ -721,11 +1001,9 @@ void MapGraphicsScene::longPressTimeout()
 		{
 			// scan for APs nearby
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
-			QApplication::processEvents();
-
-			QList<WifiDataResult> results = m_scanIf.scanWifi(DEBUG_WIFI_FILE);
+			
+			QList<WifiDataResult> results = m_scanIf.scanResults();
 			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
-			QApplication::processEvents();
 			
 			if(results.size() > 0)
 			{
@@ -733,11 +1011,10 @@ void MapGraphicsScene::longPressTimeout()
 				addSignalMarker(m_pressPnt, results);
 				
 				m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
-				QApplication::processEvents();
 				
 				// Render map overlay
 				#ifndef Q_OS_ANDROID
-				QTimer::singleShot(0, this, SLOT(renderSigMap()));
+				triggerRender();
 				#endif
 				//renderSigMap();
 				
@@ -752,7 +1029,6 @@ void MapGraphicsScene::longPressTimeout()
 				if(notFound.size() > 0)
 				{
 					m_mapWindow->setStatusMessage(tr("Ok, but %2 APs need marked: %1").arg(notFound.join(", ")).arg(notFound.size()), 10000);
-					QApplication::processEvents();
 				}
 			}
 			else
@@ -808,7 +1084,7 @@ void MapGraphicsScene::longPressTimeout()
 		}
 				
 		addSignalMarker(m_pressPnt, results);
-		QTimer::singleShot(0, this, SLOT(renderSigMap()));
+		triggerRender();
 	}
 }
 
@@ -816,7 +1092,7 @@ void MapGraphicsScene::setRenderMode(RenderMode r)
 {
 	m_colorListForMac.clear(); // color gradient style change based on render mode
 	m_renderMode = r;
-	QTimer::singleShot(0, this, SLOT(renderSigMap()));
+	triggerRender();
 }
 
 /// ImageFilters class, inlined here for ease of implementation
@@ -1218,7 +1494,7 @@ double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPo
 			//	- The lineDist divisor above in the third parenthetical part of the signalLevelDiff equation - the value should be *roughly* what the max
 			//	  straight-line dist is that can be expected by allowing the given angleDiff/levelDiff (below) - though the value is inverted (1/x) in order to smooth
 			//	  the effects of this particular value on the overall adjustment
-			//	Additionally, rendering quality and speed can be affected in the renderSigMap function by adjusting:
+			//	Additionally, rendering quality and speed can be affected in the SigMapRenderer::render() function by adjusting:
 			//	- "int steps" variable (number of circular sections to render)
 			//	- "levelInc" variable - the size of steps from 0-100% to take (currently, it's set to .25, making 400 total steps from 0-100 - more steps, more detailed rendering
 			//	- You can also tweak the line width algorithm right before the call to p.drawLine, as well as the painter opacity to suit tastes
@@ -1245,9 +1521,15 @@ double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPo
 	return level;
 }
 
-void MapGraphicsScene::renderSigMap()
+SigMapRenderer::SigMapRenderer(MapGraphicsScene* gs)
+	// Cannot set gs as QObject() parent because then we can't move it to a QThread
+	: QObject(), m_gs(gs)
+{}
+		
+void SigMapRenderer::render()
 {
-	QSize origSize = m_bgPixmap.size();
+	qDebug() << "SigMapRenderer::render(): currentThreadId:"<<QThread::currentThreadId()<<", rendering...";
+	QSize origSize = m_gs->m_bgPixmap.size();
 
 #ifdef Q_OS_ANDROID
 	if(origSize.isEmpty())
@@ -1272,25 +1554,25 @@ void MapGraphicsScene::renderSigMap()
 	
 	QHash<QString,QString> apMacToEssid;
 	
-	foreach(SigMapValue *val, m_sigValues)
+	foreach(SigMapValue *val, m_gs->m_sigValues)
 		foreach(WifiDataResult result, val->scanResults)
 			if(!apMacToEssid.contains(result.mac))
 				apMacToEssid.insert(result.mac, result.essid);
 	
-	qDebug() << "MapGraphicsScene::renderSigMap(): Unique MACs: "<<apMacToEssid.keys()<<", mac->essid: "<<apMacToEssid;
+	qDebug() << "SigMapRenderer::render(): Unique MACs: "<<apMacToEssid.keys()<<", mac->essid: "<<apMacToEssid;
 
 	int numAps = apMacToEssid.keys().size();
 	int idx = 0;
 	
 	(void)numAps; // avoid unused warnings
 	
-	if(m_renderMode == RenderTriangles)
-	{ 
+	if(m_gs->m_renderMode == MapGraphicsScene::RenderTriangles)
+	{
 		foreach(QString apMac, apMacToEssid.keys())
 		{
-			QPointF center = m_apLocations[apMac];
+			QPointF center = m_gs->m_apLocations[apMac];
 			
-			foreach(SigMapValue *val, m_sigValues)
+			foreach(SigMapValue *val, m_gs->m_sigValues)
 				val->consumed = false;
 			
 			// Find first two closest points to center [0]
@@ -1337,10 +1619,10 @@ void MapGraphicsScene::renderSigMap()
 			p2.end();
 			
 			SigMapValue *lastPnt;
-			while((lastPnt = findNearest(center, apMac)) != NULL)
+			while((lastPnt = m_gs->findNearest(center, apMac)) != NULL)
 			{
-				SigMapValue *nextPnt = findNearest(lastPnt->point, apMac);
-				renderTriangle(&tmpImg, center, lastPnt, nextPnt, dx,dy, apMac);
+				SigMapValue *nextPnt = m_gs->findNearest(lastPnt->point, apMac);
+				m_gs->renderTriangle(&tmpImg, center, lastPnt, nextPnt, dx,dy, apMac);
 			}
 			
 			p.setOpacity(.5); //1. / (double)(numAps) * (numAps - idx));
@@ -1356,20 +1638,20 @@ void MapGraphicsScene::renderSigMap()
 		
 		foreach(QString apMac, apMacToEssid.keys())
 		{
-			if(!m_apLocations.contains(apMac))
+			if(!m_gs->m_apLocations.contains(apMac))
 			{
-				qDebug() << "MapGraphicsScene::renderSigMap(): Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
+				qDebug() << "SigMapRenderer::render(): Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
 				continue;
 			}
 			
-			foreach(SigMapValue *val, m_sigValues)
+			foreach(SigMapValue *val, m_gs->m_sigValues)
 				val->renderDataDirty = true;
 			
-			QPointF center = m_apLocations[apMac];
+			QPointF center = m_gs->m_apLocations[apMac];
 			
 			double maxDistFromCenter = -1;
 			double maxSigValue = 0.0;
-			foreach(SigMapValue *val, m_sigValues)
+			foreach(SigMapValue *val, m_gs->m_sigValues)
 			{
 				if(val->hasAp(apMac))
 				{
@@ -1387,31 +1669,31 @@ void MapGraphicsScene::renderSigMap()
 			
 			//double circleRadius = maxDistFromCenter;
 			double circleRadius = (1.0/maxSigValue) * .75 * maxDistFromCenter;
-			qDebug() << "MapGraphicsScene::renderSigMap(): circleRadius:"<<circleRadius<<", maxDistFromCenter:"<<maxDistFromCenter<<", maxSigValue:"<<maxSigValue;
+			qDebug() << "SigMapRenderer::render(): circleRadius:"<<circleRadius<<", maxDistFromCenter:"<<maxDistFromCenter<<", maxSigValue:"<<maxSigValue;
 			
 			
 			
 			QRadialGradient rg;
 			
-			QColor centerColor = colorForSignal(1.0, apMac);
+			QColor centerColor = m_gs->colorForSignal(1.0, apMac);
 			rg.setColorAt(0., centerColor);
-			qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<1.0<<", color:"<<centerColor;
+			qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<1.0<<", color:"<<centerColor;
 			
-			if(m_renderMode == RenderCircles)
+			if(m_gs->m_renderMode == MapGraphicsScene::RenderCircles)
 			{
-				foreach(SigMapValue *val, m_sigValues)
+				foreach(SigMapValue *val, m_gs->m_sigValues)
 				{
 					if(val->hasAp(apMac))
 					{
 						double sig = val->signalForAp(apMac);
-						QColor color = colorForSignal(sig, apMac);
+						QColor color = m_gs->colorForSignal(sig, apMac);
 						rg.setColorAt(1-sig, color);
 						
 						//double dx = val->point.x() - center.x();
 						//double dy = val->point.y() - center.y();
 						//double distFromCenter = sqrt(dx*dx + dy*dy);
 						
-						//qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
+						//qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
 						
 						
 					}
@@ -1429,7 +1711,7 @@ void MapGraphicsScene::renderSigMap()
 				//p.drawEllipse(0,0,iconSize,iconSize);
 				//p.setCompositionMode(QPainter::CompositionMode_Xor);
 				p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
-				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+				qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
 			}
 			else
 			{
@@ -1456,6 +1738,9 @@ void MapGraphicsScene::renderSigMap()
 				const double levelInc = .25; //100 / 1;// / 2;// steps;
 				#endif
 				
+				double totalProgress = (100./levelInc) * (double)steps;
+				double progressCounter = 0.;
+				
 				QVector<QPointF> lastLevelPoints;
 				for(double level=levelInc; level<=100.; level+=levelInc)
 				{
@@ -1465,7 +1750,7 @@ void MapGraphicsScene::renderSigMap()
 					for(int step=0; step<steps; step++)
 					{
 						QPointF realPoint = levelStep2Point(level,step);
-						double renderLevel = getRenderLevel(level,step * angleStepSize,realPoint,apMac,center,circleRadius);
+						double renderLevel = m_gs->getRenderLevel(level,step * angleStepSize,realPoint,apMac,center,circleRadius);
 						// + ((step/((double)steps)) * 5.); ////(10 * fabs(cos(step/((double)steps) * 359. * 0.0174532925)));// * cos(level/100. * 359 * 0.0174532925);
 						
 						QPointF here = levelStep2Point(renderLevel,step);
@@ -1474,7 +1759,7 @@ void MapGraphicsScene::renderSigMap()
 						{
 							QPointF realPoint = levelStep2Point(level,(steps-1));
 							
-							double renderLevel = getRenderLevel(level,(steps-1) * angleStepSize,realPoint,apMac,center,circleRadius);
+							double renderLevel = m_gs->getRenderLevel(level,(steps-1) * angleStepSize,realPoint,apMac,center,circleRadius);
 							lastPoint = levelStep2Point(renderLevel,(steps-1));
 							thisLevelPoints << lastPoint;
 						}
@@ -1489,19 +1774,22 @@ void MapGraphicsScene::renderSigMap()
 						const double maxLineWidth = 5.0;
 						#endif
 						
-						p.setPen(QPen(colorForSignal((level)/100., apMac), (1.-(level/100.))*levelInc*maxLineWidth));
+						p.setPen(QPen(m_gs->colorForSignal((level)/100., apMac), (1.-(level/100.))*levelInc*maxLineWidth));
 		
 						p.drawLine(lastPoint,here);
 						thisLevelPoints << here;
 						
 						lastPoint = here;
+						
+						progressCounter ++;
+						//emit renderProgress(progressCounter / totalProgress);
 					}
 					
 					/*
 					if(level > levelInc)
 					{
 						lastLevelPoints << thisLevelPoints;
-						p.setBrush(colorForSignal((level)/100., apMac));
+						p.setBrush(m_gs->colorForSignal((level)/100., apMac));
 						//p.drawPolygon(lastLevelPoints);
 					}
 					*/
@@ -1516,15 +1804,15 @@ void MapGraphicsScene::renderSigMap()
 		// 		// Render lines to signal locations
 		// 		p.setOpacity(.75);
 		// 		p.setPen(QPen(centerColor, 1.5));
-		// 		foreach(SigMapValue *val, m_sigValues)
+		// 		foreach(SigMapValue *val, m_gs->m_sigValues)
 		// 		{
 		// 			if(val->hasAp(apMac))
 		// 			{
 		// // 				double sig = val->signalForAp(apMac);
-		// // 				QColor color = colorForSignal(sig, apMac);
+		// // 				QColor color = m_gs->colorForSignal(sig, apMac);
 		// // 				rg.setColorAt(1-sig, color);
 		// // 				
-		// // 				qDebug() << "MapGraphicsScene::renderSigMap(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
+		// // 				qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color;
 		// 				
 		// 				p.setPen(QPen(centerColor, val->signalForAp(apMac) * 10.));
 		// 				//p.drawLine(center, val->point);
@@ -1567,8 +1855,19 @@ void MapGraphicsScene::renderSigMap()
 	//mapImg.save("/tmp/mapImg.jpg");
 	
 
-	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
+	//m_gs->m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
+	emit renderComplete(mapImg);
+}
+
+void MapGraphicsScene::renderProgress(double value)
+{
+	m_mapWindow->setStatusMessage(tr("Rendering %1%").arg((int)(value*100)), 250);
+}
+
+void MapGraphicsScene::renderComplete(QImage mapImg)
+{
 	m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
+	m_mapWindow->setStatusMessage(tr("Signal map updated"), 500);
 }
 
 QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
@@ -1601,7 +1900,13 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		}
 		
 		// paint the gradient
-		QImage signalLevelImage(100,10,QImage::Format_ARGB32_Premultiplied);
+		#ifdef Q_OS_ANDROID
+		int imgHeight = 1;
+		#else
+		int imgHeight = 10; // for debugging output
+		#endif
+		
+		QImage signalLevelImage(100,imgHeight,QImage::Format_ARGB32_Premultiplied);
 		QPainter sigPainter(&signalLevelImage);
 		
 		if(m_renderMode == RenderCircles ||
@@ -1630,14 +1935,14 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 			sigPainter.fillRect( signalLevelImage.rect(), fade );
 			//sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
 			//sigPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-		
 		}
-		
 		
 		sigPainter.end();
 		
+		#ifndef Q_OS_ANDROID
 		// just for debugging (that's why the img is 10px high - so it is easier to see in this output)
 		signalLevelImage.save(tr("signalLevelImage-%1.png").arg(apMac));
+		#endif
 		
 		QRgb* scanline = (QRgb*)signalLevelImage.scanLine(0);
 		for(int i=0; i<100; i++)
@@ -1827,7 +2132,7 @@ void MapGraphicsScene::loadResults(QString filename)
 	data.endArray();
 	
 	// Call for render of map overlay
-	QTimer::singleShot(0, this, SLOT(renderSigMap()));
+	triggerRender();
 }
 
 

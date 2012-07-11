@@ -97,7 +97,8 @@ MapWindow::MapWindow(QWidget *parent)
 	//m_scene->loadResults("wmz/phc-firsttest.wmz");
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/phcfirstrun.wmz");
-	m_scene->loadResults("wmz/foobar.wmz");
+	//m_scene->loadResults("wmz/foobar.wmz");
+	m_scene->loadResults("wmz/test-track.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -150,7 +151,13 @@ void MapWindow::setupUi()
 	
 	hbox->addStretch(1);
 	
-	QPushButton *prefs = new QPushButton(QPixmap(":/data/images/stock-preferences.png"), "");
+	#ifdef Q_OS_ANDROID
+	QString size = "64x64";
+	#else
+	QString size = "32x32";
+	#endif
+	
+	QPushButton *prefs = new QPushButton(QPixmap(tr(":/data/images/%1/stock-preferences.png").arg(size)), "");
 	connect(prefs, SIGNAL(clicked()), this, SLOT(prefsSlot()));
 	hbox->addWidget(prefs);
 	
@@ -182,7 +189,7 @@ void MapWindow::prefsSlot()
 void MapWindow::setStatusMessage(const QString& msg, int timeout)
 {
 	#ifdef Q_OS_ANDROID
-	m_statusMsg->setText("<font size='-1'>"+msg+"</b>");
+	m_statusMsg->setText("<font size='-2'>"+msg+"</b>");
 	#else
 	m_statusMsg->setText("<b>"+msg+"</b>");
 	#endif
@@ -195,6 +202,9 @@ void MapWindow::setStatusMessage(const QString& msg, int timeout)
 		m_statusClearTimer.setInterval(timeout);
 		m_statusClearTimer.start();
 	}
+	
+	// Allow the UI to update in case the caller's next action is going to block the UI thread for any amount of time
+	QApplication::processEvents();
 }
 
 void MapWindow::clearStatusMessage()

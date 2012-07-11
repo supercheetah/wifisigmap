@@ -71,9 +71,33 @@ QDebug operator<<(QDebug dbg, const WifiDataResult &ref)
 }
 
 WifiDataCollector::WifiDataCollector()
+	: QObject()
+	, m_numScans(3)
+	, m_scanNum(0)
+	, m_continuousMode(true)
 {
+	
+	qRegisterMetaType<QList<WifiDataResult> >("QList<WifiDataResult> ");
+	
+	moveToThread(&m_scanThread);
+	connect(&m_scanTimer, SIGNAL(timeout()), this, SLOT(scanWifi()));
+	
+	// Thru repeated testing on my Android device, .75sec is the aparent *minimum*
+	// time necessary to wait between calls to "iwlist" in order for iwlist to 
+	// scan again (not generate an error about "transport endpoint" or "no scan results")
+	m_scanTimer.setInterval(750);
+
 	// TODO - move this to the main app, then if it returns false, ask the user if they want to continue anyway or exit.
-	auditIwlistBinary();
+	if(auditIwlistBinary())
+	{
+		qDebug() << "WifiDataCollector::WifiDataCollector(): before start, currentThreadId:" << QThread::currentThreadId();
+		
+		// Start the scan thread running
+		m_scanThread.start();
+		
+		// Start a continous scan running (in the scan thread)
+		QTimer::singleShot(0, this, SLOT(startScan()));
+	}
 }
 
 class WifiResultAverage
@@ -114,135 +138,158 @@ public:
 	WifiDataResult result;
 };
 
-
-QList<WifiDataResult> WifiDataCollector::scanWifi(QString debugTextFile)
+void WifiDataCollector::startScan(int numScans, bool continous)
 {
+	qDebug() << "WifiDataCollector::startScan(): currentThreadId:"<<QThread::currentThreadId()<<", numScans:"<<numScans<<", continous:"<<continous;
+	m_scanNum = 0;
+	m_numScans = numScans;
+	m_continuousMode = continous;
+	
+	m_scanTimer.start();
+}
+
+void WifiDataCollector::stopScan()
+{
+	qDebug() << "WifiDataCollector::stopScan(): Stopping scan timer";
+	m_scanTimer.stop();
+}
+
+QList<WifiDataResult> WifiDataCollector::scanResults()
+{
+	QMutexLocker lock(&m_resultsMutex);
+	return m_scanResults;
+}
+
+/*QList<WifiDataResult> */
+void WifiDataCollector::scanWifi()
+// QString debugTextFile)
+{
+	//qDebug() << "WifiDataCollector::scanWifi(): currentThreadId:"<<QThread::currentThreadId()<<", scanning...";
+	
+	if(m_scanNum == 0)
+		emit scanStarted();
+		
 	QString buffer;
 	QList<WifiDataResult> results;
 
-	if(!debugTextFile.isEmpty())
-		buffer = readTextFile(debugTextFile);
-#ifdef OLD_SCAN_METHOD
-	else
-	{
-		buffer = getIwlistOutput();
-	}
-#else
-	else
-	{
-		// The new method of scanning is very fast,
-		// so try to make sure we get *something*
-		int counter = 0;
-		while(counter ++ < 10 &&
-		     !buffer.contains(" Cell "))
-		      buffer = getIwlistOutput();
-	}
+	QString debugTextFile;
+
+#ifndef Q_OS_ANDROID
+	// scan3.txt is just some sample data I captured for use in development
+	debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
 #endif
 
-	qDebug() << "WifiDataCollector::scanWifi(): Raw buffer: "<<buffer;
+	if(!debugTextFile.isEmpty())
+		buffer = readTextFile(debugTextFile);
+	else
+		buffer = getIwlistOutput();
+	
+	//qDebug() << "WifiDataCollector::scanWifi(): Raw buffer: "<<buffer;
 
 	//QMessageBox::information(0, "Debug", QString("Raw buffer: %1").arg(buffer));
-
-#ifdef OLD_SCAN_METHOD
 
 	if(buffer.isEmpty() || buffer.contains("No scan results"))
 	{
 		qDebug() << "WifiDataCollector::scanWifi(): No scan results";
-		return results; // return empty list
+		//return results; // return empty list
 	}
-
-	QStringList rawBlocks = buffer.split(" Cell ");
-
-	foreach(QString block, rawBlocks)
+	else
 	{
-		if(block.toLower().contains("scan completed"))
-			continue;
-
-		WifiDataResult result = parseRawBlock(block);
-		if(!result.valid)
-		{
-			qDebug() << "WifiDataCollector::scanWifi(): Error parsing raw block: "<<block;
-			continue;
-		}
-
-		qDebug() << "WifiDataCollector::scanWifi(): Parsed result: "<<result;
-		results << result;
-	}
-#else
-	QStringList scanBuffers = buffer.split("# Scan");
-	qDebug() << "WifiDataCollector::scanWifi(): New Scan Method: Found "<<scanBuffers<<" scan results";
-
-	int idx = 0;
-	foreach(QString scanBuffer, scanBuffers)
-	{
-		idx ++;
-		if(scanBuffer.isEmpty() || scanBuffer.contains("No scan results"))
-		{
-			//qDebug() << "WifiDataCollector::scanWifi(): No scan results";
-			//return results; // return empty list
-			qDebug() << "WifiDataCollector::scanWifi(): No scan results in buffer "<<idx;
-			continue;
-		}
-
-		QStringList rawBlocks = scanBuffer.split(" Cell ");
-
-		int blockIdx = 0;
+		QStringList rawBlocks = buffer.split(" Cell ");
+	
 		foreach(QString block, rawBlocks)
 		{
-			blockIdx ++;
 			if(block.toLower().contains("scan completed"))
-			{
-				qDebug() << "WifiDataCollector::scanWifi(): No scan results in buffer "<<idx<<", block "<<blockIdx<<" (scan completed)";
 				continue;
-			}
-
+	
 			WifiDataResult result = parseRawBlock(block);
 			if(!result.valid)
 			{
-				qDebug() << "WifiDataCollector::scanWifi(): Error parsing raw block "<<blockIdx<<": "<<block;
+				qDebug() << "WifiDataCollector::scanWifi(): Error parsing raw block: "<<block;
 				continue;
 			}
-
-			qDebug() << "WifiDataCollector::scanWifi(): New scan method, parsed result for block"<<blockIdx<<": "<<result; //<<", raw:"<<block;
+	
+			qDebug() << "WifiDataCollector::scanWifi(): Parsed result: "<<result;
 			results << result;
 		}
 	}
 
-	// The "new" scanning method just scans X number of times, possibly duplicating APs
-	// So here we have to merge (average) the signal readings of any duplicate APs
+	//QList<QList<WifiDataResult> > m_scanResults;
+	
+	m_resultBuffer << results;
+	
+	if(!m_continuousMode)
+		emit scanProgress(m_scanNum / ((double)m_numScans));
+	
+	m_scanNum ++;
 
-	QHash<QString, WifiResultAverage*> resultMap;
-
-	foreach(WifiDataResult r, results)
+	if(m_continuousMode || 
+	   m_scanNum >= m_numScans)
 	{
-		qDebug() << "WifiDataCollector::scanWifi(): Merging results, current: "<<r.mac<<", dbm:"<<r.dbm<<", val:"<<r.value;
-		if(!resultMap.contains(r.mac))
-			resultMap.insert(r.mac, new WifiResultAverage(r));
+		// The "new" scanning method just scans X number of times, possibly duplicating APs
+		// So here we have to merge (average) the signal readings of any duplicate APs
+	
+		QHash<QString, WifiResultAverage*> resultMap;
+	
+		foreach(QList<WifiDataResult> results, m_resultBuffer)
+		{
+			foreach(WifiDataResult r, results)
+			{
+				//qDebug() << "WifiDataCollector::scanWifi(): Merging results, current: "<<r.mac<<", dbm:"<<r.dbm<<", val:"<<r.value;
+				if(!resultMap.contains(r.mac))
+					resultMap.insert(r.mac, new WifiResultAverage(r));
+				else
+					resultMap.value(r.mac)->add(r);
+			}
+		}
+		
+		// If running continuous scan, we just shift off the first (earliest) scan
+		// since the next scan will just be appended to the end. This maintains a 
+		// "running average" of the scan results, with the window being at most 
+		// m_numScans samples long
+		if(m_continuousMode)
+		{
+			while(m_resultBuffer.size() >= m_numScans)
+			      m_resultBuffer.takeFirst();
+		}
 		else
-			resultMap.value(r.mac)->add(r);
+		{
+			// If not in continous, clear the buffer for the next scan
+			m_resultBuffer.clear();
+		}
+	
+		// This lock will hold till the end of the function
+		QMutexLocker lock(&m_resultsMutex);
+		
+		// Even in continous mode, we always write a fresh list to the output buffer
+		m_scanResults.clear();
+		
+		foreach(WifiResultAverage *avg, resultMap.values())
+		{
+			WifiDataResult r = avg->result;
+	
+			// Update the value & dbm of this AP
+			r.value = avg->avgValue();
+			r.dbm   = (int)avg->avgDbm();
+	
+			// Since MapGraphicsScene *only* stores r.rawData, update the rawData with "fake" readings
+			r.rawData["signal level"] = QString("%1 dBm").arg((int)r.dbm);
+	
+			//qDebug() << "WifiDataCollector::scanWifi(): Averaged MAC "<<r.mac<<": dBm: "<<r.dbm<<"dBm, value:"<<r.value;
+	
+			m_scanResults << r;
+		}
+		
+		if(m_scanNum >= m_numScans)
+			m_scanNum = 0;
+		
+		emit scanFinished(m_scanResults);
+		
+		if(!m_continuousMode)
+			m_scanTimer.stop();
 	}
 
-	results.clear();
-	foreach(WifiResultAverage *avg, resultMap.values())
-	{
-		WifiDataResult r = avg->result;
-
-		// Update the value & dbm of this AP
-		r.value = avg->avgValue();
-		r.dbm   = (int)avg->avgDbm();
-
-		// Since MapGraphicsScene *only* stores r.rawData, update the rawData with "fake" readings
-		r.rawData["signal level"] = QString("%1 dBm").arg((int)r.dbm);
-
-		qDebug() << "WifiDataCollector::scanWifi(): Averaged MAC "<<r.mac<<": dBm: "<<r.dbm<<"dBm, value:"<<r.value;
-
-		results << r;
-	}
-
-#endif
-
-
-	return results;
+	//return results;
 }
 
 
@@ -257,9 +304,9 @@ double WifiDataCollector::dbmToPercent(int dbm)
 	return val;
 }
 
-/*! \brief This is for use on the Android platform - it checks for /tmp/iwlist and /tmp/iwconfig,
+/*! \brief This is for use on the Android platform - it checks for $TMP/iwlist and $TMP/iwconfig,
 	and extracts them from :/data if not present (and enables the executable bit.)
-	Noop if not on Android.
+	Noop if not on Android. ($TMP = QDir::tempPath()) 
 */
 bool WifiDataCollector::auditIwlistBinary()
 {
@@ -321,13 +368,28 @@ bool WifiDataCollector::auditIwlistBinary()
 QString WifiDataCollector::findWlanIf()
 {
 	QProcess proc;
+	proc.setProcessChannelMode(QProcess::MergedChannels);
 	proc.start(IWCONFIG_BINARY);
-	if(!proc.waitForFinished(10000))
+	
+// 	if(!proc.waitForFinished(10000))
+// 	{
+// 		qDebug() << "WifiDataCollector::findWlanIf(): Error: Timeout while waiting for" << IWCONFIG_BINARY << "to finish.";
+// 		return "";
+// 	}
+
+	if (!proc.waitForStarted())
 	{
-		qDebug() << "WifiDataCollector::findWlanIf(): Error: Timeout while waiting for" << IWCONFIG_BINARY << "to finish.";
-		return "";
+		qDebug() << "********************** Scanner start failed! " << proc.errorString();
+		QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
 	}
 
+
+	if (!proc.waitForFinished(-1))
+	{
+		qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
+		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
+	}
+	
 	QString fileContents = proc.readAllStandardOutput();
 	qDebug() << "WifiDataCollector::findWlanIf(): Raw output of" << IWCONFIG_BINARY << ": "<<fileContents;
 
@@ -402,7 +464,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	*/
 
 	QString fileContents = proc.readAllStandardOutput();
-	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWSCAN_SCRIPT << ": "<<fileContents;
+	qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents;
 	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
 
 	return fileContents;

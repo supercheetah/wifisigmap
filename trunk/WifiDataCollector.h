@@ -31,13 +31,13 @@ public:
 
 QDebug operator<<(QDebug dbg, const WifiDataResult &result);
 
-class WifiDataCollector : public QThread
+class WifiDataCollector : public QObject 
 {
 	Q_OBJECT
 public:
 	WifiDataCollector();
 	
-	//QList<WifiDataResult> scanResults(); //scanWifi(QString debugTextFile="");
+	QList<WifiDataResult> scanResults();
 	
 	bool auditIwlistBinary();
 	QString findWlanIf();
@@ -47,7 +47,7 @@ public:
 	static double dbmToPercent(int dbm);
 
 public slots:
-	void startScan(int numScans=3, bool continuous=false);
+	void startScan(int numScans=3, bool continuous=true);
 	void stopScan();
 	
 signals:
@@ -59,11 +59,17 @@ protected slots:
 	void scanWifi();
 
 protected:
+	QThread m_scanThread;
+	
 	int m_numScans;
 	int m_scanNum; // 0-m_numScans
+	bool m_continuousMode;
+	QTimer m_scanTimer;
 	
-	QList<WifiDataResult> m_resultBuffer;
+	QMutex m_resultsMutex;
+	
 	QList<WifiDataResult> m_scanResults;
+	QList<QList<WifiDataResult> > m_resultBuffer;
 	
 	QString getIwlistOutput(QString interface = "");
 	
