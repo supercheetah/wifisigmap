@@ -85,7 +85,8 @@ MapWindow::MapWindow(QWidget *parent)
 {
 	#ifdef CUSTOM_MSG_HANDLER
 		qt_debugSocket = new QTcpSocket(this);
-		qt_debugSocket->connectToHost("192.168.0.105", 3729);
+		//qt_debugSocket->connectToHost("192.168.0.105", 3729);
+		qt_debugSocket->connectToHost("10.10.9.90", 3729);
 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
 	#endif
 	
