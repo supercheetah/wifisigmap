@@ -8,7 +8,7 @@
 
     #define IWCONFIG_BINARY QString("%1/iwconfig").arg(QDir::tempPath());
     #define IWLIST_BINARY   QString("%1/iwlist").arg(QDir::tempPath());
-    #define IWSCAN_SCRIPT   QString("%1/iwscan").arg(QDir::tempPath());
+    #define IWSCAN_SCRIPT   QString("%1/iwscan.sh").arg(QDir::tempPath());
 
     #define INTERNAL_IWCONFIG_BINARY ":/data/android/iwconfig"
     #define INTERNAL_IWLIST_BINARY   ":/data/android/iwlist"
