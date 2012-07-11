@@ -18,7 +18,8 @@ QT += network
 
 RESOURCES = resources.qrc
 
-include(3rdparty/wireless-tools/wireless-tools.pri)
+# Not used yet/now...
+#include(3rdparty/wireless-tools/wireless-tools.pri)
 
 # Input
 HEADERS += \
