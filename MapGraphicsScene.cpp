@@ -585,8 +585,8 @@ void MapGraphicsScene::clear()
 	
 	
 	m_bgFilename = "";
-	//m_bgPixmap = QPixmap(4000,4000); //QApplication::desktop()->screenGeometry().size());
-	m_bgPixmap = QPixmap(2000,2000); //QApplication::desktop()->screenGeometry().size());
+	m_bgPixmap = QPixmap(4000,4000); //QApplication::desktop()->screenGeometry().size());
+	//m_bgPixmap = QPixmap(2000,2000); //QApplication::desktop()->screenGeometry().size());
 	m_bgPixmap.fill(Qt::white);
 	
 	QPainter p(&m_bgPixmap);
@@ -604,7 +604,7 @@ void MapGraphicsScene::clear()
 		p.drawLine(x,0,x,m_bgPixmap.height());
 		for(int y=0; y<m_bgPixmap.height(); y+=64)
 		{
-			p.drawText(x+pad,y+fontSize+pad,QString("%1x%2").arg(x/64).arg(y/64));
+			p.drawText(x+pad,y+fontSize+pad*3,QString("%1x%2").arg(x/64).arg(y/64));
 			p.drawLine(0,y,m_bgPixmap.width(),y);
 		}
 	}
