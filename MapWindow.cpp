@@ -3,6 +3,7 @@
 #include "MapGraphicsScene.h"
 
 #include <QTcpSocket>
+#include <QApplication>
 
 #define CUSTOM_MSG_HANDLER
 
@@ -90,6 +91,10 @@ MapWindow::MapWindow(QWidget *parent)
 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
 	#endif
 	
+	#ifdef Q_OS_ANDROID
+	QApplication::setGlobalStrut(QSize(44,44));
+	#endif
+	
 	setWindowTitle("WiFi Signal Mapper");
 	setupUi();
 	
@@ -98,8 +103,8 @@ MapWindow::MapWindow(QWidget *parent)
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/phcfirstrun.wmz");
 	//m_scene->loadResults("wmz/foobar.wmz");
-	//m_scene->loadResults("wmz/test-track.wmz");
-	m_scene->loadResults("wmz/pci4000-live.wmz");
+	m_scene->loadResults("wmz/test-track.wmz");
+	//m_scene->loadResults("wmz/pci4000-livedata2.wmz");
 }
 
 #define makeButton2(object,layout,title,slot) \

@@ -57,8 +57,8 @@ Ease of use items:
 	- Dont cancel spin if move within +/- X pixels
 	# - ERROR if can't save due to permissions
 	- Add dialog to enable/disable rendering of APs (MapApInfo::renderOnMap)
-	- Make another render mode (multiple ellipse at each level - part way between circles mode and radial lines)
-	- Move radial line render (and others?) to a "live paint" item - so zooming in renders the lines cleanly (idea: use QPicture?)
+	#- Make another render mode (multiple ellipse at each level - part way between circles mode and radial lines)
+	#- Move radial line render (and others?) to a "live paint" item - so zooming in renders the lines cleanly (idea: use QPicture?)
 	
 Idea:
 	- Factor in more than two APs 

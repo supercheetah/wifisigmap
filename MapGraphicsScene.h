@@ -27,6 +27,31 @@ protected:
 	double m_scaleFactor;
 };
 
+class SigMapValue;
+class SigMapValueMarker : public QObject, public QGraphicsPixmapItem
+{
+	Q_OBJECT
+public:
+	SigMapValueMarker(SigMapValue *val, const QPixmap& pixmap = QPixmap(), QGraphicsItem *parent = 0)
+		: QGraphicsPixmapItem(pixmap, parent)
+		, m_value(val) {}
+	
+	SigMapValue *value() { return m_value; }
+	
+signals:
+	void clicked();
+	
+protected:
+	virtual void mouseReleaseEvent ( QGraphicsSceneMouseEvent * event )
+	{
+		QGraphicsItem::mouseReleaseEvent(event);
+		
+		emit clicked();
+	}
+	
+	SigMapValue *m_value;
+};
+
 class SigMapValue
 {
 public:
@@ -51,12 +76,48 @@ public:
 	double renderLevel;
 	double renderAngle;
 	
+	SigMapValueMarker *marker;
+	
 	
 	bool hasAp(QString mac);
 	double signalForAp(QString mac, bool returnDbmValue=false);
 };
 
 class MapGraphicsScene;
+
+class SigMapItem : public QGraphicsItem
+{
+public:
+	SigMapItem();
+	
+	void setPicture(QPicture pic);
+	//void setPicture(QImage img);
+	
+	QRectF boundingRect() const;	
+	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+
+protected:
+	bool m_internalCache;
+	QPicture m_pic;
+	QImage m_img;
+};
+
+
+class LongPressSpinner : public QGraphicsItem
+{
+public:
+	LongPressSpinner();
+	
+	void setProgress(double); // [0,1]
+	
+	QRectF boundingRect() const;	
+	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+
+protected:
+	double m_progress;
+	QRectF m_boundingRect;
+
+};
 
 class SigMapRenderer : public QObject
 {
@@ -69,7 +130,8 @@ public slots:
 
 signals:
 	void renderProgress(double); // 0.0-1.0
-	void renderComplete(QImage);
+	void renderComplete(QPicture); //QImage);
+	//void renderComplete(QImage);
 
 protected:
 	MapGraphicsScene *m_gs;
@@ -81,6 +143,7 @@ public:
 	MapApInfo(WifiDataResult r = WifiDataResult())
 		: mac(r.mac)
 		, essid(r.essid)
+		, marked(false)
 		, point(QPointF())
 		, color(QColor())
 		, renderOnMap(true)
@@ -92,6 +155,19 @@ public:
 	QPointF point;
 	QColor  color;
 	bool    renderOnMap;
+};
+
+class MapRenderOptions
+{
+public:
+	bool showReadingMarkers;
+	bool multipleCircles;
+	bool fillCircles;
+	int radialCircleSteps;
+	int radialLevelSteps;
+	int radialAngleDiff;
+	int radialLevelDiff;
+	int radialLineWeight;
 };
 
 class MapWindow;
@@ -144,7 +220,8 @@ private slots:
 	void longPressCount();
 	
 	void renderProgress(double);
-	void renderComplete(QImage mapImg);
+	void renderComplete(QPicture pic); //QImage mapImg);
+	//void renderComplete(QImage mapImg);
 	
 	void scanFinished(QList<WifiDataResult>);
 	
@@ -174,7 +251,8 @@ protected:
 	QList<SigMapValue*> m_sigValues;
 		
 	void addSigMapItem();
-	QGraphicsPixmapItem *m_sigMapItem;
+ 	SigMapItem *m_sigMapItem;
+	//QGraphicsPixmapItem *m_sigMapItem;
 	QString m_bgFilename;
 	QPixmap m_bgPixmap;
 	QGraphicsPixmapItem *m_bgPixmapItem;
@@ -209,6 +287,12 @@ protected:
 	//QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
 	
 	QList<WifiDataResult> m_lastScanResults;
+	
+	MapRenderOptions m_renderOpts;
+	void showRenderDialog();
+	
+	LongPressSpinner *m_longPressSpinner;
+	
 };
 
 #endif
