@@ -90,6 +90,7 @@ class SigMapItem : public QGraphicsItem
 public:
 	SigMapItem();
 	
+	void setInternalCache(bool flag);
 	void setPicture(QPicture pic);
 	//void setPicture(QImage img);
 	
@@ -209,6 +210,8 @@ public slots:
 	void setRenderAp(QString apMac, bool flag=true);
 	void setRenderAp(MapApInfo *ap, bool flag=true);
 	
+	void setRenderOpts(MapRenderOptions);
+	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
 	virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -291,7 +294,7 @@ protected:
 	QList<WifiDataResult> m_lastScanResults;
 	
 	MapRenderOptions m_renderOpts;
-	void showRenderDialog();
+	void showRenderOptsDialog();
 	
 	LongPressSpinner *m_longPressSpinner;
 	
