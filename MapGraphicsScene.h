@@ -75,6 +75,25 @@ protected:
 	MapGraphicsScene *m_gs;
 };
 
+class MapApInfo
+{
+public:
+	MapApInfo(WifiDataResult r = WifiDataResult())
+		: mac(r.mac)
+		, essid(r.essid)
+		, point(QPointF())
+		, color(QColor())
+		, renderOnMap(true)
+		{}
+		
+	QString mac;
+	QString essid;
+	bool    marked;
+	QPointF point;
+	QColor  color;
+	bool    renderOnMap;
+};
+
 class MapWindow;
 
 class MapGraphicsScene : public QGraphicsScene
@@ -97,6 +116,10 @@ public:
 	
 	RenderMode renderMode() { return m_renderMode; }
 	
+	QList<MapApInfo*> apInfo() { return m_apInfo.values(); }
+	MapApInfo* apInfo(WifiDataResult);
+	MapApInfo* apInfo(QString apMac);
+	
 public slots:
 	void saveResults(QString filename);
 	void loadResults(QString filename);
@@ -104,6 +127,9 @@ public slots:
 	void setMarkApMode(bool flag=true);
 	
 	void setRenderMode(RenderMode mode);
+	
+	void setRenderAp(QString apMac, bool flag=true);
+	void setRenderAp(MapApInfo *ap, bool flag=true);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -127,6 +153,7 @@ protected:
 	
 	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
+	QColor baseColorForAp(QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	void renderTriangle(QImage *img, QPointF center, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	
@@ -157,11 +184,11 @@ protected:
 	
 	int m_colorCounter;
 	QList<QColor> m_masterColorsAvailable;
-	QHash<QString,QColor> m_apMasterColor;
 	QHash<QString,QList<QColor > > m_colorListForMac;
 	QList<qreal> m_huesUsed;
 	
-	QHash<QString,QPointF> m_apLocations;
+	
+	QHash<QString,MapApInfo*> m_apInfo; 
 	
 	bool m_markApMode;
 	
@@ -179,7 +206,7 @@ protected:
 	void triggerRender();
 	
 	QGraphicsPixmapItem *m_userItem;
-	QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
+	//QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
 	
 	QList<WifiDataResult> m_lastScanResults;
 };

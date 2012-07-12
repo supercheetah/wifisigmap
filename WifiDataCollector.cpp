@@ -179,6 +179,7 @@ void WifiDataCollector::scanWifi()
 	debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
 #endif
 
+	// Read input from debug file or the actual wifi card
 	if(!debugTextFile.isEmpty())
 		buffer = readTextFile(debugTextFile);
 	else
@@ -188,6 +189,7 @@ void WifiDataCollector::scanWifi()
 
 	//QMessageBox::information(0, "Debug", QString("Raw buffer: %1").arg(buffer));
 
+	// Parse the resulting input buffer
 	if(buffer.isEmpty() || buffer.contains("No scan results") || buffer.contains("Operation not supported"))
 	{
 		qDebug() << "WifiDataCollector::scanWifi(): No scan results";
@@ -209,20 +211,18 @@ void WifiDataCollector::scanWifi()
 				continue;
 			}
 	
-			qDebug() << "WifiDataCollector::scanWifi(): Parsed result: "<<result;
+			//qDebug() << "WifiDataCollector::scanWifi(): Parsed result: "<<result;
 			results << result;
 		}
 	}
 
-	//QList<QList<WifiDataResult> > m_scanResults;
-	
 	m_resultBuffer << results;
 	
 	if(!m_continuousMode)
 		emit scanProgress(m_scanNum / ((double)m_numScans));
 	
 	m_scanNum ++;
-
+	
 	if(m_continuousMode || 
 	   m_scanNum >= m_numScans)
 	{
@@ -288,8 +288,6 @@ void WifiDataCollector::scanWifi()
 		if(!m_continuousMode)
 			m_scanTimer.stop();
 	}
-
-	//return results;
 }
 
 
@@ -485,7 +483,10 @@ QString WifiDataCollector::readTextFile(QString fileName)
 	QFile file(fileName);
 	if(!file.open(QIODevice::ReadOnly))
 	{
-		QMessageBox::critical(0,QObject::tr("Can't Read File"),QString(QObject::tr("Unable to open %1")).arg(fileName));
+		qDebug() << "WifiDataCollector::readTextFile(): Unable to read:" <<fileName;
+		
+		// Can't show message box since readTextFile() since we're being called from inside the thread
+		//QMessageBox::critical(0,QObject::tr("Can't Read File"),QString(QObject::tr("Unable to open %1")).arg(fileName));
 		return "";
 	}
 

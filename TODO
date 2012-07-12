@@ -41,12 +41,13 @@ Android TODO:
 	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
 	#- Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
 	- Added a "spinner" around the fingertip during longpress to show action
-	- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
+	#- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
+		Invalid, moved scannign to scan thread
 	
 	
 Ease of use items:
 	# - Attempt rescan if no APs found (configurable from menu)
-	- Offer to NOT render circle (or delay rendering) during scan
+	#- Offer to NOT render circle (or delay rendering) during scan
 		- For now, added #ifndef Q_OS_ANDROID - TODO make it configurable
 	# - Update status when "rendering" so user can move
 	# - Place temp marker during scanning at location
@@ -55,4 +56,15 @@ Ease of use items:
 	- Fingertip spinner would be nice
 	- Dont cancel spin if move within +/- X pixels
 	# - ERROR if can't save due to permissions
+	- Add dialog to enable/disable rendering of APs (MapApInfo::renderOnMap)
+	- Make another render mode (multiple ellipse at each level - part way between circles mode and radial lines)
+	- Move radial line render (and others?) to a "live paint" item - so zooming in renders the lines cleanly (idea: use QPicture?)
 	
+Idea:
+	- Factor in more than two APs 
+	- Use live data captured (pci4000-live.wmz) to test user locating
+		- Idea: Train an ANN?
+		- Idea: Somehow account for non-linear dBm/levels to distance/angel
+	- Create AP location calculator as well
+ 	- Change rendering of user location marker to a live painter (so we're not doing QPixmap::fromImage() eveyr call)
+ 	

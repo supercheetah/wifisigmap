@@ -406,7 +406,7 @@ void MapGraphicsView::mouseMoveEvent(QMouseEvent * mouseEvent)
 	QGraphicsView::mouseMoveEvent(mouseEvent);
 }
 
-void MapGraphicsView::drawForeground(QPainter *p, const QRectF & upRect)
+void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 {
 	MapGraphicsScene *gs = qobject_cast<MapGraphicsScene*>(scene());
 	if(!gs)
@@ -432,7 +432,7 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & upRect)
 
 	int margin = fontSize/2;
 	int y = margin;
-	int lineJump = fontSize * 1.33;
+	int lineJump = (int)(fontSize * 1.33);
 
 #ifdef Q_OS_ANDROID
 	margin = fontSize;
@@ -482,10 +482,10 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 		<< Qt::red 
 		<< Qt::darkGreen 
 		<< Qt::blue 
-		<< Qt::darkYellow 
-		<< Qt::darkCyan 
 		<< Qt::magenta 
-		<< Qt::darkMagenta 
+		<< Qt::darkCyan 
+		<< Qt::green
+		<< Qt::yellow
 		<< Qt::gray;
 
 
@@ -570,7 +570,8 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 
 void MapGraphicsScene::clear()
 {
-	m_apLocations.clear();
+	qDeleteAll(m_apInfo.values());
+	m_apInfo.clear();
 	m_sigValues.clear();
 	QGraphicsScene::clear();
 	
@@ -650,10 +651,11 @@ QImage tinted(const QImage &image, const QColor &color, QPainter::CompositionMod
 
 void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 {
-	m_apLocations[mac] = point;
+	MapApInfo *info = apInfo(mac);
+	info->point  = point;
+	info->marked = true;
 	
 	QImage markerGroup(":/data/images/ap-marker.png");
-	
 	markerGroup = addDropShadow(markerGroup, (double)(markerGroup.width()/2));
 		
 	//markerGroup.save("apMarkerDebug.png");
@@ -661,13 +663,10 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 	markerGroup = tinted(markerGroup, colorForSignal(1.0, mac));
 
 	QGraphicsPixmapItem *item = addPixmap(QPixmap::fromImage(markerGroup));
-	
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	
 	double w2 = (double)(markerGroup.width())/2.;
 	double h2 = (double)(markerGroup.height())/2.;
-	//QPointF pnt(point.x()-w2,point.y()-h2);
-	//item->setPos(QPointF(pnt));
 	item->setPos(point);
 	item->setOffset(-w2,-h2);
 	
@@ -690,12 +689,14 @@ void MapGraphicsScene::addSigMapItem()
 
 void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
+	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
+	
 	m_lastScanResults = results;
 	update(); // allow HUD to update
 	
 	QPointF userLocation  = QPointF(-1000,-1000);
 
-	if(m_apLocations.values().size() < 2)
+	if(m_apInfo.values().size() < 2)
 	{
 		// Unable to calculate users location without at least two known APs
 		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
@@ -712,11 +713,9 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	{
 		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
 		if(!apMacToSignal.contains(result.mac) &&
-		    m_apLocations.contains(result.mac) &&
-		    !m_apLocations.value(result.mac).isNull())
+		    !apInfo(result.mac)->point.isNull())
 		{
 			apMacToSignal.insert(result.mac, result.value);
-			//qDebug() << "MapGraphicsScene::scanFinished(): \t result.mac:"<<result.mac<<", result.value:"<<result.value<<", m_apLocations.value(result.mac):"<<m_apLocations.value(result.mac);
 		}
 	}
 	
@@ -739,11 +738,12 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		foreach(QString apMac, apMacToEssid.keys())
 		{
 			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
-			if(val->hasAp(apMac))
+			if(val->hasAp(apMac) &&
+			  !apInfo(apMac)->point.isNull())
 			{
-				QPointF delta = m_apLocations[apMac] - val->point;
+				QPointF delta = apInfo(apMac)->point - val->point;
 				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
-				double dist = d;
+				//double dist = d;
 				d = d / val->signalForAp(apMac);
 				
 				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
@@ -800,8 +800,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	}
 	
 	
-	QPointF p0 = m_apLocations[ap0];
-	QPointF p1 = m_apLocations[ap1];
+	QPointF p0 = apInfo(ap0)->point;
+	QPointF p1 = apInfo(ap1)->point;
 	//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
 		
 	double r0 = apMacToSignal[ap0] * ratio0;
@@ -996,169 +996,117 @@ void MapGraphicsScene::longPressCount()
 
 void MapGraphicsScene::longPressTimeout()
 {
-	if(!m_develTestMode)
+	if(m_markApMode)
 	{
-		if(m_markApMode)
+		/// Scan for APs nearby and prompt user to choose AP
+		
+		m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
+		
+		QList<WifiDataResult> results = m_scanIf.scanResults();
+		m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
+		
+		if(results.isEmpty())
 		{
-			/// Scan for APs nearby and prompt user to choose AP
-			
-			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
-			
-			QList<WifiDataResult> results = m_scanIf.scanResults();
-			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
-			
-			if(results.isEmpty())
-			{
-				m_mapWindow->flagApModeCleared();
-				m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
-			}
-			else
-			{
-				QStringList items;
-				foreach(WifiDataResult result, results)
-					items << QString("%1%: %2 - %3").arg(QString().sprintf("%02d", (int)(result.value*100))).arg(result.mac/*.left(6)*/).arg(result.essid);
-				
-				qSort(items.begin(), items.end());
-				
-				// Reverse order so strongest appears on top
-				QStringList tmp;
-				for(int i=items.size()-1; i>-1; i--)
-					tmp.append(items[i]);
-				items = tmp;
-
-				
-				bool ok;
-				QString item = QInputDialog::getItem(0, tr("Found APs"),
-									tr("AP:"), items, 0, false, &ok);
-				if (ok && !item.isEmpty())
-				{
-					QStringList pair = item.split(" ");
-					if(pair.size() < 2) // problem getting MAC
-						ok = false;
-					else
-					{
-						// If user chooses AP, call addApMarker(QString mac, QPoint location);
-						QString mac = pair[1];
-						
-						// Find result just to tell user ESSID
-						WifiDataResult matchingResult;
-						foreach(WifiDataResult result, results)
-							if(result.mac == mac)
-								matchingResult = result;
-						
-						// Add to map and ap list
-						addApMarker(m_pressPnt, mac);
-						
-						// Update UI
-						m_mapWindow->flagApModeCleared();
-						m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
-						
-						// Render map overlay (because the AP may be tied to an existing scan result)
-						//#ifndef Q_OS_ANDROID
-						triggerRender();
-						//#endif
-						//renderSigMap();
-					}
-				}
-				else
-					ok = false;
-				
-				if(!ok)
-				{
-					m_mapWindow->flagApModeCleared();
-					m_mapWindow->setStatusMessage(tr("User canceled"), 3000);
-				}
-			}
+			m_mapWindow->flagApModeCleared();
+			m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
 		}
 		else
-		/// Not in "mark AP" mode - regular scan mode, so scan and add store results
 		{
-			// scan for APs nearby
-			m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
+			QStringList items;
+			foreach(WifiDataResult result, results)
+				items << QString("%1%: %2 - %3").arg(QString().sprintf("%02d", (int)(result.value*100))).arg(result.mac/*.left(6)*/).arg(result.essid);
 			
-			QList<WifiDataResult> results = m_scanIf.scanResults();
-			m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
+			qSort(items.begin(), items.end());
 			
-			if(results.size() > 0)
+			// Reverse order so strongest appears on top
+			QStringList tmp;
+			for(int i=items.size()-1; i>-1; i--)
+				tmp.append(items[i]);
+			items = tmp;
+
+			
+			bool ok;
+			QString item = QInputDialog::getItem(0, tr("Found APs"),
+								tr("AP:"), items, 0, false, &ok);
+			if (ok && !item.isEmpty())
 			{
-				// call addSignalMarker() with presspnt
-				addSignalMarker(m_pressPnt, results);
-				
-				m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
-				
-				// Render map overlay
-				//#ifndef Q_OS_ANDROID
-				triggerRender();
-				//#endif
-				//renderSigMap();
-				
-				QStringList notFound;
-				foreach(WifiDataResult result, results)
-					if(!m_apLocations.contains(result.mac))
-						notFound << QString("<font color='%1'>%2</font> (<i>%3</i>)")
-							.arg(colorForSignal(result.value, result.mac).name())
-							.arg(result.mac.right(6))
-							.arg(result.essid); // last two octets of mac should be enough
-						
-				if(notFound.size() > 0)
+				QStringList pair = item.split(" ");
+				if(pair.size() < 2) // problem getting MAC
+					ok = false;
+				else
 				{
-					m_mapWindow->setStatusMessage(tr("Ok, but %2 APs need marked: %1").arg(notFound.join(", ")).arg(notFound.size()), 10000);
+					// If user chooses AP, call addApMarker(QString mac, QPoint location);
+					QString mac = pair[1];
+					
+					// Find result just to tell user ESSID
+					WifiDataResult matchingResult;
+					foreach(WifiDataResult result, results)
+						if(result.mac == mac)
+							matchingResult = result;
+					
+					// Add to map and ap list
+					addApMarker(m_pressPnt, mac);
+					
+					// Update UI
+					m_mapWindow->flagApModeCleared();
+					m_mapWindow->setStatusMessage(tr("Added %1 (%2)").arg(mac).arg(matchingResult.valid ? matchingResult.essid : "Unknown ESSID"), 3000);
+					
+					// Render map overlay (because the AP may be tied to an existing scan result)
+					//#ifndef Q_OS_ANDROID
+					triggerRender();
+					//#endif
+					//renderSigMap();
 				}
 			}
 			else
+				ok = false;
+			
+			if(!ok)
 			{
-				m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
+				m_mapWindow->flagApModeCleared();
+				m_mapWindow->setStatusMessage(tr("User canceled"), 3000);
 			}
 		}
 	}
 	else
+	/// Not in "mark AP" mode - regular scan mode, so scan and add store results
 	{
-		/// This is just development code - need to integrate with WifiDataCollector
-	
-		QList<WifiDataResult> results;
-		for(int i=0; i<3; i++)
+		// scan for APs nearby
+		m_mapWindow->setStatusMessage(tr("<font color='green'>Scanning...</font>"));
+		
+		QList<WifiDataResult> results = m_scanIf.scanResults();
+		m_mapWindow->setStatusMessage(tr("<font color='green'>Scan finished!</font>"), 3000);
+		
+		if(results.size() > 0)
 		{
-			//const int range = 40;
-			//int sig = (int)(rand() % range);
+			// call addSignalMarker() with presspnt
+			addSignalMarker(m_pressPnt, results);
 			
-			QString apMac = QString("TE:ST:MA:C1:23:0%1").arg(i);
+			m_mapWindow->setStatusMessage(tr("Added marker for %1 APs").arg(results.size()), 3000);
 			
-			QPointF center = m_apLocations[apMac];
-			double dx = m_pressPnt.x() - center.x();
-			double dy = m_pressPnt.y() - center.y();
-			double distFromCenter = sqrt(dx*dx + dy*dy);
+			// Render map overlay
+			//#ifndef Q_OS_ANDROID
+			triggerRender();
+			//#endif
+			//renderSigMap();
 			
-			double rangeMax = 2694.0; // TODO - This is the diagnal size of the test background
-			
-			double fakeSignalLevel = distFromCenter / (rangeMax * .25); // reduce for lower falloff
-			
-			const float range = 15.;
-			float rv = ((float)(rand() % (int)range) - (range/2.)) / 100.;
-		
-			fakeSignalLevel += rv; // add jitter
-			
-			fakeSignalLevel = 1 - fakeSignalLevel; // invert level so further away from center is lower signal
-		
-			qDebug() << "MapGraphicsScene::longPressTimeout(): AP#"<<i<<": "<<apMac<<": dist: "<<distFromCenter<<", rv:"<<rv<<", fakeSignalLevel:"<<fakeSignalLevel;
-			
-			if(fakeSignalLevel > .05)
-			{
-				if(fakeSignalLevel > 1.)
-					fakeSignalLevel = 1.;
+			QStringList notFound;
+			foreach(WifiDataResult result, results)
+				if(!apInfo(result)->marked)
+					notFound << QString("<font color='%1'>%2</font> (<i>%3</i>)")
+						.arg(colorForSignal(result.value, result.mac).name())
+						.arg(result.mac.right(6))
+						.arg(result.essid); // last two octets of mac should be enough
 					
-				WifiDataResult result;
-				result.value = fakeSignalLevel;
-				result.essid = "Testing123";
-				result.mac = apMac;
-				result.valid = true;
-				result.chan = (double)i;
-				result.dbm = (int)(fakeSignalLevel*100) - 100;
-				results << result;
+			if(notFound.size() > 0)
+			{
+				m_mapWindow->setStatusMessage(tr("Ok, but %2 APs need marked: %1").arg(notFound.join(", ")).arg(notFound.size()), 10000);
 			}
 		}
-				
-		addSignalMarker(m_pressPnt, results);
-		triggerRender();
+		else
+		{
+			m_mapWindow->setStatusMessage(tr("<font color='red'>No APs found nearby</font>"), 3000);
+		}
 	}
 }
 
@@ -1352,8 +1300,6 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	
 	double w2 = (double)(markerGroup.width())/2.;
 	double h2 = (double)(markerGroup.height())/2.;
-// 	QPointF pnt(point.x()-w2,point.y()-h2);
-// 	item->setPos(QPointF(pnt));
 	item->setPos(point);
 	item->setOffset(-w2,-h2);
 	
@@ -1635,7 +1581,9 @@ void SigMapRenderer::render()
 	{
 		foreach(QString apMac, apMacToEssid.keys())
 		{
-			QPointF center = m_gs->m_apLocations[apMac];
+			MapApInfo *info = m_gs->apInfo(apMac);
+			
+			QPointF center = info->point;
 			
 			foreach(SigMapValue *val, m_gs->m_sigValues)
 				val->consumed = false;
@@ -1703,16 +1651,24 @@ void SigMapRenderer::render()
 		
 		foreach(QString apMac, apMacToEssid.keys())
 		{
-			if(!m_gs->m_apLocations.contains(apMac))
+			MapApInfo *info = m_gs->apInfo(apMac);
+			
+			if(!info->marked)
 			{
 				qDebug() << "SigMapRenderer::render(): Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
+				continue;
+			}
+			
+			if(!info->renderOnMap)
+			{
+				qDebug() << "SigMapRenderer::render(): User disabled render for "<<apMac;
 				continue;
 			}
 			
 			foreach(SigMapValue *val, m_gs->m_sigValues)
 				val->renderDataDirty = true;
 			
-			QPointF center = m_gs->m_apLocations[apMac];
+			QPointF center = info->point;
 			
 			double maxDistFromCenter = -1;
 			double maxSigValue = 0.0;
@@ -1805,6 +1761,8 @@ void SigMapRenderer::render()
 				
 				double totalProgress = (100./levelInc) * (double)steps;
 				double progressCounter = 0.;
+				
+				(void)totalProgress; // avoid "unused" warnings...
 				
 				QVector<QPointF> lastLevelPoints;
 				for(double level=levelInc; level<=100.; level+=levelInc)
@@ -1931,8 +1889,94 @@ void MapGraphicsScene::renderProgress(double value)
 
 void MapGraphicsScene::renderComplete(QImage mapImg)
 {
+	qDebug() << "MapGraphicsScene::renderComplete(): currentThreadId:" << QThread::currentThreadId();
 	m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
 	m_mapWindow->setStatusMessage(tr("Signal map updated"), 500);
+}
+
+void MapGraphicsScene::setRenderAp(MapApInfo *info, bool flag)
+{
+	info->renderOnMap = flag;
+	triggerRender();
+}
+
+void MapGraphicsScene::setRenderAp(QString mac, bool flag)
+{
+	apInfo(mac)->renderOnMap = flag;
+	triggerRender();
+}
+
+MapApInfo* MapGraphicsScene::apInfo(WifiDataResult r)
+{
+	if(m_apInfo.contains(r.mac))
+		return m_apInfo.value(r.mac);
+		
+	MapApInfo *inf = new MapApInfo(r);
+	m_apInfo[r.mac] = inf;
+	 
+	return inf;
+}
+
+
+MapApInfo* MapGraphicsScene::apInfo(QString apMac)
+{
+	if(m_apInfo.contains(apMac))
+		return m_apInfo.value(apMac);
+		
+	MapApInfo *inf = new MapApInfo();
+	inf->mac = apMac;
+	m_apInfo[apMac] = inf;
+	 
+	return inf;
+}
+
+QColor MapGraphicsScene::baseColorForAp(QString apMac)
+{
+	QColor baseColor;
+	
+	MapApInfo *info = apInfo(apMac);
+	
+	if(info->color.isValid())
+	{
+		baseColor = info->color;
+		//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Loaded base "<<baseColor<<" from m_apMasterColor";
+	} 
+	else
+	{
+		bool foundColor = false;
+		while(m_colorCounter < m_masterColorsAvailable.size()-1)
+		{
+			baseColor = m_masterColorsAvailable[m_colorCounter ++];
+			
+			bool colorInUse = false;
+			/*foreach(QColor color, m_apMasterColor)
+				if(color == baseColor)
+					colorInUse = true;
+			*/		
+			if(!colorInUse)
+			{
+				foundColor = true;
+				break;
+			}
+		}
+		
+		if(foundColor)
+		{
+			qDebug() << "MapGraphicsScene::baseColorForAp: "<<apMac<<": Using NEW base "<<baseColor.name()<<" from m_masterColorsAvailable # "<<m_colorCounter;
+		}
+		//if(!foundColor)
+		else
+		{
+			baseColor = QColor::fromHsv(qrand() % 359, 255, 255);
+			qDebug() << "MapGraphicsScene::baseColorForAp: "<<apMac<<": Using NEW base "<<baseColor.name()<<" (random HSV color)";
+		}
+		
+		//m_apMasterColor[apMac] = baseColor;
+		info->color = baseColor;
+		//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Stored baseColor "<<m_apMasterColor[apMac]<<" in m_apMasterColor["<<apMac<<"]";
+	}
+	
+	return baseColor;
 }
 
 QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
@@ -1941,42 +1985,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 	if(!m_colorListForMac.contains(apMac))
 	{
 		//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": m_colorListforMac cache miss, getting base...";
-		QColor baseColor;
-		if(m_apMasterColor.contains(apMac))
-		{
-			baseColor = m_apMasterColor[apMac];
-			//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Loaded base "<<baseColor<<" from m_apMasterColor";
-		} 
-		else
-		{
-			bool foundColor = false;
-			while(m_colorCounter ++ < m_masterColorsAvailable.size()-1)
-			{
-				baseColor = m_masterColorsAvailable[m_colorCounter];
-				
-				bool colorInUse = false;
-				foreach(QColor color, m_apMasterColor)
-					if(color == baseColor)
-						colorInUse = true;
-						
-				if(!colorInUse)
-				{
-					foundColor = true;
-					break;
-				}
-			}
-			
-			//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Using NEW base "<<baseColor<<" from m_masterColorsAvailable # "<<m_colorCounter;
-			
-			if(!foundColor)
-			{
-				baseColor = QColor::fromHsv(qrand() % 359, 255, 255);
-				//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Using NEW base "<<baseColor<<" (random HSV color)";
-			}
-			
-			m_apMasterColor[apMac] = baseColor;
-			//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": Stored baseColor "<<m_apMasterColor[apMac]<<" in m_apMasterColor["<<apMac<<"]";
-		}
+		QColor baseColor = baseColorForAp(apMac);
 		
 		// paint the gradient
 		#ifdef Q_OS_ANDROID
@@ -2081,29 +2090,19 @@ void MapGraphicsScene::saveResults(QString filename)
 	
 	// Save AP locations
 	data.beginWriteArray("ap-locations");
-	foreach(QString apMac, m_apLocations.keys())
+	foreach(MapApInfo *info, m_apInfo)
 	{
-		QPointF center = m_apLocations[apMac];
-//		QList<QColor> colorList = m_colorListForMac.value(apMac);
-		
 		data.setArrayIndex(idx++);
-		data.setValue("mac", apMac);
-		data.setValue("center", qPointFToString(center));
-		data.setValue("color", m_apMasterColor.value(apMac).name());
-		
-// 		int colorIdx = 0;
-// 		data.beginWriteArray("colors");
-// 		foreach(QColor color, colorList)
-// 		{
-// 			data.setArrayIndex(colorIdx++);
-// 			data.setValue("color", color.name());
-// 		}
-// 		data.endArray();
+		data.setValue("mac",		info->mac);
+		data.setValue("essid",		info->essid);
+		data.setValue("marked",		info->marked);
+		data.setValue("point",		qPointFToString(info->point));
+		data.setValue("color", 		info->color.name());
+		data.setValue("renderOnMap",	info->renderOnMap);
 	}
 	data.endArray();
 		
 	// Save signal readings
-	//m_sigValues << new SigMapValue(point, results);
 	idx = 0;
 	data.beginWriteArray("readings");
 	foreach(SigMapValue *val, m_sigValues)
@@ -2149,41 +2148,50 @@ void MapGraphicsScene::loadResults(QString filename)
 	
 	// Load ap locations
 	int numApLocations = data.beginReadArray("ap-locations");
+	
+	qDebug() << "MapGraphicsScene::loadResults(): Reading numApLocations: "<<numApLocations;
 	for(int i=0; i<numApLocations; i++)
 	{
 		data.setArrayIndex(i);
 		
-		QPointF center = qPointFFromString(data.value("center").toString());
+		QString pointString = data.value("point").toString();
+		if(pointString.isEmpty())
+			// prior to r35, point key was "center"
+			pointString = data.value("center").toString();
+		
+		QPointF point  = qPointFFromString(pointString);
 		QString apMac  = data.value("mac").toString();
+		QString essid  = data.value("essid").toString();
+		bool marked    = data.value("marked", !point.isNull()).toBool();
 		QColor color   = data.value("color").toString();
+		bool render    = data.value("renderOnMap", true).toBool();
 		
-		if(color.isValid())
-			m_apMasterColor[apMac] = color;
-			
-		addApMarker(center, apMac);
+		if(!color.isValid())
+		{
+			qDebug() << "MapGraphicsScene::loadResults(): Getting base color for AP#:"<<i<<", mac:"<<apMac;
+			color = baseColorForAp(apMac);
+		}
 		
-	
-// 		QList<QColor> colorList;
-// 		
-// 		int numColors = data.beginReadArray("colors");
-// 		for(int j=0; j<numColors; j++)
-// 		{
-// 			data.setArrayIndex(j);
-// 			QString color = data.value("color").toString();
-// 			colorList << QColor(color);
-// 			
-// 		}
-// 		data.endArray();
-// 		
-// 		m_colorListForMac[apMac] = colorList;
+		MapApInfo *info = apInfo(apMac);
+		
+		info->essid	= essid;
+		info->marked	= marked;
+		info->point	= point;
+		info->color	= color;
+		info->renderOnMap = render;
+		
+		if(marked)
+			addApMarker(point, apMac);
 	}
 	data.endArray();
 	
 	// Load signal readings
 	int numReadings = data.beginReadArray("readings");
+	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
 		data.setArrayIndex(i);
+		//qDebug() << "MapGraphicsScene::loadResults(): Reading point#: "<<i;
 		QPointF point = qPointFFromString(data.value("point").toString());
 		
 		int numSignals = data.beginReadArray("signals");
