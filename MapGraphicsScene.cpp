@@ -977,7 +977,8 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
-	m_longPressSpinner->setPos(m_pressPnt - QPointF(32.,32.));
+	double half = m_longPressSpinner->boundingRect().width()/2;
+	m_longPressSpinner->setPos(m_pressPnt - QPointF(half,half));
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
@@ -1662,13 +1663,13 @@ void SigMapRenderer::render()
 // 	QImage mapImg(renderSize, QImage::Format_ARGB32_Premultiplied);
 	double dx=1., dy=1.;
 	
-// 	QImage mapImg(origSize, QImage::Format_ARGB32_Premultiplied);
-// 	QPainter p(&mapImg);
+	QImage mapImg(origSize, QImage::Format_ARGB32_Premultiplied);
+	QPainter p(&mapImg);
 	
- 	QPicture pic;
+/* 	QPicture pic;
  	QPainter p(&pic);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
-	//p.fillRect(mapImg.rect(), Qt::transparent);
+*/	//p.fillRect(mapImg.rect(), Qt::transparent);
 	
 	QHash<QString,QString> apMacToEssid;
 	
@@ -2065,10 +2066,11 @@ void SigMapRenderer::render()
 
 	//m_gs->m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	//emit renderComplete(mapImg);
-// 	QPicture pic;
-// 	QPainter pp(&pic);
-// 	pp.drawImage(0,0,mapImg);
-// 	pp.end();
+	QPicture pic;
+	QPainter pp(&pic);
+	pp.drawImage(0,0,mapImg);
+	pp.end();
+
 	emit renderComplete(pic);
 }
 
@@ -2100,6 +2102,10 @@ LongPressSpinner::LongPressSpinner()
 	m_progress = 0.;
 	
 	QSizeF size = QSizeF(64.,64.);//.expandTo(QApplication::globalStrut());
+#ifdef Q_OS_ANDROID
+	size = QSizeF(128,128);
+#endif
+
 	m_boundingRect = QRectF(QPointF(0,0),size);
 }
 
@@ -2143,8 +2149,8 @@ void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *
 	  
 	painter->setBrush(Qt::white);
 	painter->drawChord(boundingRect().adjusted(10,10,-10,-10), 
-		 45 * 16, // start at 12 o'clock 
-	  (int)(360 * 16 * m_progress)); // counter-clockwise
+		0 /*45 * 16*/, // start at 12 o'clock
+	 -(int)(360 * 16 * m_progress)); // counter-clockwise
 	
 	painter->restore();
 }
