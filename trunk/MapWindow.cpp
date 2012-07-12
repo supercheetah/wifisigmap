@@ -103,7 +103,8 @@ MapWindow::MapWindow(QWidget *parent)
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/phcfirstrun.wmz");
 	//m_scene->loadResults("wmz/foobar.wmz");
-	m_scene->loadResults("wmz/test-track.wmz");
+	//m_scene->loadResults("wmz/test-track.wmz");
+	m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/pci4000-livedata2.wmz");
 }
 
@@ -111,10 +112,10 @@ MapWindow::MapWindow(QWidget *parent)
 	{ QPushButton *btn = new QPushButton(title); \
 		connect(btn, SIGNAL(clicked()), object, slot); \
 		layout->addWidget(btn); \
-	} 
+	}
 	
 #define makeButton(layout,title,slot) \
-	makeButton2(this,layout,title,slot) 
+	makeButton2(this,layout,title,slot)
 	
 void MapWindow::setupUi()
 {
@@ -125,14 +126,14 @@ void MapWindow::setupUi()
 	QHBoxLayout *hbox;
 	hbox = new QHBoxLayout();
 	
-	makeButton(hbox,"New",SLOT(clearSlot()));
-	makeButton(hbox,"Load",SLOT(loadSlot()));
-	makeButton(hbox,"Save",SLOT(saveSlot()));
+	makeButton(hbox, "New",  SLOT(clearSlot()));
+	makeButton(hbox, "Load", SLOT(loadSlot()));
+	makeButton(hbox, "Save", SLOT(saveSlot()));       
 	
 	#ifndef Q_OS_ANDROID
 	// Disable on android because until I rewrite the file browser dialog,
 	// the file browser is pretty much useless
-	makeButton(hbox,"Background...",SLOT(chooseBgSlot()));
+	makeButton(hbox, "Background...", SLOT(chooseBgSlot()));
 	#endif
 	
 	makeButton2(m_gv, hbox, "+", SLOT(zoomIn()));
