@@ -4,13 +4,10 @@ background=/tmp/phclayout.png
 [ap-locations]
 1\mac=00:2D:08:0E:92:14
 1\center="34.8365,875.889"
-1\color=#ff0000
 2\mac=00:1A:70:59:5B:6F
 2\center="1205.63,1188.89"
-2\color=#008000
 3\mac=58:6D:8F:9B:2B:07
 3\center="939.911,484.664"
-3\color=#0000ff
 size=3
 
 [readings]
