@@ -100,6 +100,7 @@ protected:
 	bool m_internalCache;
 	QPicture m_pic;
 	QImage m_img;
+	QPoint m_offset;
 };
 
 
@@ -160,6 +161,7 @@ public:
 class MapRenderOptions
 {
 public:
+	bool cacheMapRender;
 	bool showReadingMarkers;
 	bool multipleCircles;
 	bool fillCircles;

@@ -488,6 +488,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	, m_userItem(0)
 {
 	// Setup default render options
+	m_renderOpts.cacheMapRender     = true;
 	m_renderOpts.showReadingMarkers = true;
 	m_renderOpts.multipleCircles	= true;
 	m_renderOpts.fillCircles	= true;
@@ -507,7 +508,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 		<< "#fd1402" // rich red
 		<< "#f8fc0f" // kid yellow
 		<< "#19f900" // kid green
-		<< "ff4500"  // dark orange
+		<< "#ff4500"  // dark orange
 		;
 
 
@@ -1662,14 +1663,14 @@ void SigMapRenderer::render()
 // 	
 // 	QImage mapImg(renderSize, QImage::Format_ARGB32_Premultiplied);
 	double dx=1., dy=1.;
-	
+	/*
 	QImage mapImg(origSize, QImage::Format_ARGB32_Premultiplied);
-	QPainter p(&mapImg);
+	QPainter p(&mapImg);*/
 	
-/* 	QPicture pic;
+ 	QPicture pic;
  	QPainter p(&pic);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
-*/	//p.fillRect(mapImg.rect(), Qt::transparent);
+	//p.fillRect(mapImg.rect(), Qt::transparent);
 	
 	QHash<QString,QString> apMacToEssid;
 	
@@ -2066,17 +2067,18 @@ void SigMapRenderer::render()
 
 	//m_gs->m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg.scaled(origSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	//emit renderComplete(mapImg);
-	QPicture pic;
-	QPainter pp(&pic);
-	pp.drawImage(0,0,mapImg);
-	pp.end();
+// 	QPicture pic;
+// 	QPainter pp(&pic);
+// 	pp.drawImage(0,0,mapImg);
+// 	pp.end();
 
 	emit renderComplete(pic);
 }
 
 void MapGraphicsScene::renderProgress(double value)
 {
-	m_mapWindow->setStatusMessage(tr("Rendering %1%").arg((int)(value*100)), 250);
+	(void)value;
+	//m_mapWindow->setStatusMessage(tr("Rendering %1%").arg((int)(value*100)), 250);
 }
 
 // void MapGraphicsScene::renderComplete(QImage mapImg)
@@ -2165,6 +2167,12 @@ SigMapItem::SigMapItem()
 	m_internalCache = true;
 }
 
+void SigMapItem::setInternalCache(bool flag)
+{
+	m_internalCache = flag;
+	setPIcture(m_pic);
+}
+
 void SigMapItem::setPicture(QPicture pic)
 {
 	setCacheMode(QGraphicsItem::DeviceCoordinateCache);
@@ -2172,16 +2180,21 @@ void SigMapItem::setPicture(QPicture pic)
 	prepareGeometryChange();
 	m_pic = pic;
 	
+	m_offset = QPoint();
+	
 	if(m_internalCache)
 	{
-		QImage img(m_pic.boundingRect().size(), QImage::Format_ARGB32_Premultiplied);
+		QRect picRect = m_pic.boundingRect();
+		m_offset = picRect.topLeft();
+		
+		QImage img(picRect.size(), QImage::Format_ARGB32_Premultiplied);
 		QPainter p(&img);
 		p.fillRect(img.rect(), Qt::transparent);
-		p.drawPicture(0,0,m_pic);
+		p.drawPicture(-m_offset, m_pic);
 		p.end();
 		m_img = img;
-		qDebug() << "SigMapItem::setPicture(): m_img.size():"<<m_img.size();
-		m_img.save("mapImg.jpg");
+		qDebug() << "SigMapItem::setPicture(): m_img.size():"<<m_img.size()<<", picRect:"<<picRect;
+		//m_img.save("mapImg.jpg");
 	}
 	else
 		m_img = QImage();
@@ -2204,7 +2217,7 @@ QRectF SigMapItem::boundingRect() const
 	
 void SigMapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget */*widget*/)
 {
-	//qDebug() << "SigMapItem::paint: option->exposedRect:"<<option->exposedRect;
+	qDebug() << "SigMapItem::paint: option->exposedRect:"<<option->exposedRect<<", m_offset:"<<m_offset<<", m_img.size():"<<m_img.size();
 		
 	painter->save();
 	painter->setOpacity(0.75);
@@ -2213,14 +2226,16 @@ void SigMapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
 	if(m_internalCache && 
 	  !m_img.isNull())
 	{
+		/*
 		if(option->exposedRect.isValid())
-			painter->drawImage( option->exposedRect, m_img, option->exposedRect.toRect() );
+			painter->drawImage( option->exposedRect.translated(m_offset), m_img, option->exposedRect.toRect() );
 		else
-			painter->drawImage( 0, 0, m_img );
+		*/
+			painter->drawImage( m_offset, m_img );
 	}
 	else
 	if(!m_pic.isNull())
-		painter->drawPicture( 0, 0, m_pic );
+		painter->drawPicture( m_offset, m_pic );
 
 // 	if(!m_img.isNull())
 // 	{
