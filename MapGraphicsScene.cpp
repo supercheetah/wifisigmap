@@ -492,12 +492,17 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	m_renderOpts.showReadingMarkers = true;
 	m_renderOpts.multipleCircles	= true;
 	m_renderOpts.fillCircles	= true;
+	#ifdef Q_OS_ANDROID
+	m_renderOpts.radialCircleSteps	= 4 * 4 * 2;
+	m_renderOpts.radialLevelSteps	= (int)(100 / .2);
+	#else
 	m_renderOpts.radialCircleSteps	= 4 * 4 * 4;
 	m_renderOpts.radialLevelSteps	= (int)(100 / .25);
+	#endif
 	m_renderOpts.radialAngleDiff	= 45 * 3;
 	m_renderOpts.radialLevelDiff	= 100 / 3;
 	m_renderOpts.radialLineWeight	= 200;
-	
+
 	// Create initial palette of colors for flagging APs
 	m_masterColorsAvailable = QList<QColor>() 
 		<< Qt::red 
@@ -510,7 +515,6 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 		<< "#19f900" // kid green
 		<< "#ff4500"  // dark orange
 		;
-
 
 	// Setup the "longpress" timer
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
@@ -1519,7 +1523,8 @@ double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPo
 			// Now, calculate the straight-line distance of this reading to the current point we're rendering
 			QPointF calcPoint = val->point - realPoint;
 			double lineDist = sqrt(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
-			const double lineWeight = 200.; // NOTE arbitrary magic number
+			//const double lineWeight = 200.; // NOTE arbitrary magic number
+			double lineWeight = (double)m_renderOpts.radialLineWeight;
 			
 			// Calculate the value to adjust the render level by.
 			double signalLevelDiff = (testLevel - signalLevel)    // Adjustment is based on the differences in the current render level vs the signal level read at this point 
@@ -1564,9 +1569,12 @@ double MapGraphicsScene::getRenderLevel(double level,double angle,QPointF realPo
 					
 			//qDebug() << "getRenderLevel: val "<<val->point<<", signal for "<<apMac<<": "<<(int)signalLevel<<"%, angleDiff:"<<angleDiff<<", levelDiff:"<<levelDiff<<", lineDist:"<<lineDist<<", signalLevelDiff:"<<signalLevelDiff;
 			
-				
+			/*	
 			if(angleDiff < 135. && // 1/3rd of 360*
 			   levelDiff <  33.)   // 1/3rd of 100 levels
+			*/
+			if(angleDiff < m_renderOpts.radialAngleDiff &&
+			   levelDiff < m_renderOpts.radialLevelDiff)
 			{
 				//double oldLev = level;
 				level += signalLevelDiff;
@@ -1757,22 +1765,27 @@ void SigMapRenderer::render()
 	}
 	else
 	{
-		
+		/*
 		#ifdef Q_OS_ANDROID
 		int steps = 4 * 4 * 2;
 		#else
 		int steps = 4 * 4 * 4; //4 * 2;
 		#endif
+		*/
+		int steps = m_gs->m_renderOpts.radialCircleSteps;
 		
 		double angleStepSize = 360. / ((double)steps);
 		
 		//int radius = 64*10/2;
 		
+		/*
 		#ifdef Q_OS_ANDROID
 		const double levelInc = .50; //100 / 1;// / 2;// steps;
 		#else
 		const double levelInc = .25; //100 / 1;// / 2;// steps;
 		#endif
+		*/
+		double levelInc = 100. / ((double)m_gs->m_renderOpts.radialLevelSteps);
 		
 		double totalProgress = (100./levelInc) * (double)steps * apMacToEssid.keys().size();
 		double progressCounter = 0.;
@@ -1837,107 +1850,102 @@ void SigMapRenderer::render()
 			
 			if(m_gs->m_renderMode == MapGraphicsScene::RenderCircles)
 			{
-// 				foreach(SigMapValue *val, m_gs->m_sigValues)
-// 				{
-// 					if(val->hasAp(apMac))
-// 					{
-// 						double sig = val->signalForAp(apMac);
-// 						QColor color = m_gs->colorForSignal(sig, apMac);
-// 						rg.setColorAt(1-sig, color);
-// 						
-// 						//double dx = val->point.x() - center.x();
-// 						//double dy = val->point.y() - center.y();
-// 						//double distFromCenter = sqrt(dx*dx + dy*dy);
-// 						
-// 						//qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
-// 						
-// 						
-// 					}
-//
-//					progressCounter ++;
-//					emit renderProgress(progressCounter / totalProgress);
-//					
-//					
-// 				}
-// 				
-// 				rg.setCenter(center);
-// 				rg.setFocalPoint(center);
-// 				rg.setRadius(maxDistFromCenter);
-// 				
-// 				p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
-// 				p.setOpacity(1. / (double)(numAps) * (numAps - idx));
-// 				p.setBrush(QBrush(rg));
-// 				//p.setBrush(Qt::green);
-// 				p.setPen(QPen(Qt::black,1.5));
-// 				//p.drawEllipse(0,0,iconSize,iconSize);
-// 				p.setCompositionMode(QPainter::CompositionMode_Xor);
-// 				p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
-// 				qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
-
-
-				SigMapRenderer_sort_apMac = apMac;
-				SigMapRenderer_sort_center = center;
-				
-				QList<SigMapValue*> readings = m_gs->m_sigValues;
-				
-				// Sort the readings based on signal level so readings cloest to the antenna are drawn last
-				qSort(readings.begin(), readings.end(), SigMapRenderer_sort_SigMapValue);
-				
-				foreach(SigMapValue *val, readings)
+				if(!m_gs->m_renderOpts.multipleCircles)
 				{
-					if(val->hasAp(apMac))
+					foreach(SigMapValue *val, m_gs->m_sigValues)
 					{
-						double sig = val->signalForAp(apMac);
-						QColor color = m_gs->colorForSignal(sig, apMac);
-//						rg.setColorAt(1-sig, color);
+						if(val->hasAp(apMac))
+						{
+							double sig = val->signalForAp(apMac);
+							QColor color = m_gs->colorForSignal(sig, apMac);
+							rg.setColorAt(1-sig, color);
+							
+							//double dx = val->point.x() - center.x();
+							//double dy = val->point.y() - center.y();
+							//double distFromCenter = sqrt(dx*dx + dy*dy);
+							
+							//qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
+							
+							
+						}
+	
+						progressCounter ++;
+						emit renderProgress(progressCounter / totalProgress);
 						
-						double dx = val->point.x() - center.x();
-						double dy = val->point.y() - center.y();
-//  						double distFromCenter = sqrt(dx*dx + dy*dy);
 						
-						//qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
-						
-						//p.drawEllipse(center, distFromCenter, distFromCenter);
-// 						rg.setCenter(center);
-// 						rg.setFocalPoint(center);
-// 						rg.setRadius(maxDistFromCenter);
-						
-						//p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
-						p.setOpacity(.5); //1. / (double)(numAps) * (numAps - idx));
-						p.setBrush(color); //QBrush(rg));
-						
-						#ifdef Q_OS_ANDROID
-						const double maxLineWidth = 7.5;
-						#else
-						const double maxLineWidth = 5.0;
-						#endif
-						
-						p.setPen(QPen(color.darker(400), (1.-sig)*maxLineWidth));
-		
-		
-						//p.setPen(QPen(Qt::black,1.5));
-						
-						p.drawEllipse(center, fabs(dx), fabs(dy));
 					}
 					
-					progressCounter ++;
-					emit renderProgress(progressCounter / totalProgress);
+					rg.setCenter(center);
+					rg.setFocalPoint(center);
+					rg.setRadius(maxDistFromCenter);
+					
+					p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
+					p.setOpacity(1. / (double)(numAps) * (numAps - idx));
+					p.setBrush(QBrush(rg));
+					//p.setBrush(Qt::green);
+					p.setPen(QPen(Qt::black,1.5));
+					//p.drawEllipse(0,0,iconSize,iconSize);
+					p.setCompositionMode(QPainter::CompositionMode_Xor);
+					p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
+					qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+				}
+				else
+				{
+	
+					SigMapRenderer_sort_apMac = apMac;
+					SigMapRenderer_sort_center = center;
+					
+					QList<SigMapValue*> readings = m_gs->m_sigValues;
+					
+					// Sort the readings based on signal level so readings cloest to the antenna are drawn last
+					qSort(readings.begin(), readings.end(), SigMapRenderer_sort_SigMapValue);
+					
+					foreach(SigMapValue *val, readings)
+					{
+						if(val->hasAp(apMac))
+						{
+							double sig = val->signalForAp(apMac);
+							QColor color = m_gs->colorForSignal(sig, apMac);
+	//						rg.setColorAt(1-sig, color);
+							
+							double dx = val->point.x() - center.x();
+							double dy = val->point.y() - center.y();
+	//  						double distFromCenter = sqrt(dx*dx + dy*dy);
+							
+							//qDebug() << "SigMapRenderer::render(): "<<apMac<<": sig:"<<sig<<", color:"<<color<<", distFromCenter:"<<distFromCenter;
+							
+							//p.drawEllipse(center, distFromCenter, distFromCenter);
+	// 						rg.setCenter(center);
+	// 						rg.setFocalPoint(center);
+	// 						rg.setRadius(maxDistFromCenter);
+							
+							//p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
+							p.setOpacity(.5); //1. / (double)(numAps) * (numAps - idx));
+							if(m_gs->m_renderOpts.fillCircles)
+								p.setBrush(color); //QBrush(rg));
+							
+							#ifdef Q_OS_ANDROID
+							const double maxLineWidth = 7.5;
+							#else
+							const double maxLineWidth = 5.0;
+							#endif
+							
+							if(m_gs->m_renderOpts.fillCircles)
+								p.setPen(QPen(color.darker(400), (1.-sig)*maxLineWidth));
+							else
+								p.setPen(QPen(color, (1.-sig)*maxLineWidth));
+			
+			
+							//p.setPen(QPen(Qt::black,1.5));
+							
+							p.drawEllipse(center, fabs(dx), fabs(dy));
+						}
+						
+						progressCounter ++;
+						emit renderProgress(progressCounter / totalProgress);
+					}
 				}
 				
-				/*
-				rg.setCenter(center);
-				rg.setFocalPoint(center);
-				rg.setRadius(maxDistFromCenter);
-				
-				p.setOpacity(.75); //1. / (double)(numAps) * (numAps - idx));
-				p.setOpacity(1. / (double)(numAps) * (numAps - idx));
-				p.setBrush(QBrush(rg));
-				//p.setBrush(Qt::green);
-				p.setPen(QPen(Qt::black,1.5));
-				//p.drawEllipse(0,0,iconSize,iconSize);
-				p.setCompositionMode(QPainter::CompositionMode_Xor);
-				p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
-				*/
 				qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
 			}
 			else
@@ -2170,7 +2178,7 @@ SigMapItem::SigMapItem()
 void SigMapItem::setInternalCache(bool flag)
 {
 	m_internalCache = flag;
-	setPIcture(m_pic);
+	setPicture(m_pic);
 }
 
 void SigMapItem::setPicture(QPicture pic)
@@ -2657,4 +2665,28 @@ void MapGraphicsScene::renderTriangle(QImage *img, QPointF center, SigMapValue *
 // 	p.drawConvexPolygon(points);
 // 	p.end();
 
+}
+
+void MapGraphicsScene::setRenderOpts(MapRenderOptions opts)
+{
+	m_renderOpts = opts;
+	/*
+	//Defaults:
+	m_renderOpts.cacheMapRender     = true;
+	m_renderOpts.showReadingMarkers = true;
+	m_renderOpts.multipleCircles	= true;
+	m_renderOpts.fillCircles	= true;
+	m_renderOpts.radialCircleSteps	= 4 * 4 * 4;
+	m_renderOpts.radialLevelSteps	= (int)(100 / .25);
+	m_renderOpts.radialAngleDiff	= 45 * 3;
+	m_renderOpts.radialLevelDiff	= 100 / 3;
+	m_renderOpts.radialLineWeight	= 200;
+	*/
+	
+	m_sigMapItem->setInternalCache(m_renderOpts.cacheMapRender);
+	
+	foreach(SigMapValue *val, m_sigValues)
+		val->marker->setVisible(m_renderOpts.showReadingMarkers);
+		
+	triggerRender();	
 }
