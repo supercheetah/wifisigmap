@@ -18,6 +18,8 @@ protected:
 	friend class MapGraphicsScene; // friend for access to the following (and flagApModeCleared())
 	void setStatusMessage(const QString&, int timeout=-1);
 	
+	MapGraphicsView *gv() { return m_gv; }
+	
 protected slots:
 	void saveSlot();
 	void loadSlot();
