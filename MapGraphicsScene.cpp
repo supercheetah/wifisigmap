@@ -443,6 +443,7 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 		
 	p->save();
 	p->resetTransform();
+	p->setOpacity(1.);
 	
 	p->setPen(Qt::black);
 	p->fillRect(rect, QColor(0,0,0,150));
@@ -1436,7 +1437,14 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
 	double half = m_longPressSpinner->boundingRect().width()/2;
-	m_longPressSpinner->setPos(m_pressPnt - QPointF(half,half));
+	int fingertipAdjust = 0;
+	#ifdef Q_OS_ANDROID
+	// TODO Is there some OS preference that indicates right or left handed usage?
+	fingertipAdjust = half/2;
+	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
+	#endif
+	
+	m_longPressSpinner->setPos(m_pressPnt - QPointF(half - fingertipAdjust,half));
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
@@ -1483,7 +1491,6 @@ void MapGraphicsScene::longPressCount()
 	if(percent > 100.) // we missed a cancel call somehwere...
 	{
 		m_longPressCountTimer.stop();
-		m_longPressSpinner->setVisible(false);
 	}
 	else
 	{
@@ -1493,6 +1500,8 @@ void MapGraphicsScene::longPressCount()
 
 void MapGraphicsScene::longPressTimeout()
 {
+	m_longPressSpinner->setGoodPress(true);
+
 	if(m_markApMode)
 	{
 		/// Scan for APs nearby and prompt user to choose AP
@@ -2562,6 +2571,7 @@ void MapGraphicsScene::renderComplete(QPicture pic)
 
 LongPressSpinner::LongPressSpinner()
 {
+	m_goodPressFlag = false;
 	m_progress = 0.;
 	
 	QSizeF size = QSizeF(64.,64.);//.expandTo(QApplication::globalStrut());
@@ -2570,11 +2580,52 @@ LongPressSpinner::LongPressSpinner()
 #endif
 
 	m_boundingRect = QRectF(QPointF(0,0),size);
+	
+	connect(&m_goodPressTimer, SIGNAL(timeout()), this, SLOT(fadeTick()));
+	m_goodPressTimer.setInterval(333/20);
+	//m_goodPressTimer.setSingleShot(true);
+	
+}
+
+void LongPressSpinner::setGoodPress(bool flag)
+{
+	setVisible(true);
+	setOpacity(1.0);
+	prepareGeometryChange();
+	m_goodPressFlag = flag;
+	m_goodPressTimer.start();
+	update();
+}
+
+void LongPressSpinner::fadeTick()
+{
+	setOpacity(opacity() - 20./333.);
+	update();
+	if(opacity() <= 0)
+		goodPressExpire(); 
+}
+
+void LongPressSpinner::setVisible(bool flag)
+{
+	if(m_goodPressFlag)
+		return;
+	
+	QGraphicsItem::setVisible(flag);
+}
+
+void LongPressSpinner::goodPressExpire()
+{
+	m_goodPressFlag = false;
+	setOpacity(1.0);
+	setVisible(false);
+	prepareGeometryChange();
+	update();
 }
 
 void LongPressSpinner::setProgress(double p)
 {
 	m_progress = p;
+	setOpacity(1.0);
 	setVisible(p > 0. && p < 1.);
 	//qDebug() << "LongPressSpinner::setProgress(): m_progress:"<<m_progress<<", isVisible:"<<isVisible();
 	update();
@@ -2582,49 +2633,70 @@ void LongPressSpinner::setProgress(double p)
 
 QRectF LongPressSpinner::boundingRect() const
 {
-	return m_boundingRect;	
+	if(m_goodPressFlag)
+	{
+		int iconSize = 64;
+#ifdef Q_OS_ANDROID
+		iconSize = 128;
+#endif
+		return m_boundingRect.adjusted(-iconSize,-iconSize,iconSize,iconSize);
+	}
+	return m_boundingRect;
 }
 	
 void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget */*widget*/)
 {
 	painter->save();
-	painter->setOpacity(0.75);
 	painter->setClipRect( option->exposedRect );
 	
 	int iconSize = boundingRect().size().toSize().width();
 	
-	// Draw inner gradient
-	QColor centerColor("#0277fd"); // cream blue
-	QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
-	rg.setColorAt(0, centerColor/*.lighter(100)*/);
-	rg.setColorAt(1, centerColor.darker(500));
-	//p.setPen(Qt::black);
-	painter->setBrush(QBrush(rg));
+	if(m_goodPressFlag)
+	{
+		// Draw inner gradient
+		QColor centerColor = Qt::green;
+		QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
+		rg.setColorAt(0, centerColor/*.lighter(100)*/);
+		rg.setColorAt(1, centerColor.darker(500));
+		//p.setPen(Qt::black);
+		painter->setBrush(QBrush(rg));
+		
+		//painter->setPen(QPen(Qt::black,3));
+		painter->drawEllipse(boundingRect());
+	}
+	else
+	{
+		painter->setOpacity(0.75);
+		
+		// Draw inner gradient
+		QColor centerColor("#0277fd"); // cream blue
+		QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
+		rg.setColorAt(0, centerColor/*.lighter(100)*/);
+		rg.setColorAt(1, centerColor.darker(500));
+		//p.setPen(Qt::black);
+		painter->setBrush(QBrush(rg));
+		
+		//qDebug() << "LongPressSpinner::paint(): progress:"<<m_progress<<", rect:"<<boundingRect()<<", iconSize:"<<iconSize;
+		
+		QPainterPath outerPath;
+		outerPath.addEllipse(boundingRect());
+		
+		QPainterPath innerPath;
+		innerPath.addEllipse(boundingRect().adjusted(12.5,12.5,-12.5,-12.5));
+		
+		// Clip center of circle
+		painter->setClipPath(outerPath.subtracted(innerPath));
+		
+		// Draw outline
+		painter->setPen(QPen(Qt::black,3));
+		//painter->drawEllipse(0,0,iconSize,iconSize);
+		painter->drawChord(boundingRect().adjusted(3,3,-3,-3), 
+				0, -(int)(360 * 16 * m_progress)); // clockwise
 	
-	//qDebug() << "LongPressSpinner::paint(): progress:"<<m_progress<<", rect:"<<boundingRect()<<", iconSize:"<<iconSize;
-	
-	QPainterPath outerPath;
-	outerPath.addEllipse(boundingRect());
-	
-	QPainterPath innerPath;
-	innerPath.addEllipse(boundingRect().adjusted(12.5,12.5,-12.5,-12.5));
-	
-	painter->setClipPath(outerPath.subtracted(innerPath));
-	
-	// Draw outline
-	painter->setPen(QPen(Qt::black,3));
-	//painter->drawEllipse(0,0,iconSize,iconSize);
-	painter->drawChord(boundingRect().adjusted(3,3,-3,-3), 
-		 0 /*45 * 16*/, // start at 12 o'clock
-	 -(int)(360 * 16 * m_progress)); // counter-clockwise
-	/*
-		 45 * 16, // start at 12 o'clock 
-	  (int)(360 * 16 * m_progress)); // counter-clockwise*/
-
-	painter->setBrush(Qt::white);
-	painter->drawChord(boundingRect().adjusted(10,10,-10,-10), 
-		       0, // start at 12 o'clock
-	 -(int)(360 * 16 * m_progress)); // counter-clockwise
+		painter->setBrush(Qt::white);
+		painter->drawChord(boundingRect().adjusted(10,10,-10,-10), 
+				0, -(int)(360 * 16 * m_progress)); // clocwise
+	}
 	
 	painter->restore();
 }
@@ -2657,14 +2729,18 @@ void SigMapItem::setPicture(QPicture pic)
 	if(m_internalCache)
 	{
 		QRect picRect = m_pic.boundingRect();
-		m_offset = picRect.topLeft();
+		if(picRect.isValid())
+		{
+			m_offset = picRect.topLeft();
+			
+			QImage img(picRect.size(), QImage::Format_ARGB32_Premultiplied);
+			QPainter p(&img);
+			p.fillRect(img.rect(), Qt::transparent);
+			p.drawPicture(-m_offset, m_pic);
+			p.end();
+			m_img = img;
+		}
 		
-		QImage img(picRect.size(), QImage::Format_ARGB32_Premultiplied);
-		QPainter p(&img);
-		p.fillRect(img.rect(), Qt::transparent);
-		p.drawPicture(-m_offset, m_pic);
-		p.end();
-		m_img = img;
 		//qDebug() << "SigMapItem::setPicture(): m_img.size():"<<m_img.size()<<", picRect:"<<picRect;
 		//m_img.save("mapImg.jpg");
 	}
