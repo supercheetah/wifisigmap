@@ -899,11 +899,12 @@ void MapGraphicsScene::sensorReadingChanged()
 	#endif
 }
 
+#ifdef Q_OS_ANDROID
 void MapGraphicsScene::positionUpdated(QGeoPositionInfo info)
 {
 	qDebug() << "Position updated:" << info;
 }
-
+#endif
 
 void MapGraphicsScene::triggerRender()
 {
