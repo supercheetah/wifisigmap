@@ -1,5 +1,11 @@
 #include "WifiDataCollector.h"
 
+#ifdef Q_OS_LINUX
+#ifndef Q_OS_ANDROID
+#include <stdio.h>
+#endif
+#endif
+
 #include <QDir>
 
 //#define OLD_SCAN_METHOD
@@ -426,6 +432,14 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		// *does* print out all the results, but doesn't force a re-scan (normal
 		// users use the cached results in the kernel)
 		system(qPrintable(QString("su -c '%1 scan'; sleep 1").arg(IWLIST_BINARY)));
+	#else
+	#ifdef Q_OS_LINUX
+		if(getuid() != 0)
+		{
+			int ret = system(qPrintable(QString("sudo %1 scan 2>/dev/null >/dev/null").arg(IWLIST_BINARY)));
+			(void)ret; // ignore warnings about unused ret val of system()
+		}
+	#endif
 	#endif
 
 	QStringList scanArgs = QStringList() << interface << "scan";
