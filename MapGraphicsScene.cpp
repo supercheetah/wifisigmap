@@ -3,6 +3,7 @@
 
 #ifdef Q_OS_ANDROID
 #include <QSensor>
+#include <QSensorReading>
 #endif
 
 // Some math constants...
@@ -565,16 +566,69 @@ MapGraphicsScene::~MapGraphicsScene()
 	}
 }
 
+
 void MapGraphicsScene::debugTest()
 {
 	#ifdef Q_OS_ANDROID
-	QList<QByteArray> sensorList = QSensor::sensorTypes();
+	QList<QByteArray> sensorList = QtMobility::QSensor::sensorTypes();
 	qDebug() << "Sensor list length: "<<sensorList.size();
-	foreach (QByteArray sensor, sensorList)
-		qDebug() << "Sensor: "<<sensor;
+	foreach (QByteArray sensorName, sensorList)
+	{
+		qDebug() << "Sensor: "<<sensorName;
+		QtMobility::QSensor *sensor = new QtMobility::QSensor(sensorName, this); // destroyed when this is destroyed
+		sensor->setObjectName(sensorName);
+		bool started = sensor->start();
+		if(started)
+		{
+			qDebug() << " - Started!";
+			connect(sensor, SIGNAL(readingChanged()), this, SLOT(sensorReadingChanged()));
+		}
+		else
+			qDebug() << " ! Error starting";
+	}
+
+	/*
+	// start the sensor
+	QSensor sensor("QAccelerometer");
+	sensor.start();
+
+	// later
+	QSensorReading *reading = sensor.reading();
+	qreal x = reading->property("x").value<qreal>();
+	qreal y = reading->value(1).value<qreal>();
+
+	*/
+
+/*
+	QtMobility::QGeoPositionInfoSource *source = QtMobility::QGeoPositionInfoSource::createDefaultSource(this);
+	if (source) {
+	    connect(source, SIGNAL(positionUpdated(QtMobility::QGeoPositionInfo)),
+		    this, SLOT(positionUpdated(QtMobility::QGeoPositionInfo)));
+	    source->startUpdates();
+	    qDebug() << "Started geo source:"<<source;
+	}
+	else
+	    qDebug() << "No geo source found";
+*/
 	#endif
 }
 
+void MapGraphicsScene::sensorReadingChanged()
+{
+	QtMobility::QSensor *sensor = qobject_cast<QtMobility::QSensor*>(sender());
+	const QtMobility::QSensorReading *reading = sensor->reading();
+	int count = reading->valueCount();
+	qDebug() << "Receved "<<count<<" value readings from: " << sensor->objectName() << " - " <<sensor->description();
+	for(int i=0; i<count; i++)
+		qDebug() << "Value " << i << ":" << reading->value(i);
+}
+
+/*
+void MapGraphicsScene::positionUpdated(const QtMobility::QGeoPositionInfo &info)
+{
+	qDebug() << "Position updated:" << info;
+}
+*/
 void MapGraphicsScene::triggerRender()
 {
 	if(m_renderTrigger.isActive())

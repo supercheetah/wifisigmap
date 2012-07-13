@@ -4,6 +4,7 @@
         <item>QtCore</item>
         <item>QtGui</item>
         <item>QtNetwork</item>
+        <item>QtSensors</item>
     </array>
     <array name="bundled_libs"/>
 </resources>

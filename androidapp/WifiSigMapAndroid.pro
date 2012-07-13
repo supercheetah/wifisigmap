@@ -1,12 +1,12 @@
 DEPENDPATH += .
 INCLUDEPATH += .
 
-# For some reason, Necessitas isn't adding the proper include path for qtmultimediakit automatically
-#INCLUDEPATH += C:\Users\JosiahBryan\Devel\necessitas\Android\Qt\480\armeabi\include\QtMultimediaKit
+# TODO: See if this works better...
+CONFIG += mobility
+MOBILITY += sensors
+# Mobility 'location' causes my app to crash
+# location
 
-# This define used in WifiDataCollector
-#DEFINES += Q_OS_ANDROID
-QT += senors
 
 # Input
 HEADERS += \

@@ -3,6 +3,10 @@
 
 #include <QtGui>
 
+#ifdef Q_OS_ANDROID
+//#include <QGeoPositionInfoSource>
+#endif
+
 #include "WifiDataCollector.h"
 
 class MapGraphicsView : public QGraphicsView
@@ -224,6 +228,8 @@ protected:
 	
 private slots:
 	void debugTest();
+	//void positionUpdated(const QtMobility::QGeoPositionInfo &info);
+	void sensorReadingChanged();
 	
 	void longPressTimeout();
 	void longPressCount();
