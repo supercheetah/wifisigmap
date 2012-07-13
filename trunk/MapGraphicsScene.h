@@ -227,9 +227,13 @@ protected:
 	void invalidateLongPress();
 	
 private slots:
-#define QGeoPositionInfo QtMobility::QGeoPositionInfo
 	void debugTest();
+
+	#ifdef Q_OS_ANDROID
+	#define QGeoPositionInfo QtMobility::QGeoPositionInfo
 	void positionUpdated(QGeoPositionInfo);
+	#endif
+	
 	void sensorReadingChanged();
 	
 	void longPressTimeout();

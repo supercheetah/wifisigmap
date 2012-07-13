@@ -174,9 +174,13 @@ void WifiDataCollector::scanWifi()
 
 	QString debugTextFile;
 
+	QString interface;
+	
 #ifndef Q_OS_ANDROID
-	// scan3.txt is just some sample data I captured for use in development
-	debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
+	interface = findWlanIf();
+	if(interface.isEmpty())
+		// scan3.txt is just some sample data I captured for use in development
+		debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
 #endif
 
 	// Read input from debug file or the actual wifi card
@@ -310,8 +314,7 @@ bool WifiDataCollector::auditIwlistBinary()
 {
 #ifndef Q_OS_ANDROID
 	return true;
-#endif
-
+#else
 	// Extract ARM versions of iwconfig/iwlist and our iwscan.sh from internal Qt resource storage
 	if(!QFile::exists(IWCONFIG_BINARY))
 	{
@@ -360,6 +363,7 @@ bool WifiDataCollector::auditIwlistBinary()
 
 
 	return true;
+#endif
 }
 
 /*! \brief Read 'iwconfig' and find the first interface with wireless extensions */
@@ -389,7 +393,7 @@ QString WifiDataCollector::findWlanIf()
 	}
 	
 	QString fileContents = proc.readAllStandardOutput();
-	qDebug() << "WifiDataCollector::findWlanIf(): Raw output of" << IWCONFIG_BINARY << ": "<<fileContents;
+	//qDebug() << "WifiDataCollector::findWlanIf(): Raw output of" << IWCONFIG_BINARY << ": "<<fileContents;
 
 	// Parse output (iwconfig is nice - it only prints wireless interfaces actually found to stdout)
 	QStringList tokens = fileContents.split(" ");
@@ -400,7 +404,7 @@ QString WifiDataCollector::findWlanIf()
 	}
 
 	QString wlanIf = tokens.takeFirst();
-	qDebug() << "WifiDataCollector::findWlanIf(): Success, found interface: "<<wlanIf;
+	//qDebug() << "WifiDataCollector::findWlanIf(): Success, found interface: "<<wlanIf;
 	return wlanIf;
 }
 
@@ -570,8 +574,23 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 			values["address"] = line;
 		}
 		else
+		if(line.contains("Signal level"))
 		{
-			QStringList pair = line.split(QRegExp("[:=]"));
+			QRegExp sig("Signal level=(-?\\d+ dBm)", Qt::CaseInsensitive);
+			if(sig.indexIn(line) > -1)
+			{
+				values["signal level"] = sig.cap(1);
+				//qDebug() << "WifiDataCollector::parseRawBlock: Debug: Extracted value:"<<values["signal level"]<<"from line:"<<line;
+			}
+			else
+			{
+				qDebug() << "WifiDataCollector::parseRawBlock: Error: Unable to extract signal level from line:"<<line;
+				return result; // not valid yet
+			}
+		}
+		else
+		{
+			QStringList pair = line.split(QRegExp(":"));
 			if(pair.length() < 2)
 			{
 				qDebug() << "WifiDataCollector::parseRawBlock: Error: line invalid:"<<line;
