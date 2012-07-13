@@ -1,6 +1,10 @@
 #include "MapGraphicsScene.h"
 #include "MapWindow.h"
 
+#ifdef Q_OS_ANDROID
+#include <QSensor>
+#endif
+
 // Some math constants...
 static const double Pi  = 3.14159265358979323846264338327950288419717;
 static const double Pi2 = Pi * 2.;
@@ -490,7 +494,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	// Setup default render options
 	m_renderOpts.cacheMapRender     = true;
 	m_renderOpts.showReadingMarkers = true;
-	m_renderOpts.multipleCircles	= true;
+	m_renderOpts.multipleCircles	= false;
 	m_renderOpts.fillCircles	= true;
 	#ifdef Q_OS_ANDROID
 	m_renderOpts.radialCircleSteps	= 4 * 4 * 2;
@@ -547,6 +551,8 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	clear(); 
 
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
+	
+	QTimer::singleShot(1000, this, SLOT(debugTest()));
 }
 
 MapGraphicsScene::~MapGraphicsScene()
@@ -557,6 +563,16 @@ MapGraphicsScene::~MapGraphicsScene()
 		delete m_renderer;
 		m_renderer = 0;
 	}
+}
+
+void MapGraphicsScene::debugTest()
+{
+	#ifdef Q_OS_ANDROID
+	QList<QByteArray> sensorList = QSensor::sensorTypes();
+	qDebug() << "Sensor list length: "<<sensorList.size();
+	foreach (QByteArray sensor, sensorList)
+		qDebug() << "Sensor: "<<sensor;
+	#endif
 }
 
 void MapGraphicsScene::triggerRender()
@@ -585,8 +601,8 @@ void MapGraphicsScene::clear()
 	
 	
 	m_bgFilename = "";
-	m_bgPixmap = QPixmap(4000,4000); //QApplication::desktop()->screenGeometry().size());
-	//m_bgPixmap = QPixmap(2000,2000); //QApplication::desktop()->screenGeometry().size());
+	//m_bgPixmap = QPixmap(4000,4000); //QApplication::desktop()->screenGeometry().size());
+	m_bgPixmap = QPixmap(2000,2000); //QApplication::desktop()->screenGeometry().size());
 	m_bgPixmap.fill(Qt::white);
 	
 	QPainter p(&m_bgPixmap);
@@ -626,9 +642,11 @@ void MapGraphicsScene::clear()
 	m_userItem->setOffset(-(pix.width()/2.),-(pix.height()/2.));
 	m_userItem->setVisible(false);
 	m_userItem->setZValue(150);
+	//m_userItem->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	
 	m_longPressSpinner = new LongPressSpinner();
 	m_longPressSpinner->setVisible(false);
+	m_longPressSpinner->setZValue(999);
 	addItem(m_longPressSpinner);
 	
 	m_currentMapFilename = "";
@@ -964,7 +982,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	p.end();
 	
 	m_userItem->setPixmap(QPixmap::fromImage(image));
-	m_userItem->setOffset(-(image.width()/2), -(image.height()/2));
+	m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
 	m_userItem->setPos(itemWorldRect.center());
 // 	m_userItem->setOffset(0,0); //-(image.width()/2), -(image.height()/2));
 // 	m_userItem->setPos(0,0); //itemWorldRect.center());
@@ -2150,16 +2168,27 @@ void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *
 	
 	//qDebug() << "LongPressSpinner::paint(): progress:"<<m_progress<<", rect:"<<boundingRect()<<", iconSize:"<<iconSize;
 	
+	QPainterPath outerPath;
+	outerPath.addEllipse(boundingRect());
+	
+	QPainterPath innerPath;
+	innerPath.addEllipse(boundingRect().adjusted(12.5,12.5,-12.5,-12.5));
+	
+	painter->setClipPath(outerPath.subtracted(innerPath));
+	
 	// Draw outline
 	painter->setPen(QPen(Qt::black,3));
 	//painter->drawEllipse(0,0,iconSize,iconSize);
 	painter->drawChord(boundingRect().adjusted(3,3,-3,-3), 
+		 0 /*45 * 16*/, // start at 12 o'clock
+	 -(int)(360 * 16 * m_progress)); // counter-clockwise
+	/*
 		 45 * 16, // start at 12 o'clock 
-	  (int)(360 * 16 * m_progress)); // counter-clockwise
-	  
+	  (int)(360 * 16 * m_progress)); // counter-clockwise*/
+
 	painter->setBrush(Qt::white);
 	painter->drawChord(boundingRect().adjusted(10,10,-10,-10), 
-		0 /*45 * 16*/, // start at 12 o'clock
+		       0, // start at 12 o'clock
 	 -(int)(360 * 16 * m_progress)); // counter-clockwise
 	
 	painter->restore();
@@ -2201,7 +2230,7 @@ void SigMapItem::setPicture(QPicture pic)
 		p.drawPicture(-m_offset, m_pic);
 		p.end();
 		m_img = img;
-		qDebug() << "SigMapItem::setPicture(): m_img.size():"<<m_img.size()<<", picRect:"<<picRect;
+		//qDebug() << "SigMapItem::setPicture(): m_img.size():"<<m_img.size()<<", picRect:"<<picRect;
 		//m_img.save("mapImg.jpg");
 	}
 	else
@@ -2225,7 +2254,7 @@ QRectF SigMapItem::boundingRect() const
 	
 void SigMapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget */*widget*/)
 {
-	qDebug() << "SigMapItem::paint: option->exposedRect:"<<option->exposedRect<<", m_offset:"<<m_offset<<", m_img.size():"<<m_img.size();
+	//qDebug() << "SigMapItem::paint: option->exposedRect:"<<option->exposedRect<<", m_offset:"<<m_offset<<", m_img.size():"<<m_img.size();
 		
 	painter->save();
 	painter->setOpacity(0.75);
@@ -2313,10 +2342,10 @@ QColor MapGraphicsScene::baseColorForAp(QString apMac)
 			baseColor = m_masterColorsAvailable[m_colorCounter ++];
 			
 			bool colorInUse = false;
-			/*foreach(QColor color, m_apMasterColor)
-				if(color == baseColor)
+			foreach(MapApInfo *info, m_apInfo)
+				if(info->color == baseColor)
 					colorInUse = true;
-			*/		
+					
 			if(!colorInUse)
 			{
 				foundColor = true;
@@ -2450,6 +2479,11 @@ void MapGraphicsScene::saveResults(QString filename)
 	// Store bg filename
 	data.setValue("background", m_bgFilename);
 	
+	// Store window scroll/zoom location
+	data.setValue("h-pos", m_mapWindow->gv()->horizontalScrollBar()->value());
+	data.setValue("v-pos", m_mapWindow->gv()->verticalScrollBar()->value());
+	data.setValue("scale", m_mapWindow->gv()->scaleFactor());
+	
 	int idx = 0;
 	
 	// Save AP locations
@@ -2491,6 +2525,9 @@ void MapGraphicsScene::saveResults(QString filename)
 
 void MapGraphicsScene::loadResults(QString filename)
 {
+	//m_mapWindow->gv()->resetMatrix();
+	m_mapWindow->gv()->resetTransform();
+	
 	m_colorCounter = 0; // reset AP color counter
 	
 	QSettings data(filename, QSettings::IniFormat);
@@ -2508,7 +2545,16 @@ void MapGraphicsScene::loadResults(QString filename)
 	// Load background file
 	QString bg = data.value("background").toString();
 	if(!bg.isEmpty())
-		setBgFile(bg);	
+		setBgFile(bg);
+		
+	// Load scroll/zoom locations
+	double scale = data.value("scale", 1.0).toDouble();
+	m_mapWindow->gv()->scaleView(scale);
+	
+	int hPos = data.value("h-pos", 0).toInt();
+	int vPos = data.value("v-pos", 0).toInt();
+	m_mapWindow->gv()->horizontalScrollBar()->setValue(hPos);
+	m_mapWindow->gv()->verticalScrollBar()->setValue(vPos);
 	
 	// Load ap locations
 	int numApLocations = data.beginReadArray("ap-locations");

@@ -6,6 +6,7 @@ INCLUDEPATH += .
 
 # This define used in WifiDataCollector
 #DEFINES += Q_OS_ANDROID
+QT += senors
 
 # Input
 HEADERS += \

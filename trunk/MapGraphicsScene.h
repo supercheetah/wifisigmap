@@ -11,6 +11,8 @@ class MapGraphicsView : public QGraphicsView
 public:
 	MapGraphicsView();
 	void scaleView(qreal scaleFactor);
+	
+	double scaleFactor() { return m_scaleFactor; } 
 
 public slots:
 	void zoomIn();
@@ -221,6 +223,8 @@ protected:
 	void invalidateLongPress();
 	
 private slots:
+	void debugTest();
+	
 	void longPressTimeout();
 	void longPressCount();
 	
