@@ -599,21 +599,22 @@ void MapGraphicsScene::debugTest()
 
 	*/
 
-/*
+	/// NOTE Starting QGeoPositionInfoSource causes the app to crash as of 2012-07-13
+	/*
 	QtMobility::QGeoPositionInfoSource *source = QtMobility::QGeoPositionInfoSource::createDefaultSource(this);
 	if (source) {
-	    connect(source, SIGNAL(positionUpdated(QtMobility::QGeoPositionInfo)),
-		    this, SLOT(positionUpdated(QtMobility::QGeoPositionInfo)));
+	    connect(source, SIGNAL(positionUpdated(QGeoPositionInfo)),
+		    this, SLOT(positionUpdated(QGeoPositionInfo)));
 	    source->startUpdates();
 	    qDebug() << "Started geo source:"<<source;
 	}
 	else
 	    qDebug() << "No geo source found";
-*/
+	*/
 	#endif
 }
 
-#ifdef 0
+#if 0
 
     /** Helper function to compute the angle change between two rotation matrices.
      *  Given a current rotation matrix (R) and a previous rotation matrix
@@ -799,7 +800,8 @@ void MapGraphicsScene::sensorReadingChanged()
 	#ifdef Q_OS_ANDROID
 	QtMobility::QSensor *sensor = qobject_cast<QtMobility::QSensor*>(sender());
 	const QtMobility::QSensorReading *reading = sensor->reading();
-	if(QString(sensor->objectName()) == "QAccelerometer")
+	QString sensorName(sensor->objectName());
+	if(sensorName == "QAccelerometer")
 	{
 		// Gravity removal code from http://developer.android.com/reference/android/hardware/SensorEvent.html#values
 
@@ -826,7 +828,64 @@ void MapGraphicsScene::sensorReadingChanged()
 		linear_acceleration[1] = values[1] - gravity[1];
 		linear_acceleration[2] = values[2] - gravity[2];
 
-		qDebug() << " --> Accelerometer: " << linear_acceleration[0] << linear_acceleration[1] << linear_acceleration[2];
+		//qDebug() << " --> Accelerometer: " << linear_acceleration[0] << linear_acceleration[1] << linear_acceleration[2];
+	}
+	else
+	if(sensorName == "QGyroscope")
+	{
+		static const float NS2S = 1.0f / 1000000000.0f;
+		static float deltaRotationVector[4] = {0,0,0,0};
+		static float timestamp = 0;
+
+		double values[3] = {
+		    reading->value(0).toDouble(),
+		    reading->value(1).toDouble(),
+		    reading->value(2).toDouble()
+		};
+
+		// This timestep's delta rotation to be multiplied by the current rotation
+		// after computing it from the gyro sample data.
+		if (timestamp != 0)
+		{
+			float dT = (reading->timestamp() - timestamp) * NS2S;
+
+			// Axis of the rotation sample, not normalized yet.
+			float axisX = values[0];
+			float axisY = values[1];
+			float axisZ = values[2];
+
+			// Calculate the angular speed of the sample
+			float omegaMagnitude = sqrt(axisX*axisX + axisY*axisY + axisZ*axisZ);
+
+			// Normalize the rotation vector if it's big enough to get the axis
+			if (omegaMagnitude > 1.0) { // 1.0 was EPSILON
+				axisX /= omegaMagnitude;
+				axisY /= omegaMagnitude;
+				axisZ /= omegaMagnitude;
+			}
+
+			// Integrate around this axis with the angular speed by the timestep
+			// in order to get a delta rotation from this sample over the timestep
+			// We will convert this axis-angle representation of the delta rotation
+			// into a quaternion before turning it into the rotation matrix.
+			float thetaOverTwo = omegaMagnitude * dT / 2.0f;
+			float sinThetaOverTwo = sin(thetaOverTwo);
+			float cosThetaOverTwo = cos(thetaOverTwo);
+			deltaRotationVector[0] = sinThetaOverTwo * axisX;
+			deltaRotationVector[1] = sinThetaOverTwo * axisY;
+			deltaRotationVector[2] = sinThetaOverTwo * axisZ;
+			deltaRotationVector[3] = cosThetaOverTwo;
+		}
+		timestamp = reading->timestamp();
+		//float deltaRotationMatrix[] = { 0,0,0, 0,0,0, 0,0,0 };
+		// TODO: Translate getRotationMatrixFromVector() [above] from Java to C++
+		//SensorManager.getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
+		// User code should concatenate the delta rotation we computed with the current rotation
+		// in order to get the updated rotation.
+		//float rotationCurrent[] = { 1,1,1, 1,1,1, 1,1,1 };
+		//rotationCurrent = rotationCurrent * deltaRotationMatrix;
+
+
 	}
 	else
 	{
@@ -840,12 +899,12 @@ void MapGraphicsScene::sensorReadingChanged()
 	#endif
 }
 
-/*
-void MapGraphicsScene::positionUpdated(const QtMobility::QGeoPositionInfo &info)
+void MapGraphicsScene::positionUpdated(QGeoPositionInfo info)
 {
 	qDebug() << "Position updated:" << info;
 }
-*/
+
+
 void MapGraphicsScene::triggerRender()
 {
 	if(m_renderTrigger.isActive())

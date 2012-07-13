@@ -4,7 +4,7 @@
 #include <QtGui>
 
 #ifdef Q_OS_ANDROID
-//#include <QGeoPositionInfoSource>
+#include <QGeoPositionInfoSource>
 #endif
 
 #include "WifiDataCollector.h"
@@ -227,8 +227,9 @@ protected:
 	void invalidateLongPress();
 	
 private slots:
+#define QGeoPositionInfo QtMobility::QGeoPositionInfo
 	void debugTest();
-	//void positionUpdated(const QtMobility::QGeoPositionInfo &info);
+	void positionUpdated(QGeoPositionInfo);
 	void sensorReadingChanged();
 	
 	void longPressTimeout();
