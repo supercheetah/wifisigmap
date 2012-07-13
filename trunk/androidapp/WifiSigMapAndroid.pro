@@ -3,7 +3,7 @@ INCLUDEPATH += .
 
 # TODO: See if this works better...
 CONFIG += mobility
-MOBILITY += sensors
+MOBILITY += sensors location
 # Mobility 'location' causes my app to crash
 # location
 
