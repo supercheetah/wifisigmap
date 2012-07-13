@@ -405,7 +405,7 @@ QString WifiDataCollector::findWlanIf()
 	QStringList tokens = fileContents.split(" ");
 	if(fileContents.isEmpty() || tokens.isEmpty())
 	{
-		qDebug() << "WifiDataCollector::findWlanIf(): Error: No wireless interfaces found on this system.";
+		//qDebug() << "WifiDataCollector::findWlanIf(): Error: No wireless interfaces found on this system.";
 		return "";
 	}
 
