@@ -326,6 +326,17 @@ protected:
 	
 	LongPressSpinner *m_longPressSpinner;
 	
+	/// TODO make user configurable
+	double m_footPx;
+	double m_meterPx;
+	
+	// On first render complete after load file, reset scrollbars and zoom
+	bool m_firstRender;
+	int m_scrollHPos;
+	int m_scrollVPos;
+	double m_viewScale;
+	
+	
 };
 
 #endif

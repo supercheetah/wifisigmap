@@ -1088,8 +1088,9 @@ QLineF calcIntersect(QPointF p0, double r0, QPointF p1, double r1)
 { 
 	// Based following code on http://paulbourke.net/geometry/2circle/
 	// Test cases under "First calculate the distance d between the center of the circles. d = ||P1 - P0||."
-	QPointF delta = p1 - p0;
-	double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+	//QPointF delta = p1 - p0;
+	//ouble d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+	double d = QLineF(p1,p0).length();
 	
 // 	qDebug() << "\t r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1<<", d:"<<d;
 // 	qDebug() << "\t ratio0 * apMacToSignal[ap0]:"<<ratio0<<apMacToSignal[ap0];
@@ -1200,6 +1201,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
 	QStringList apsVisible;
 	QHash<QString,double> apMacToSignal;
+	QHash<QString,double> apMacToDbm;
 	foreach(WifiDataResult result, results)
 	{
 		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
@@ -1208,6 +1210,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		{
 			apsVisible << result.mac;
 			apMacToSignal.insert(result.mac, result.value);
+			apMacToDbm.insert(result.mac, result.dbm);
+			qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm; 
 		}
 	}
 	
@@ -1383,7 +1387,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	// j = ey(P3 - P1)
 	QPointF vj = vex * (p1 - p0);
 	// x = (r12 - r22 + d2) / 2d
-	double x = (r0*r0 - r1*r1 + d*d)/(2*d);
+	double x = (r0*r0 - r1*r1 + d*d)/(2*d);(void)x;//ignore warning
 	// TODO: This line doesn't make sense: (type conversion?)
 	// y = (r12 - r32 + i2 + j2) / 2j - ix / j
 	//double y = (r0*r0 - r2*r2 + vi*vi + vj*vj) / (2*vj - vix/vij);
@@ -1413,9 +1417,42 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QLineF realLine2(p1,realPoint);
 	double realAngle2 = realLine2.angle();
 	
-	double la = r0; //realLine2.length(); //r0;
-	double lb = r1; //realLine.length(); //r1;
-	double lc = apLine.length(); //sqrt(dist2(p1,p0));
+// 	double la = r0; //realLine2.length(); //r0;
+// 	double lb = r1; //realLine.length(); //r1;
+ 	double lc = apLine.length(); //sqrt(dist2(p1,p0));
+	
+	
+	double n   =  1.07; /// TUNE THIS 
+	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b radio
+	double Xa  = 18.00; // normal rand var, std dev a=[3,20]
+	double pTx = 11.80; // (dBm) - Transmit power, [1] est stock WRT54GL at 19 mW, [1]=http://forums.speedguide.net/showthread.php?253953-Tomato-and-Linksys-WRT54GL-transmit-power
+	double pRx = apMacToDbm[ap1]; /// Our measurement
+	double gTx =  5.00; // (dBi) - Gain of stock WRT54GL antennas
+	double gRx =  3.00; // (dBi) - Estimated gain of laptop antenna, neg dBi. Internal atennas for phones/laptops range from (-3,+3)
+	
+	// Formula from http://web.mysites.ntu.edu.sg/aschfoh/public/Shared%20Documents/pub/04449717-icics07.pdf
+	//double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log(m) - 20*log(4*Pi));
+	
+// 	double fA = 1./(10.*n);
+// 	double fB = pTx - pRx + gTx + gRx;
+// 	double fC = -Xa + (20.*log10(m)) - (20.*log10(4.*Pi));
+// 	
+	double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+	//double logDist = fA * (fB + fC);
+	
+	//logDist /= 2.303; // convert from natural log to log base 10
+	double invLog  = pow(10, logDist); // distance in meters
+	qDebug() << "[formula] invLog: "<<invLog<<" meters";
+	qDebug() << "[formula] n:"<<n<<", m:"<<m<<", Xa:"<<Xa<<", pTx:"<<pTx<<", pRx:"<<pRx<<", gTx:"<<gTx<<", gRx:"<<gRx<<", logDist:"<<logDist;
+	//qDebug() << "[formula] fA:"<<fA<<", fB:"<<fB<<", fC:"<<fC<<", log test: log(10):"<<log(10)<<", log(10)/2.303:"<<(log(10)/2.303);
+	double lb = invLog * m_meterPx; // convert to pixels
+
+	// .pdf above says -49 dBm (pRx) is approx 15 meter limit to switch models by changing n
+	n = apMacToDbm[ap0] < -49 ? 1.07 : 0.43;
+	double ma = pow(10, ( (1/(10*n)) * (pTx - apMacToDbm[ap0] + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)) ));
+	double la = ma * m_meterPx;
+	qDebug() << "[formula] ma: "<<ma<<" meters, n:"<<n<<", apMacToDbm[ap0]:"<<apMacToDbm[ap0];
+	
 	
 	qDebug() << "[dump1] "<<la<<lb<<lc;
 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
@@ -2722,6 +2759,15 @@ void MapGraphicsScene::renderComplete(QPicture pic)
 	//m_sigMapItem->setPixmap(QPixmap::fromImage(mapImg));
 	m_sigMapItem->setPicture(pic);
 	m_mapWindow->setStatusMessage(tr("Signal map updated"), 500);
+	
+	if(m_firstRender) // first render after load, init view
+	{
+		m_mapWindow->gv()->resetTransform();
+		m_mapWindow->gv()->scaleView(m_viewScale);
+		m_mapWindow->gv()->horizontalScrollBar()->setValue(m_scrollHPos);
+		m_mapWindow->gv()->verticalScrollBar()->setValue(m_scrollVPos);
+		m_firstRender = false;
+	}
 }
 
 /// LongPressSpinner impl
@@ -3152,6 +3198,11 @@ void MapGraphicsScene::saveResults(QString filename)
 	data.setValue("v-pos", m_mapWindow->gv()->verticalScrollBar()->value());
 	data.setValue("scale", m_mapWindow->gv()->scaleFactor());
 	
+	// Store view cale translation values
+	/// TODO make user configurable
+	data.setValue("footpx",  m_footPx);
+	data.setValue("meterpx", m_meterPx);
+	
 	int idx = 0;
 	
 	// Save AP locations
@@ -3223,6 +3274,18 @@ void MapGraphicsScene::loadResults(QString filename)
 	int vPos = data.value("v-pos", 0).toInt();
 	m_mapWindow->gv()->horizontalScrollBar()->setValue(hPos);
 	m_mapWindow->gv()->verticalScrollBar()->setValue(vPos);
+	
+	// Store for setting up the view after render because
+	// the real "pixel meaning" of hPos may change if the render resizes the scene rect,
+	// so reapply after the scene rect may have changed for the first time.
+	m_firstRender = true;
+	m_scrollHPos = hPos;
+	m_scrollVPos = vPos;
+	m_viewScale = scale;
+	
+	// Read scale translation values
+	m_footPx  = data.value("footpx",  13.).toDouble();
+	m_meterPx = data.value("meterpx", 42.).toDouble();
 	
 	// Load ap locations
 	int numApLocations = data.beginReadArray("ap-locations");

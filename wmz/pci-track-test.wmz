@@ -1,8 +1,12 @@
 [General]
 background=/tmp/pci4000px.png
-h-pos=0
-v-pos=-202
-scale=0.0778865658226496
+h-pos=-363
+v-pos=-150
+scale=0.110148237713056
+; 390px = 30 ft
+; 650px = 50 ft
+footpx=13
+meterpx=42.65092
 
 [ap-locations]
 1\mac=58:6D:8F:9B:2B:1C
