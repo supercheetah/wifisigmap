@@ -103,9 +103,11 @@ MapWindow::MapWindow(QWidget *parent)
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/phcfirstrun.wmz");
 	//m_scene->loadResults("wmz/foobar.wmz");
-	m_scene->loadResults("wmz/test-track3.wmz");
+	//m_scene->loadResults("wmz/test-track3.wmz");
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/pci4000-livedata2.wmz");
+	m_scene->loadResults("wmz/pci-track-test.wmz");
+	
 }
 
 #define makeButton2(object,layout,title,slot) \

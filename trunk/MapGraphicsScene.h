@@ -102,6 +102,9 @@ public:
 	
 	QRectF boundingRect() const;	
 	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+	
+	QPoint offset() { return m_offset; }
+	QPicture picture() { return m_pic; }
 
 protected:
 	bool m_internalCache;
