@@ -1177,7 +1177,8 @@ QPointF operator*(const QPointF&a, const QPointF& b) { return QPointF(a.x()*b.x(
 void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
 	/// JUST for debugging
-	//results = m_sigValues.last()->scanResults;
+	QPointF realPoint = m_sigValues.last()->point;
+	results = m_sigValues.last()->scanResults;
 	
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
 	
@@ -1224,6 +1225,33 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QHash<QString,double> apRatioSums;
 	QHash<QString,double> apRatioAvgs;
 	
+	
+	foreach(QString apMac, apsVisible)
+	{
+		QPointF center = apInfo(apMac)->point;
+		
+		double maxDistFromCenter = -1;
+		double maxSigValue = 0.0;
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(val->hasAp(apMac))
+			{
+				double dx = val->point.x() - center.x();
+				double dy = val->point.y() - center.y();
+				double distFromCenter = sqrt(dx*dx + dy*dy);
+				if(distFromCenter > maxDistFromCenter)
+				{
+					maxDistFromCenter = distFromCenter;
+					maxSigValue = val->signalForAp(apMac);
+				}
+			}
+		}
+		
+		apRatioAvgs[apMac] = maxDistFromCenter;// / maxSigValue;
+		qDebug() << "[ratio calc] "<<apMac<<": maxDistFromCenter:"<<maxDistFromCenter<<", macSigValue:"<<maxSigValue<<", ratio:"<<apRatioAvgs[apMac]; 
+	}
+			
+	/*
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
@@ -1263,6 +1291,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
 	}
+	*/
 	
 	// apsVisible implicitly is sorted strong->weak signal
 	QString ap0 = apsVisible[0];
@@ -1314,10 +1343,14 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QPointF p1 = apInfo(ap1)->point;
 	QPointF p2 = !ap2.isEmpty() ? apInfo(ap2)->point : QPointF();
 	//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
-		
+	
 	double r0 = apMacToSignal[ap0] * ratio0;
 	double r1 = apMacToSignal[ap1] * ratio1;
 	double r2 = apMacToSignal[ap2] * ratio2;
+	
+	qDebug() << "[radius] "<<ap0<<": r0:"<<r0<<", ratio0:"<<ratio0<<", signal:"<<apMacToSignal[ap0];
+	qDebug() << "[radius] "<<ap1<<": r1:"<<r1<<", ratio1:"<<ratio1<<", signal:"<<apMacToSignal[ap1];
+	qDebug() << "[radius] "<<ap2<<": r2:"<<r2<<", ratio2:"<<ratio2<<", signal:"<<apMacToSignal[ap2];
 	
 	QLineF line  = calcIntersect(p0,r0, p1,r1);
 	QLineF line2 = calcIntersect(p1,r1, p2,r2);
@@ -1356,18 +1389,109 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	//double y = (r0*r0 - r2*r2 + vi*vi + vj*vj) / (2*vj - vix/vij);
 	
 	
+	// That didn't work, so let's tri triangulation
+	
+	/*
+	
+	  C
+	  *
+	  |`.
+	 b|  `. a
+	  |    `.
+	  |      `.
+	A *--------* B
+	      c
+	
+	
+	*/
+	
+	QLineF apLine(p1,p0);
+	
+	QLineF realLine(p0,realPoint);
+	double realAngle = realLine.angle();
+	
+	QLineF realLine2(p1,realPoint);
+	double realAngle2 = realLine2.angle();
+	
+	double la = r0; //realLine2.length(); //r0;
+	double lb = r1; //realLine.length(); //r1;
+	double lc = apLine.length(); //sqrt(dist2(p1,p0));
+	
+	qDebug() << "[dump1] "<<la<<lb<<lc;
+	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
+	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
+	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
+	/*	
+	la= 8;
+	lb= 6;
+	lc= 7;
+	*/
+// 	la = 180;
+// 	lb = 238;
+// 	lc = 340;
+	
+	// cos A = (b2 + c2 - a2)/2bc
+	// cos B = (a2 + c2 - b2)/2ac
+	// cos C = (a2 + b2 - c2)/2ab
+	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
+	double cosB = (la*la + lc*lc - lb*lb)/(2*la*lc);
+	double cosC = (la*la + lb*lb - lc*lc)/(2*la*lb);
+	double angA = acos(cosA)* 180.0 / Pi;
+	double angB = acos(cosB)* 180.0 / Pi;
+	double angC = acos(cosC)* 180.0 / Pi;
+	//double angC = 180 - angB - angA;
+			
+	
+	QLineF userLine(p1,QPointF());
+	QLineF userLine2(p0,QPointF());
+	
+	double userLineAngle = 90+45-angB+apLine.angle()-180;
+	//userLineAngle *= -1;
+	userLine.setAngle(angB + apLine.angle());
+	userLine.setLength(r1);
+	
+	userLine2.setAngle(angB + angC + apLine.angle());
+	userLine2.setLength(r0);
+	
+	double realAngle3 = realLine2.angleTo(realLine);
+	
+	double errA = realAngle - angA;
+	double errB = realAngle2 - angB;
+	double errC = realAngle3 - angC;
+	
+	qDebug() << "Triangulation: ang(A-C):"<<angA<<angB<<angC<<", cos(A-C):"<<cosA<<cosB<<cosC;
+	qDebug() << "Triangulation: err(A-C):"<<errA<<errB<<errC;
+	qDebug() << "Triangulation: abs(A-C):"<<realAngle<<realAngle2<<apLine.angle();
+	qDebug() << "Triangulation: realAngle:"<<realAngle<<"/"<<realLine.length()<<", realAngle2:"<<realAngle2<<"/"<<realLine2.length();
+	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<<". userLineAngle:"<<userLineAngle<<", realAngle3:"<<realAngle3;
+	
+	QPointF calcPoint = userLine.p2();
+	
+	
+	
+	
 /*
 	QImage image(
 		(int)qMax((double)itemWorldRect.size().width(),  64.) + 10,
 		(int)qMax((double)itemWorldRect.size().height(), 64.) + 10,
 		QImage::Format_ARGB32_Premultiplied);
 */
-	QSize origSize = m_bgPixmap.size();
-	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+	QRect picRect = m_sigMapItem->picture().boundingRect();
+	QPointF offset = picRect.topLeft();
 		
-	memset(image.bits(), 0, image.byteCount());
-	
+	QImage image(picRect.size(), QImage::Format_ARGB32_Premultiplied);
 	QPainter p(&image);
+	//p.fillRect(img.rect(), Qt::transparent);
+	//p.drawPicture(-m_offset, m_pic);
+	p.translate(-offset);
+	//qDebug() << "debug: offset:"<<offset;
+	
+	//QSize origSize = m_bgPixmap.size();
+	//QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+		
+	//memset(image.bits(), 0, image.byteCount());
+	
+	//QPainter p(&image);
 	
 	//p.setPen(Qt::black);
 	
@@ -1381,7 +1505,9 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QString size = "32x32";
 	#endif
 	
-	p.setPen(QPen(Qt::blue,10.0));
+	double penWidth = 20.0;
+	
+	p.setPen(QPen(Qt::blue,penWidth));
 // 	QPointF s1 = line.p1() - itemWorldRect.topLeft();
 // 	QPointF s2 = line.p2() - itemWorldRect.topLeft();
 	QPointF s1 = line.p1();
@@ -1398,26 +1524,54 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	p.setBrush(QBrush());
 	//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
+	p.setPen(QPen(Qt::white,penWidth));
 	p.drawEllipse(p0, r0,r0);
+	p.setPen(QPen(Qt::red,penWidth));
 	p.drawEllipse(p1, r1,r1);
+	p.setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
 		p.drawEllipse(p2, r2,r2);
 	
+	p.setPen(QPen(Qt::white,penWidth));
 	p.drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
+	p.setPen(QPen(Qt::red,penWidth));
 	p.drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
+	p.setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
 		p.drawRect(QRectF(p2-QPointF(5,5), QSizeF(10,10)));
 	
-	p.setPen(QPen(Qt::red,10.0));
-	p.drawLine(line);
-	p.drawLine(line2);
-	p.drawLine(line3);
+// 	p.setPen(QPen(Qt::red,penWidth));
+// 	p.drawLine(line);
+// 	p.drawLine(line2);
+// 	p.drawLine(line3);
+	
+	penWidth *=2;
+	
+	p.setPen(QPen(Qt::white,penWidth));
+	p.drawLine(realLine);
+	p.setPen(QPen(Qt::gray,penWidth));
+	p.drawLine(realLine2);
+
+	penWidth /=2;
+	p.setPen(QPen(Qt::darkGreen,penWidth));
+	p.drawLine(apLine);
+	p.setPen(QPen(Qt::darkYellow,penWidth));
+	p.drawLine(userLine);
+	p.setPen(QPen(Qt::darkRed,penWidth));
+	p.drawLine(userLine2);
+
+// 	p.setPen(QPen(Qt::darkYellow,penWidth));
+// 	p.drawRect(QRectF(calcPoint-QPointF(5,5), QSizeF(10,10)));
+// 	p.setPen(QPen(Qt::darkGreen,penWidth));
+// 	p.drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
+	
 	
 	p.end();
 	
 	m_userItem->setPixmap(QPixmap::fromImage(image));
 	//m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
 	//m_userItem->setPos(itemWorldRect.center());
+	m_userItem->setOffset(offset);
 	m_userItem->setPos(0,0);
 	
 // 	m_userItem->setOffset(0,0); //-(image.width()/2), -(image.height()/2));
@@ -2298,9 +2452,12 @@ void SigMapRenderer::render()
 			}
 			
 			
-			double circleRadius = maxDistFromCenter;
-			//double circleRadius = (1.0/maxSigValue) * .75 * maxDistFromCenter;
+			//double circleRadius = maxDistFromCenter;
+// 			double circleRadius = (1.0/maxSigValue) /** .75*/ * maxDistFromCenter;
+			double circleRadius = maxDistFromCenter / maxSigValue;
+			//maxDistFromCenter = circleRadius;
 			//qDebug() << "SigMapRenderer::render(): circleRadius:"<<circleRadius<<", maxDistFromCenter:"<<maxDistFromCenter<<", maxSigValue:"<<maxSigValue;
+			qDebug() << "render: "<<apMac<<": circleRadius: "<<circleRadius<<", center:"<<center;
 			
 			
 			
@@ -2349,7 +2506,7 @@ void SigMapRenderer::render()
 					//p.drawEllipse(0,0,iconSize,iconSize);
 					p.setCompositionMode(QPainter::CompositionMode_Xor);
 					p.drawEllipse(center, maxDistFromCenter, maxDistFromCenter);
-					//qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter;
+					//qDebug() << "SigMapRenderer::render(): "<<apMac<<": center:"<<center<<", maxDistFromCenter:"<<maxDistFromCenter<<", circleRadius:"<<circleRadius;
 				}
 				else
 				{
@@ -3111,6 +3268,10 @@ void MapGraphicsScene::loadResults(QString filename)
 	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
+		//qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
+		//if(i != numReadings - 4)
+		//	continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
+			
 		data.setArrayIndex(i);
 		//qDebug() << "MapGraphicsScene::loadResults(): Reading point#: "<<i;
 		QPointF point = qPointFFromString(data.value("point").toString());
