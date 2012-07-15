@@ -4,17 +4,10 @@ INCLUDEPATH += $$PWD
 
 QT += network
 
-### Can't just include the gfxengine.pri because it uses OpenGL and Android devices cant use openGL yet.
-##include(../gfxengine/gfxengine.pri)
-##DEFINES += NO_OPENGL
-
-##INCLUDEPATH += $$PWD/../gfxengine
-##DEPENDPATH += $$PWD/../gfxengine
-
-##QT += multimedia
-
-### Used for the HTTP interface to the host
-##include(../3rdparty/qjson/qjson.pri)
+win32 {
+        INCLUDEPATH += "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\include"
+        INCLUDEPATH += "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.0\\Include"
+}
 
 RESOURCES = resources.qrc
 
