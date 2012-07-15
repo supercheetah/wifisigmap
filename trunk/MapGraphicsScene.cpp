@@ -1372,7 +1372,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QLineF line3 = calcIntersect(p2,r2, p0,r0);
 	
 	// Make an image to contain x1,y1 and x2,y2, or at least the user's icon
-	QRectF itemWorldRect = QRectF(line.p1(), QSize(
+	QRectF itemWorldRect = QRectF(line.p1(), QSizeF(
 		line.p1().x() - line.p2().x(), 
 		line.p1().y() - line.p2().y()))
 			.normalized();
@@ -1493,8 +1493,9 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QLineF userLine(p1,QPointF());
 	QLineF userLine2(p0,QPointF());
 	
-	double userLineAngle = 90+45-angB+apLine.angle()-180;
+	//double userLineAngle = 90+45-angB+apLine.angle()-180;
 	//userLineAngle *= -1;
+	//userLine.setAngle(angA + apLine.angle() + 90*3);
 	userLine.setAngle(angA + apLine.angle());
 // 	userLine.setLength(r1);
 	userLine.setLength(lb);
@@ -1579,7 +1580,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	p.drawEllipse(p0, la,la);
 	p.setPen(QPen(Qt::red,penWidth));
 // 	p.drawEllipse(p1, r1,r1);
-	p.drawEllipse(p0, lb,lb);
+	p.drawEllipse(p1, lb,lb);
 	p.setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
 		p.drawEllipse(p2, r2,r2);
@@ -3346,10 +3347,10 @@ void MapGraphicsScene::loadResults(QString filename)
 	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
-		/*qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
-		if(i != numReadings - 1)
+		qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
+		if(i != numReadings - 2)
 			continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
-		*/	
+			
 		data.setArrayIndex(i);
 		//qDebug() << "MapGraphicsScene::loadResults(): Reading point#: "<<i;
 		QPointF point = qPointFFromString(data.value("point").toString());
