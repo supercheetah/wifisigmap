@@ -117,6 +117,7 @@ protected:
 class LongPressSpinner : public QObject, public QGraphicsItem
 {
 	Q_OBJECT
+	Q_INTERFACES(QGraphicsItem)
 public:
 	LongPressSpinner();
 	
@@ -243,8 +244,7 @@ private slots:
 	void debugTest();
 
 	#ifdef Q_OS_ANDROID
-	#define QGeoPositionInfo QtMobility::QGeoPositionInfo
-	void positionUpdated(QGeoPositionInfo);
+	void positionUpdated(QtMobility::QGeoPositionInfo);
 	#endif
 	
 	void sensorReadingChanged();

@@ -342,8 +342,9 @@ bool fillTriColor(QImage *img, QVector<QPointF> points, QList<QColor> colors)
 MapGraphicsView::MapGraphicsView()
 	: QGraphicsView()
 {
+#ifndef Q_OS_WIN
 	srand ( time(NULL) );
-	
+#endif
 	m_scaleFactor = 1.;
 	
 	#ifndef QT_NO_OPENGL
@@ -611,17 +612,21 @@ void MapGraphicsScene::debugTest()
 	*/
 
 	/// NOTE Starting QGeoPositionInfoSource causes the app to crash as of 2012-07-13
-	/*
+
 	QtMobility::QGeoPositionInfoSource *source = QtMobility::QGeoPositionInfoSource::createDefaultSource(this);
 	if (source) {
+	    /*
 	    connect(source, SIGNAL(positionUpdated(QGeoPositionInfo)),
 		    this, SLOT(positionUpdated(QGeoPositionInfo)));
+	    */
 	    source->startUpdates();
 	    qDebug() << "Started geo source:"<<source;
+	    QtMobility::QGeoPositionInfo last = source->lastKnownPosition();
+	    qDebug() << "Last position:" << last;
 	}
 	else
 	    qDebug() << "No geo source found";
-	*/
+
 	#endif
 }
 
@@ -911,7 +916,7 @@ void MapGraphicsScene::sensorReadingChanged()
 }
 
 #ifdef Q_OS_ANDROID
-void MapGraphicsScene::positionUpdated(QGeoPositionInfo info)
+void MapGraphicsScene::positionUpdated(QtMobility::QGeoPositionInfo info)
 {
 	qDebug() << "Position updated:" << info;
 }
@@ -1641,7 +1646,7 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	int fingertipAdjust = 0;
 	#ifdef Q_OS_ANDROID
 	// TODO Is there some OS preference that indicates right or left handed usage?
-	fingertipAdjust = half/2;
+	//fingertipAdjust = -half/3;
 	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
 	#endif
 	
@@ -2789,7 +2794,7 @@ LongPressSpinner::LongPressSpinner()
 	
 	QSizeF size = QSizeF(64.,64.);//.expandTo(QApplication::globalStrut());
 #ifdef Q_OS_ANDROID
-	size = QSizeF(128,128);
+	size = QSizeF(192,192);
 #endif
 
 	m_boundingRect = QRectF(QPointF(0,0),size);
@@ -2848,9 +2853,9 @@ QRectF LongPressSpinner::boundingRect() const
 {
 	if(m_goodPressFlag)
 	{
-		int iconSize = 64;
+		int iconSize = 64/2;
 #ifdef Q_OS_ANDROID
-		iconSize = 128;
+		iconSize = 128/2;
 #endif
 		return m_boundingRect.adjusted(-iconSize,-iconSize,iconSize,iconSize);
 	}
