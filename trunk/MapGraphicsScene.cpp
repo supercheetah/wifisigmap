@@ -1177,6 +1177,12 @@ QPointF operator*(const QPointF&a, const QPointF& b) { return QPointF(a.x()*b.x(
 
 void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
+	static bool firstScan = true;
+	if(!firstScan)
+		return;
+		
+	firstScan = false;
+	
 	/// JUST for debugging
 	QPointF realPoint = m_sigValues.last()->point;
 	results = m_sigValues.last()->scanResults;
@@ -1484,15 +1490,17 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	double userLineAngle = 90+45-angB+apLine.angle()-180;
 	//userLineAngle *= -1;
-	userLine.setAngle(angB + apLine.angle());
-	userLine.setLength(r1);
+	userLine.setAngle(angA + apLine.angle());
+// 	userLine.setLength(r1);
+	userLine.setLength(lb);
 	
-	userLine2.setAngle(angB + angC + apLine.angle());
-	userLine2.setLength(r0);
+	userLine2.setAngle(angA + angC + apLine.angle());
+// 	userLine2.setLength(r0);
+	userLine2.setLength(la);
 	
 	double realAngle3 = realLine2.angleTo(realLine);
 	
-	double errA = realAngle - angA;
+	double errA = realAngle  - angA;
 	double errB = realAngle2 - angB;
 	double errC = realAngle3 - angC;
 	
@@ -1500,7 +1508,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	qDebug() << "Triangulation: err(A-C):"<<errA<<errB<<errC;
 	qDebug() << "Triangulation: abs(A-C):"<<realAngle<<realAngle2<<apLine.angle();
 	qDebug() << "Triangulation: realAngle:"<<realAngle<<"/"<<realLine.length()<<", realAngle2:"<<realAngle2<<"/"<<realLine2.length();
-	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<<". userLineAngle:"<<userLineAngle<<", realAngle3:"<<realAngle3;
+	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<</*". userLineAngle:"<<userLineAngle<<*/", realAngle3:"<<realAngle3;
 	
 	QPointF calcPoint = userLine.p2();
 	
@@ -1562,9 +1570,11 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	p.setBrush(QBrush());
 	//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
 	p.setPen(QPen(Qt::white,penWidth));
-	p.drawEllipse(p0, r0,r0);
+// 	p.drawEllipse(p0, r0,r0);
+	p.drawEllipse(p0, la,la);
 	p.setPen(QPen(Qt::red,penWidth));
-	p.drawEllipse(p1, r1,r1);
+// 	p.drawEllipse(p1, r1,r1);
+	p.drawEllipse(p0, lb,lb);
 	p.setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
 		p.drawEllipse(p2, r2,r2);
@@ -3331,10 +3341,10 @@ void MapGraphicsScene::loadResults(QString filename)
 	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
-		//qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
-		//if(i != numReadings - 4)
-		//	continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
-			
+		/*qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
+		if(i != numReadings - 1)
+			continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
+		*/	
 		data.setArrayIndex(i);
 		//qDebug() << "MapGraphicsScene::loadResults(): Reading point#: "<<i;
 		QPointF point = qPointFFromString(data.value("point").toString());
