@@ -1539,17 +1539,16 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	QRect picRect = m_sigMapItem->picture().boundingRect();
 	QPointF offset = picRect.topLeft();
 		
-	QImage image(picRect.size(), QImage::Format_ARGB32_Premultiplied);
-	QPainter p(&image);
-	//p.fillRect(img.rect(), Qt::transparent);
-	//p.drawPicture(-m_offset, m_pic);
-	p.translate(-offset);
-	//qDebug() << "debug: offset:"<<offset;
+// 	QImage image(picRect.size(), QImage::Format_ARGB32_Premultiplied);
+// 	QPainter p(&image);
+// 	p.translate(-offset);
 	
-	//QSize origSize = m_bgPixmap.size();
-	//QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
-		
-	//memset(image.bits(), 0, image.byteCount());
+	QSize origSize = m_bgPixmap.size();
+	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+	offset = QPointF();
+	
+	memset(image.bits(), 0, image.byteCount());
+	QPainter p(&image);
 	
 	//QPainter p(&image);
 	
@@ -1620,16 +1619,23 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 			
 			double avgMeterDist = QLineF(avgPoint, info->point).length() / m_meterPx;
 			double absLossFactor = deriveLossFactor(ap, apMacToDbm[ap], avgMeterDist/*, gRx*/);
-			
-			QPointF lossFactor = info->lossFactor;
-			if(apMacToDbm[ap] > info->shortCutoff)
-				lossFactor.setY(absLossFactor);
+
+			if(isnan(absLossFactor))
+			{
+				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+			}
 			else
-				lossFactor.setX(absLossFactor);
-			
-			info->lossFactor = lossFactor;
-			
-			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+			{
+				QPointF lossFactor = info->lossFactor;
+				if(apMacToDbm[ap] > info->shortCutoff)
+					lossFactor.setY(absLossFactor);
+				else
+					lossFactor.setX(absLossFactor);
+
+				info->lossFactor = lossFactor;
+
+				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+			}
 		}
 	}
 
@@ -1700,6 +1706,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	p.setPen(QPen(Qt::red, 30.));
 	//p.drawPolygon(userPoly);
+
+	penWidth = 100;
 	
 	p.setPen(QPen(Qt::green, 10.));
 	p.setBrush(QColor(0,0,0,127));
@@ -2106,18 +2114,18 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
-	#ifdef Q_OS_ANDROID
-	double half = m_longPressSpinner->boundingRect().width()/2;
-	int fingertipAdjust = 0;
-	
-	// TODO Is there some OS preference that indicates right or left handed usage?
-	//fingertipAdjust = -half/3;
-	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
-	
-	m_longPressSpinner->setPos(m_pressPnt - QPointF(half - fingertipAdjust,half));
-	#else
+// 	#ifdef Q_OS_ANDROID
+// 	double half = m_longPressSpinner->boundingRect().width()/2;
+// 	int fingertipAdjust = 0;
+// 	
+// 	// TODO Is there some OS preference that indicates right or left handed usage?
+// 	//fingertipAdjust = -half/3;
+// 	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
+// 	
+// 	m_longPressSpinner->setPos(m_pressPnt - QPointF(half - fingertipAdjust,half));
+// 	#else
 	m_longPressSpinner->setPos(m_pressPnt);
-	#endif
+//	#endif
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
