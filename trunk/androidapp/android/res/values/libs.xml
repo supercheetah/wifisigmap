@@ -5,7 +5,6 @@
         <item>QtGui</item>
         <item>QtNetwork</item>
         <item>QtSensors</item>
-        <item>QtLocation</item>
     </array>
     <array name="bundled_libs"/>
 </resources>

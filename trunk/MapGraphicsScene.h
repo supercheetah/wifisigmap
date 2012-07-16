@@ -4,7 +4,7 @@
 #include <QtGui>
 
 #ifdef Q_OS_ANDROID
-#include <QGeoPositionInfoSource>
+//#include <QGeoPositionInfoSource>
 #endif
 
 #include "WifiDataCollector.h"
@@ -244,7 +244,7 @@ private slots:
 	void debugTest();
 
 	#ifdef Q_OS_ANDROID
-	void positionUpdated(QtMobility::QGeoPositionInfo);
+	//void positionUpdated(QtMobility::QGeoPositionInfo);
 	#endif
 	
 	void sensorReadingChanged();
