@@ -16,7 +16,9 @@ public:
 	MapGraphicsView();
 	void scaleView(qreal scaleFactor);
 	
-	double scaleFactor() { return m_scaleFactor; } 
+	double scaleFactor() { return m_scaleFactor; }
+	 
+	void reset();
 
 public slots:
 	void zoomIn();
@@ -82,7 +84,7 @@ public:
 	QPointF point;
 	
 	double rxGain; // dBi, typically in the range of [-3,+3] - +3 for laptops, -3 for phones, 0 for unknown or possibly tablets
-	QString rxMac; // for estimating gain ..?
+	QString rxMac; // for estimating gain ...?
 	QDateTime timestamp;
 	
 	double lat; // future use
@@ -119,7 +121,7 @@ public:
 	void setPicture(QPicture pic);
 	//void setPicture(QImage img);
 	
-	QRectF boundingRect() const;	
+	QRectF boundingRect() const;
 	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	
 	QPoint offset() { return m_offset; }
@@ -188,6 +190,11 @@ public:
 		, point(QPointF())
 		, color(QColor())
 		, renderOnMap(true)
+		, mfg("")
+		, txPower(11.9)
+		, txGain(5.0)
+		, lossFactor(2.,2.)
+		, shortCutoff(-49)
 		{}
 		
 	QString mac;
@@ -199,9 +206,12 @@ public:
 	
 	QString mfg; // Guessed based on MAC OUI
 	
-	double  txPower; // dBm
-	double  txGain;  // dbi
-	double  lossFactor; // arbitrary tuning parameter, typically in the range of [-1.0,5.0]
+	double  txPower; // dBm, 11.9 dBm = 19 mW (approx) = Linksys WRT54 Default TX power (approx)
+	double  txGain;  // dBi,  5.0 dBi = Linksys WRT54 Stock Antenna Gain (approx)
+	QPointF lossFactor; // arbitrary tuning parameters X and Y, typically in the range of [-1.0,5.0]
+			    // (formula variable 'n' for short and far dBms, respectively)
+	int shortCutoff; // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
+			 // (less than shortFactorCutoff [close to AP], use X, greater [farther from AP] - use Y)
 	
 	
 };
@@ -301,6 +311,32 @@ protected:
 	QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
 	
 	double getRenderLevel(double level,double angle,QPointF realPoint,QString apMac,QPointF center,double circleRadius);
+	
+	/** \brief Calculate an approximate distance from the AP given the received signal strength in dBm
+	 \a dBm - received signal strength in dBm
+	 \a lossFactor - loss factor describing obstacles, walls, reflection, etc. Can derive existing factor with driveObservedLossFactor()
+	 \a shortCutoff - dBm at which to switch from the long lossFactor (x) to the short lossFactor (y) for readings close to the AP
+	 \a txPower - dBm transmit power of the AP
+	 \a txGain - dBi gain of the AP antennas
+	 \a rxGain - dBi gain of the receiving antenna
+	 \return Distance in meters from the AP
+	*/
+	double dBmToDistance(int dBm, QPointF lossFactor=QPointF(2.,2.), int shortCutoff=-49, double txPower=11.9, double txGain=5.0,  double rxGain=3.);
+	
+	/** \brief dBmToDistance(dBm, apMac, rxGain) is just a shortcut to dBmToDistance(), retrieves lossFactor, shortCutoff, txPower, txGain from stored values in apInfo(apMac)
+	*/ 
+	double dBmToDistance(int dBm, QString apMac,   double rxGain=3.);
+	
+	/** \brief driveObservedLossFactor() calculates an approx lossFactor from observed signal readings for both short and long factors (x and y)
+	    NOTE: Assumes m_meterPx is set correctly to convert pixel distance on the current background (map) to meters
+	*/
+	QPointF deriveObservedLossFactor(QString apMac);
+	
+	/// \brief Calculate the appropriate loss factor which would give distMeters
+	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
+	
+	QPointF triangulate(QString apMac1, int dBm1, QString apMac2, int dBm2);
+	
 	
 protected:
 	QPointF m_pressPnt;
