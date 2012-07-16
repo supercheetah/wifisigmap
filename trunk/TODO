@@ -14,8 +14,22 @@ Core Items TODO:
 	- NEED TO BE ABLE TO REMOVE MARKERS
 	
 Enhancmenets:
-	- Add FTP upload/download "feature" to upload/download backgrounds/wmz files for "cloud" storage
 	- Add RSSI sparkline to HUD next to each AP (or behind/over the AP text to save space) 
+	- Add FTP upload/download "feature" to upload/download backgrounds/wmz files for "cloud" storage
+		- Example C++ code:
+			QUrl uploadurl("ftp://ftp.drivehq.com/wwwhome/"); 
+			uploadurl.setUserName("XXXXXX"); 
+			uploadurl.setPassword("XXXXXX"); 
+			uploadurl.setPort(21); 
+			QNetworkRequest upload(uploadurl); 
+			QNetworkAccessManager *uploadman = new QNetworkAccessManager(this); 
+			uploadman->put(upload, file);
+	- Add code to lookup mfg of AP based on MAC OUI.
+		- Example Perl code:
+			my $oui_cmd = "wget http://iphone.aruljohn.com/mac/mac.pl?mac=$mac -O - 2>/dev/null";
+			my $oui_raw = `$oui_cmd`;
+			my ($mfg) = $oui_raw =~ /<h2>(.*?)<\/h2>/i;
+
 
 Android TODO:
 	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)

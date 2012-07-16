@@ -86,13 +86,21 @@ MapWindow::MapWindow(QWidget *parent)
 {
 	#ifdef CUSTOM_MSG_HANDLER
 		qt_debugSocket = new QTcpSocket(this);
-		qt_debugSocket->connectToHost("192.168.2.104", 3729);
-		//qt_debugSocket->connectToHost("10.10.9.90", 3729);
+		//qt_debugSocket->connectToHost("192.168.2.104", 3729);
+		qt_debugSocket->connectToHost("10.10.9.90", 3729);
 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
 	#endif
 	
 	#ifdef Q_OS_ANDROID
-	QApplication::setGlobalStrut(QSize(96,96));
+	// 96px was a bit big, especially on Kindle Fire
+	// TODO need a way to determine physical screen size (mm)
+	// TODO use 'int QPaintDevice::physicalDpiX ()' (and DpiY) to adjust properly?)
+	// TODO maybe use int QPaintDevice::heightMM () / width() and widthMM() / height() 
+	// NOTE http://stackoverflow.com/a/2019766 cites Target Size Study for One-Handed Thumb Use on Small Touchscreen Devices (Parhi, Karlson, & Bederson 2006). Other sources agree on this "close-to-0.4-inch-rule" (e.g. Designing Gestural Interfaces (Saffer 2008, p. 42))
+	//	- Which gives 9.2mm-9.6mm or approx 0.4in
+	QSize strut(physicalDpiX() * 0.4,physicalDpiY() * 0.4);
+	qDebug() << "NapWindow: Setting global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
+	QApplication::setGlobalStrut(strut);
 	#endif
 	
 	setWindowTitle("WiFi Signal Mapper");

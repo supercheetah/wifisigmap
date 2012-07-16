@@ -18,10 +18,6 @@ SOURCES += main.cpp \
 # The core of the actual app
 include(../wifisigmap.pri)
 
-# # switchmon.pri uses multimedia (older ver of Qt that I'm using onmy desktop)
-# QT -= multimedia
-# QT += multimediakit
-
 QT += core gui
 
 #

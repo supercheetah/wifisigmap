@@ -4,11 +4,6 @@ INCLUDEPATH += $$PWD
 
 QT += network
 
-win32:!unix {
-#        INCLUDEPATH += "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\include"
-#        INCLUDEPATH += "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.0\\Include"
-}
-
 RESOURCES = resources.qrc
 
 # Not used yet/now...
