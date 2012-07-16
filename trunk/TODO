@@ -1,70 +1,43 @@
-Stage: Alpha
-Development Items Todo
-	#- UI to mark AP locations
-		x- Future idea: Calculate location of APs based on intersection of circles:
-			http://paulbourke.net/geometry/2circle/
-			http://mathworld.wolfram.com/Circle-CircleIntersection.html
-			http://math.stackexchange.com/questions/38925/least-squares-intersection-of-three-circles
-			http://stackoverflow.com/questions/5760582/how-to-define-the-intersection-of-three-circles
-	#- Code and UI to save/load "map"
-		- Map composed of:
-			- Map file (store bitmap in file?)
-			- AP locations
-			- Signal readings
-				- WiFi readings at each point
-	#- Actual code to interface UI with WifiDataCollector
+Stage: Beta
+
+Core Items TODO:
 	- UI to for user to change color of the AP signal
 	- UI for user to remove signal reading/get info (e.g. popup of AP essid, etc)
 	- UI to browse for BG image
 		- Future idea:
 			- Specify scale, e.g. if bg image is from google maps, etc.
-	#- Test build an Android version
+	- Add dialog to enable/disable rendering of APs (MapApInfo::renderOnMap)
+	- Need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
+
+	#- Offer to NOT render circle (or delay rendering) during scan
+		- For now, added #ifndef Q_OS_ANDROID - TODO make it configurable
+	- NEED TO BE ABLE TO REMOVE MARKERS
+	
+Enhancmenets:
+	- Add FTP upload/download "feature" to upload/download backgrounds/wmz files for "cloud" storage
+	- Add RSSI sparkline to HUD next to each AP (or behind/over the AP text to save space) 
+
+Android TODO:
+	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)
+	- Move buttons for "load/save/bg" to a popup menu
+	- Need better integration with native theme on Android (e.g. buttons don't look right)
+	- Need new filebrowser dialog (current one is next to useless)
+	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
+	- Dont cancel spin if move within +/- X pixels
+		- MUST have to use app on Kindle because Kindle Fire touch screen is VERY sensitive (won't hold still so it invalidates the longpress timer)
 
 Later:
 	- Possible idea if needed/demand:
 		- UI/code to provide a URL for a bg image and download URL for use as bg
 	
-Bugs and Minor Items not specific to Android:
-	- Definetly need to be able to move items and update map rendering (.e.g to fine-tune position of APs)
-	- Draw grid numbers in default background
-	#- Fix positions of markers - positions dont zoom promperly (shift during zoom)
-
-	
-Android TODO:
-	#- Test with map
-	#- Fix rendering of markerGroups
-	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)
-	- Move buttons for "load/save/bg" to a popup menu
-	#- Elimate scrollbars on QGraphicsView
-	- Need better integration with native theme on Android (e.g. buttons don't look right)
-	- Need new filebrowser dialog (current one is next to useless)
-	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
-	#- Since necessitas conolse isn't giving qDebug() output, create simple qDebug hook to xmit debug messages over the wire
-	- Added a "spinner" around the fingertip during longpress to show action
-	#- Add a spinner during calls to WifiDataCollector::scanWifi() since the 1sec hard delay has been added on android
-		Invalid, moved scannign to scan thread
-	
-	
-Ease of use items:
-	# - Attempt rescan if no APs found (configurable from menu)
-	#- Offer to NOT render circle (or delay rendering) during scan
-		- For now, added #ifndef Q_OS_ANDROID - TODO make it configurable
-	# - Update status when "rendering" so user can move
-	# - Place temp marker during scanning at location
-		- NA, changed scan mode
-	- NEED TO BE ABLE TO REMOVE MARKERS
-	- Fingertip spinner would be nice
-	- Dont cancel spin if move within +/- X pixels
-	# - ERROR if can't save due to permissions
-	- Add dialog to enable/disable rendering of APs (MapApInfo::renderOnMap)
-	#- Make another render mode (multiple ellipse at each level - part way between circles mode and radial lines)
-	#- Move radial line render (and others?) to a "live paint" item - so zooming in renders the lines cleanly (idea: use QPicture?)
-	
 Idea:
-	- Factor in more than two APs 
-	- Use live data captured (pci4000-live.wmz) to test user locating
-		- Idea: Train an ANN?
-		- Idea: Somehow account for non-linear dBm/levels to distance/angel
 	- Create AP location calculator as well
- 	- Change rendering of user location marker to a live painter (so we're not doing QPixmap::fromImage() eveyr call)
- 	
+	- Change rendering of user location marker to a live painter (so we're not doing QPixmap::fromImage() eveyr call)
+ 
+Location Notes:
+	- Calculate location of APs based on intersection of circles:
+		http://paulbourke.net/geometry/2circle/
+		http://mathworld.wolfram.com/Circle-CircleIntersection.html
+		http://math.stackexchange.com/questions/38925/least-squares-intersection-of-three-circles
+		http://stackoverflow.com/questions/5760582/how-to-define-the-intersection-of-three-circles
+	- Use Kalman filtering to smooth results

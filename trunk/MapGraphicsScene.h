@@ -63,30 +63,49 @@ class SigMapValue
 public:
 	SigMapValue(QPointF p, QList<WifiDataResult> results)
 		: point(p)
-		, consumed(false)
- 		, scanResults(results)
- 		// For rendering and internal use, not stored in datafile:
+		, rxGain(0.)
+		, rxMac("")
+		, timestamp(QDateTime::currentDateTime())
+		, lat(0.)
+		, lng(0.)
+		, scanResults(results)
+		// For rendering and internal use, not stored in datafile:
  		, renderDataDirty(true)
  		, renderCircleRadius(0.)
  		, renderLevel(0.)
  		, renderAngle(0.)
-		{}
-		
-	QPointF point;
-	bool consumed;
+		, consumed(false)
+		, marker(0)
+ 		{}
 	
+	// Location on the map
+	QPointF point;
+	
+	double rxGain; // dBi, typically in the range of [-3,+3] - +3 for laptops, -3 for phones, 0 for unknown or possibly tablets
+	QString rxMac; // for estimating gain ..?
+	QDateTime timestamp;
+	
+	double lat; // future use
+	double lng;
+	
+	// Actual scan data for this point
 	QList<WifiDataResult> scanResults;
 	
+	// Utils for accessing data in scanResults
+	bool hasAp(QString mac);
+	double signalForAp(QString mac, bool returnDbmValue=false);
+	
+	// Cache fields for rendering
 	bool renderDataDirty;
 	double renderCircleRadius;
 	double renderLevel;
 	double renderAngle;
 	
+	bool consumed;
+	
+	// The actual marker on the map
 	SigMapValueMarker *marker;
 	
-	
-	bool hasAp(QString mac);
-	double signalForAp(QString mac, bool returnDbmValue=false);
 };
 
 class MapGraphicsScene;
@@ -177,6 +196,14 @@ public:
 	QPointF point;
 	QColor  color;
 	bool    renderOnMap;
+	
+	QString mfg; // Guessed based on MAC OUI
+	
+	double  txPower; // dBm
+	double  txGain;  // dbi
+	double  lossFactor; // arbitrary tuning parameter, typically in the range of [-1.0,5.0]
+	
+	
 };
 
 class MapRenderOptions
@@ -238,7 +265,7 @@ protected:
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent * mouseEvent);
 	
 	friend class MapGraphicsView; // for access to:
-	void invalidateLongPress();
+	void invalidateLongPress(QPointF pnt = QPointF());
 	
 private slots:
 	void debugTest();
@@ -261,7 +288,7 @@ private slots:
 protected:
 	friend class SigMapRenderer;
 	
-	void addSignalMarker(QPointF point, QList<WifiDataResult> results);
+	SigMapValue *addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
 	QColor baseColorForAp(QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);

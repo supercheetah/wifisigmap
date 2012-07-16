@@ -425,7 +425,7 @@ void MapGraphicsView::scaleView(qreal scaleFactor)
 
 void MapGraphicsView::mouseMoveEvent(QMouseEvent * mouseEvent)
 {
-	qobject_cast<MapGraphicsScene*>(scene())->invalidateLongPress();
+	qobject_cast<MapGraphicsScene*>(scene())->invalidateLongPress(mapToScene(mouseEvent->pos()));
 		
 	QGraphicsView::mouseMoveEvent(mouseEvent);
 }
@@ -1441,8 +1441,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	
 	double n   =  1.07; /// TUNE THIS 
-	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b radio
-	double Xa  = 18.00; // normal rand var, std dev a=[3,20]
+	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+	double Xa  = 18.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
 	double pTx = 11.80; // (dBm) - Transmit power, [1] est stock WRT54GL at 19 mW, [1]=http://forums.speedguide.net/showthread.php?253953-Tomato-and-Linksys-WRT54GL-transmit-power
 	double pRx = apMacToDbm[ap1]; /// Our measurement
 	double gTx =  5.00; // (dBi) - Gain of stock WRT54GL antennas
@@ -1458,7 +1458,6 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
 	//double logDist = fA * (fB + fC);
 	
-	//logDist /= 2.303; // convert from natural log to log base 10
 	double invLog  = pow(10, logDist); // distance in meters
 	qDebug() << "[formula] invLog: "<<invLog<<" meters";
 	qDebug() << "[formula] n:"<<n<<", m:"<<m<<", Xa:"<<Xa<<", pTx:"<<pTx<<", pRx:"<<pRx<<", gTx:"<<gTx<<", gRx:"<<gRx<<", logDist:"<<logDist;
@@ -1470,6 +1469,12 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	double ma = pow(10, ( (1/(10*n)) * (pTx - apMacToDbm[ap0] + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)) ));
 	double la = ma * m_meterPx;
 	qDebug() << "[formula] ma: "<<ma<<" meters, n:"<<n<<", apMacToDbm[ap0]:"<<apMacToDbm[ap0];
+	
+	// Alternative forumla presented here http://www.moxa.com/newsletter/connection/2008/03/Figure_out_transmission_distance_from_wireless_device_specs.htm#04
+	// Merging the two provided gives:
+	// r=pow(10,(pTx+(gTx+gRx)*n-pRx)/20) / (41.88 * f) where r is in km and f is the frequency, e.g. 2442
+	
+	
 	
 	
 	qDebug() << "[dump1] "<<la<<lb<<lc;
@@ -1666,10 +1671,24 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	QGraphicsScene::mousePressEvent(mouseEvent);
 }
 
-void MapGraphicsScene::invalidateLongPress()
+void MapGraphicsScene::invalidateLongPress(QPointF curPoint)
 {
 	if(m_longPressTimer.isActive())
 	{
+		if(!curPoint.isNull())
+		{
+			#ifdef Q_OS_ANDROID
+			const double maxDist = 16.;
+			#else
+			const double maxDist = 1.;
+			#endif
+			
+			// Don't invalidate longpress if curPoint (current mouse/finger position)
+			// is within 'maxDist' radius of the starting location
+			if(QLineF(m_pressPnt, curPoint).length() < maxDist)
+				return;
+		}
+		
 		m_longPressTimer.stop();
 		m_longPressCountTimer.stop();
 		m_longPressSpinner->setVisible(false);
@@ -1687,7 +1706,7 @@ void MapGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent * mouseEvent)
 
 void MapGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
-	invalidateLongPress(); //mouseEvent->lastScenePos());
+	invalidateLongPress(mouseEvent->lastScenePos());
 		
 	QGraphicsScene::mouseMoveEvent(mouseEvent);
 }
@@ -1892,7 +1911,7 @@ QImage ImageFilters::blurred(const QImage& image, const QRect& /*rect*/, int rad
 /// End ImageFilters implementation
 
 
-void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
+SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
 {	
 	
 #ifdef Q_OS_ANDROID
@@ -2042,6 +2061,8 @@ void MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> resu
 	
 	// Add to list of readings
 	m_sigValues << val;
+	
+	return val;
 }
 
 QImage MapGraphicsScene::addDropShadow(QImage markerGroup, double shadowSize)
@@ -3238,7 +3259,11 @@ void MapGraphicsScene::saveResults(QString filename)
 		data.setValue("marked",		info->marked);
 		data.setValue("point",		qPointFToString(info->point));
 		data.setValue("color", 		info->color.name());
-		data.setValue("renderOnMap",	info->renderOnMap);
+		data.setValue("renderap",	info->renderOnMap);
+		data.setValue("mfg",		info->mfg);
+		data.setValue("txpower",	info->txPower);
+		data.setValue("txgain",		info->txGain);
+		data.setValue("lossfactor",	info->lossFactor);
 	}
 	data.endArray();
 		
@@ -3248,7 +3273,12 @@ void MapGraphicsScene::saveResults(QString filename)
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		data.setArrayIndex(idx++);
-		data.setValue("point", qPointFToString(val->point));
+		data.setValue("point",		qPointFToString(val->point));
+		data.setValue("rxgain",		val->rxGain);
+		data.setValue("rxmac",		val->rxMac);
+		data.setValue("timestamp",	val->timestamp.toTime_t());
+		data.setValue("lat",		val->lat);
+		data.setValue("lng",		val->lng);
 		
 		int resultIdx = 0;
 		data.beginWriteArray("signals");
@@ -3328,7 +3358,12 @@ void MapGraphicsScene::loadResults(QString filename)
 		QString essid  = data.value("essid").toString();
 		bool marked    = data.value("marked", !point.isNull()).toBool();
 		QColor color   = data.value("color").toString();
-		bool render    = data.value("renderOnMap", true).toBool();
+		bool render    = data.value("renderap", true).toBool();
+		
+		QString mfg    = data.value("mfg", "").toString();
+		double txPower = data.value("txpower",	11.8).toDouble();  // dBm, Linksys WRT54 Default TX power (approx)
+		double txGain  = data.value("txgain",    5.0).toDouble();  // dBi, Linksys WRT54 Stock Antenna Gain (approx)
+		double lossf   = data.value("lossfactor", 1.0).toDouble(); // loss factor - arbitrary tuning parameter, typically in the range of [-1.0,5.0]
 		
 		if(!color.isValid())
 		{
@@ -3343,6 +3378,10 @@ void MapGraphicsScene::loadResults(QString filename)
 		info->point	= point;
 		info->color	= color;
 		info->renderOnMap = render;
+		info->mfg	= mfg;
+		info->txPower	= txPower;
+		info->txGain	= txGain;
+		info->lossFactor = lossf;
 		
 		if(marked)
 			addApMarker(point, apMac);
@@ -3354,13 +3393,22 @@ void MapGraphicsScene::loadResults(QString filename)
 	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
-		qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
+		/*qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
 		if(i != numReadings - 2)
 			continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
-			
+		*/	
 		data.setArrayIndex(i);
 		//qDebug() << "MapGraphicsScene::loadResults(): Reading point#: "<<i;
+		
+		// Load location of this reading
 		QPointF point = qPointFFromString(data.value("point").toString());
+		
+		// Load other fields
+		double rxGain  = data.value("rxgain",0.).toDouble();
+		QString rxMac  = data.value("rxMac","").toString();
+		uint timestamp = data.value("timestamp",0).toUInt();
+		double lat     = data.value("lat",0.).toDouble();
+		double lng     = data.value("lng",0.).toDouble();
 		
 		int numSignals = data.beginReadArray("signals");
 		
@@ -3387,7 +3435,14 @@ void MapGraphicsScene::loadResults(QString filename)
 		}
 		data.endArray();
 		
-		addSignalMarker(point, results);
+		SigMapValue *val = addSignalMarker(point, results);
+		
+		val->rxGain	= rxGain;
+		val->rxMac	= rxMac;
+		val->timestamp	= QDateTime::fromTime_t(timestamp);
+		val->lat	= lat;
+		val->lng	= lng;
+		
 	}
 	data.endArray();
 	
