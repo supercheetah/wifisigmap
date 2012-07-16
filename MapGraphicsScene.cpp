@@ -581,6 +581,9 @@ MapGraphicsScene::~MapGraphicsScene()
 
 void MapGraphicsScene::debugTest()
 {
+	// Disable sensor testing for now - I'll work more on it later.
+	return;
+
 	#ifdef Q_OS_ANDROID
 	QList<QByteArray> sensorList = QtMobility::QSensor::sensorTypes();
 	qDebug() << "Sensor list length: "<<sensorList.size();
@@ -612,13 +615,14 @@ void MapGraphicsScene::debugTest()
 	*/
 
 	/// NOTE Starting QGeoPositionInfoSource causes the app to crash as of 2012-07-13
-
+	/// Still crrashes as of 7/15
+	/*
 	QtMobility::QGeoPositionInfoSource *source = QtMobility::QGeoPositionInfoSource::createDefaultSource(this);
 	if (source) {
-	    /*
-	    connect(source, SIGNAL(positionUpdated(QGeoPositionInfo)),
-		    this, SLOT(positionUpdated(QGeoPositionInfo)));
-	    */
+
+	    //connect(source, SIGNAL(positionUpdated(QGeoPositionInfo)),
+	    //	    this, SLOT(positionUpdated(QGeoPositionInfo)));
+
 	    source->startUpdates();
 	    qDebug() << "Started geo source:"<<source;
 	    QtMobility::QGeoPositionInfo last = source->lastKnownPosition();
@@ -626,6 +630,7 @@ void MapGraphicsScene::debugTest()
 	}
 	else
 	    qDebug() << "No geo source found";
+	*/
 
 	#endif
 }
@@ -916,10 +921,12 @@ void MapGraphicsScene::sensorReadingChanged()
 }
 
 #ifdef Q_OS_ANDROID
+/*
 void MapGraphicsScene::positionUpdated(QtMobility::QGeoPositionInfo info)
 {
 	qDebug() << "Position updated:" << info;
 }
+*/
 #endif
 
 void MapGraphicsScene::triggerRender()
@@ -1182,16 +1189,22 @@ QPointF operator*(const QPointF&a, const QPointF& b) { return QPointF(a.x()*b.x(
 
 void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
+	QPointF realPoint;
+
+	/*
 	static bool firstScan = true;
 	if(!firstScan)
 		return;
 		
 	firstScan = false;
 	
+
 	/// JUST for debugging
-	QPointF realPoint = m_sigValues.last()->point;
+	realPoint = m_sigValues.last()->point;
 	results = m_sigValues.last()->scanResults;
-	
+	*/
+
+
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
 	
 	// Sort the results high-low
