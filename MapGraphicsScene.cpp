@@ -1123,11 +1123,6 @@ QLineF calcIntersect(QPointF p0, double r0, QPointF p1, double r1)
 		//m_userItem->setVisible(false);
 		return QLineF();
 	}
-	else
-	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): d > |r0 - r1|, sanity check stop";
-		//return;
-	}
 	
 	if(d == 0. && r0 == r1)
 	{
@@ -1191,7 +1186,6 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
 	QPointF realPoint;
 
-	/*
 	static bool firstScan = true;
 	if(!firstScan)
 		return;
@@ -1202,7 +1196,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	/// JUST for debugging
 	realPoint = m_sigValues.last()->point;
 	results = m_sigValues.last()->scanResults;
-	*/
+	
 
 
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
