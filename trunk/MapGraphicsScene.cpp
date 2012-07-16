@@ -374,6 +374,12 @@ MapGraphicsView::MapGraphicsView()
 	#endif
 }
 
+void MapGraphicsView::reset()
+{
+	resetTransform();
+	m_scaleFactor = 1.;
+}
+
 void MapGraphicsView::zoomIn()
 {
 	scaleView(qreal(1.2));
@@ -469,7 +475,8 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 	
 	QList<WifiDataResult> results = gs->m_lastScanResults;
 	
-	qSort(results.begin(), results.end(), MapGraphicsScene_sort_WifiDataResult);
+	// Sort not needed - already sorted when m_lastScanResults is set
+	//qSort(results.begin(), results.end(), MapGraphicsScene_sort_WifiDataResult);
 	
 	foreach(WifiDataResult result, results)
 	{
@@ -1186,16 +1193,18 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 {
 	QPointF realPoint;
 
-	static bool firstScan = true;
-	if(!firstScan)
-		return;
-		
-	firstScan = false;
+// 	static bool firstScan = true;
+// 	if(!firstScan)
+// 		return;
+// 		
+// 	firstScan = false;
 	
+	if(m_sigValues.isEmpty())
+		return;
 
 	/// JUST for debugging
-	realPoint = m_sigValues.last()->point;
-	results = m_sigValues.last()->scanResults;
+// 	realPoint = m_sigValues.last()->point;
+// 	results   = m_sigValues.last()->scanResults;
 	
 
 
@@ -1219,7 +1228,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
 	QStringList apsVisible;
 	QHash<QString,double> apMacToSignal;
-	QHash<QString,double> apMacToDbm;
+	QHash<QString,int> apMacToDbm;
 	foreach(WifiDataResult result, results)
 	{
 		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
@@ -1240,7 +1249,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs marked AND visble, unable to guess user location";
 		return;
 	}
-	
+/*	
 	// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
 	// This is used to calculate the radius of the APs coverage.
 	QHash<QString,int>    apRatioCount;
@@ -1273,47 +1282,47 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		qDebug() << "[ratio calc] "<<apMac<<": maxDistFromCenter:"<<maxDistFromCenter<<", macSigValue:"<<maxSigValue<<", ratio:"<<apRatioAvgs[apMac]; 
 	}
 			
-	/*
-	foreach(SigMapValue *val, m_sigValues)
-	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
-		
-		// Remember, apsVisible has all the APs *visible* in this scan result *AND* marked in the map 
-		foreach(QString apMac, apsVisible)
-		{
-			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
-			if(val->hasAp(apMac) &&
-			  !apInfo(apMac)->point.isNull()) // TODO Since apsVisible are only APs marked, do we need to test this still?
-			{
-				QPointF delta = apInfo(apMac)->point - val->point;
-				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
-				//double dist = d;
-				d = d / val->signalForAp(apMac);
-				
-				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
-				
-				// Incrememnt counters/sums
-				if(!apRatioSums.contains(apMac))
-				{
-					apRatioSums.insert(apMac, d);
-					apRatioCount.insert(apMac, 1);
-				}
-				else
-				{
-					apRatioSums[apMac] += d;
-					apRatioCount[apMac] ++;
-				}
-			}
-		}
-	}
 	
-	// Average the values found above to determine the pixel-signal ratio
-	foreach(QString key, apRatioSums.keys())
-	{
-		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
-		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
-	}
-	*/
+// 	foreach(SigMapValue *val, m_sigValues)
+// 	{
+// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
+// 		
+// 		// Remember, apsVisible has all the APs *visible* in this scan result *AND* marked in the map 
+// 		foreach(QString apMac, apsVisible)
+// 		{
+// 			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
+// 			if(val->hasAp(apMac) &&
+// 			  !apInfo(apMac)->point.isNull()) // TODO Since apsVisible are only APs marked, do we need to test this still?
+// 			{
+// 				QPointF delta = apInfo(apMac)->point - val->point;
+// 				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+// 				//double dist = d;
+// 				d = d / val->signalForAp(apMac);
+// 				
+// 				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
+// 				
+// 				// Incrememnt counters/sums
+// 				if(!apRatioSums.contains(apMac))
+// 				{
+// 					apRatioSums.insert(apMac, d);
+// 					apRatioCount.insert(apMac, 1);
+// 				}
+// 				else
+// 				{
+// 					apRatioSums[apMac] += d;
+// 					apRatioCount[apMac] ++;
+// 				}
+// 			}
+// 		}
+// 	}
+// 	
+// 	// Average the values found above to determine the pixel-signal ratio
+// 	foreach(QString key, apRatioSums.keys())
+// 	{
+// 		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
+// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
+// 	}
+	
 	
 	// apsVisible implicitly is sorted strong->weak signal
 	QString ap0 = apsVisible[0];
@@ -1413,19 +1422,17 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	// That didn't work, so let's tri triangulation
 	
-	/*
-	
-	  C
-	  *
-	  |`.
-	 b|  `. a
-	  |    `.
-	  |      `.
-	A *--------* B
-	      c
 	
 	
-	*/
+// 	  C
+// 	  *
+// 	  |`.
+// 	 b|  `. a
+// 	  |    `.
+// 	  |      `.
+// 	A *--------* B
+// 	      c
+		
 	
 	QLineF apLine(p1,p0);
 	
@@ -1440,52 +1447,37 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
  	double lc = apLine.length(); //sqrt(dist2(p1,p0));
 	
 	
-	double n   =  1.07; /// TUNE THIS 
-	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
-	double Xa  = 18.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
-	double pTx = 11.80; // (dBm) - Transmit power, [1] est stock WRT54GL at 19 mW, [1]=http://forums.speedguide.net/showthread.php?253953-Tomato-and-Linksys-WRT54GL-transmit-power
-	double pRx = apMacToDbm[ap1]; /// Our measurement
-	double gTx =  5.00; // (dBi) - Gain of stock WRT54GL antennas
-	double gRx =  3.00; // (dBi) - Estimated gain of laptop antenna, neg dBi. Internal atennas for phones/laptops range from (-3,+3)
-	
-	// Formula from http://web.mysites.ntu.edu.sg/aschfoh/public/Shared%20Documents/pub/04449717-icics07.pdf
-	//double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log(m) - 20*log(4*Pi));
-	
 // 	double fA = 1./(10.*n);
 // 	double fB = pTx - pRx + gTx + gRx;
 // 	double fC = -Xa + (20.*log10(m)) - (20.*log10(4.*Pi));
 // 	
-	double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
-	//double logDist = fA * (fB + fC);
 	
-	double invLog  = pow(10, logDist); // distance in meters
-	qDebug() << "[formula] invLog: "<<invLog<<" meters";
-	qDebug() << "[formula] n:"<<n<<", m:"<<m<<", Xa:"<<Xa<<", pTx:"<<pTx<<", pRx:"<<pRx<<", gTx:"<<gTx<<", gRx:"<<gRx<<", logDist:"<<logDist;
-	//qDebug() << "[formula] fA:"<<fA<<", fB:"<<fB<<", fC:"<<fC<<", log test: log(10):"<<log(10)<<", log(10)/2.303:"<<(log(10)/2.303);
-	double lb = invLog * m_meterPx; // convert to pixels
-
-	// .pdf above says -49 dBm (pRx) is approx 15 meter limit to switch models by changing n
-	n = apMacToDbm[ap0] < -49 ? 1.07 : 0.43;
-	double ma = pow(10, ( (1/(10*n)) * (pTx - apMacToDbm[ap0] + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)) ));
-	double la = ma * m_meterPx;
-	qDebug() << "[formula] ma: "<<ma<<" meters, n:"<<n<<", apMacToDbm[ap0]:"<<apMacToDbm[ap0];
+	QPointF lossFactor2 = deriveObservedLossFactor(ap2);	
+	QPointF lossFactor1 = deriveObservedLossFactor(ap1);
+	QPointF lossFactor0 = deriveObservedLossFactor(ap0);
 	
-	// Alternative forumla presented here http://www.moxa.com/newsletter/connection/2008/03/Figure_out_transmission_distance_from_wireless_device_specs.htm#04
-	// Merging the two provided gives:
-	// r=pow(10,(pTx+(gTx+gRx)*n-pRx)/20) / (41.88 * f) where r is in km and f is the frequency, e.g. 2442
+	// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+	apInfo(ap2)->lossFactor = lossFactor2;
+	apInfo(ap1)->lossFactor = lossFactor1;
+	apInfo(ap0)->lossFactor = lossFactor0;
 	
+// 	qDebug() << "[formula] codified comparrison (ap1): "<<dBmToDistance(apMacToDbm[ap1], ap1);
+// 	qDebug() << "[formula] codified comparrison (ap0): "<<dBmToDistance(apMacToDbm[ap0], ap0);
 	
+	double lb = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
+	double la = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
 	
+	r2 = dBmToDistance(apMacToDbm[ap2], ap2) * m_meterPx;
 	
 	qDebug() << "[dump1] "<<la<<lb<<lc;
 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
 	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
 	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
-	/*	
-	la= 8;
-	lb= 6;
-	lc= 7;
-	*/
+		
+// 	la= 8;
+// 	lb= 6;
+// 	lc= 7;
+	
 // 	la = 180;
 // 	lb = 238;
 // 	lc = 340;
@@ -1526,12 +1518,17 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	qDebug() << "Triangulation: err(A-C):"<<errA<<errB<<errC;
 	qDebug() << "Triangulation: abs(A-C):"<<realAngle<<realAngle2<<apLine.angle();
 	qDebug() << "Triangulation: realAngle:"<<realAngle<<"/"<<realLine.length()<<", realAngle2:"<<realAngle2<<"/"<<realLine2.length();
-	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<</*". userLineAngle:"<<userLineAngle<<*/", realAngle3:"<<realAngle3;
+	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<<", realAngle3:"<<realAngle3;
 	
-	QPointF calcPoint = userLine.p2();
+	//QPointF calcPoint = userLine.p2();
 	
+	QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0], 
+					ap1, apMacToDbm[ap1]);
 	
+	userLine  = QLineF(p1, calcPoint);
+	userLine2 = QLineF(p0, calcPoint);
 	
+*/	
 	
 /*
 	QImage image(
@@ -1559,8 +1556,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	//p.setPen(Qt::black);
 	
 //	QRectF rect(QPointF(0,0),itemWorldRect.size());
-	QRectF rect = itemWorldRect;
-	QPointF center = rect.center();
+// 	QRectF rect = itemWorldRect;
+// 	QPointF center = rect.center();
 	
 	#ifdef Q_OS_ANDROID
 	QString size = "64x64";
@@ -1570,6 +1567,149 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	double penWidth = 20.0;
 	
+	QHash<QString,bool> drawnFlag;
+	QHash<QString,int> badLossFactor;
+	
+	QVector<QPointF> userPoly;
+	
+	QPointF avgPoint(0.,0.);
+	int count = 0;
+	
+	int numAps = apsVisible.size();
+	for(int i=0; i<numAps; i++)
+	{
+		QString ap0 = apsVisible[i];
+		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+		
+		QPointF p0 = apInfo(ap0)->point;
+		QPointF p1 = apInfo(ap1)->point;
+		
+		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
+						ap1, apMacToDbm[ap1]);
+		
+		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+		{
+			if(!badLossFactor.contains(ap0))
+				badLossFactor[ap0] = 0;
+			else
+				badLossFactor[ap0] = badLossFactor[ap0] + 1;
+			
+			if(!badLossFactor.contains(ap1))
+				badLossFactor[ap1] = 0;
+			else
+				badLossFactor[ap1] = badLossFactor[ap1] + 1;
+				
+			qDebug() << "\t NaN: "<<badLossFactor[ap0]<<" / "<<badLossFactor[ap1];
+		}
+		else
+		{
+			avgPoint += calcPoint;
+			count ++;
+		}
+	}
+	
+// 	avgPoint.setX( avgPoint.x() / count );
+// 	avgPoint.setY( avgPoint.y() / count );
+	avgPoint /= count;
+	
+	foreach(QString ap, apsVisible)
+	{
+		if(badLossFactor[ap] > 0)
+		{
+			MapApInfo *info = apInfo(ap);
+			
+			double avgMeterDist = QLineF(avgPoint, info->point).length() / m_meterPx;
+			double absLossFactor = deriveLossFactor(ap, apMacToDbm[ap], avgMeterDist/*, gRx*/);
+			
+			QPointF lossFactor = info->lossFactor;
+			if(apMacToDbm[ap] > info->shortCutoff)
+				lossFactor.setY(absLossFactor);
+			else
+				lossFactor.setX(absLossFactor);
+			
+			info->lossFactor = lossFactor;
+			
+			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+		}
+	}
+
+	QPointF avgPoint2(0.,0.);
+	count = 0;
+	
+// 	int numAps = apsVisible.size();
+	for(int i=0; i<numAps; i++)
+	{
+		QString ap0 = apsVisible[i];
+		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+		
+		QPointF p0 = apInfo(ap0)->point;
+		QPointF p1 = apInfo(ap1)->point;
+		
+		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
+						ap1, apMacToDbm[ap1]);
+		
+		// We assume triangulate() already stored drived loss factor into apInfo()
+		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
+		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
+		
+		qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1;
+		
+		userPoly << calcPoint;
+		
+		QColor color0 = baseColorForAp(ap0);
+		if(!drawnFlag.contains(ap0))
+		{
+			drawnFlag.insert(ap0, true);
+			
+			p.setPen(QPen(color0, penWidth));
+			p.drawEllipse(p0, r0, r0);
+		}
+		
+		QColor color1 = baseColorForAp(ap1);
+
+		if(!drawnFlag.contains(ap1))
+		{
+			drawnFlag.insert(ap1, true);
+			
+			p.setPen(QPen(color1, penWidth));
+			p.drawEllipse(p1, r1, r1);
+		}
+		
+		p.setPen(QPen(Qt::gray, penWidth));
+		p.drawLine(p0, p1);
+		
+		p.setPen(QPen(color0, penWidth));
+		p.drawLine(p0, calcPoint);
+		
+		p.setPen(QPen(color1, penWidth));
+		p.drawLine(p1, calcPoint);
+		
+		if(!isnan(calcPoint.x()) && !isnan(calcPoint.y()))
+		{
+			avgPoint2 += calcPoint;
+			count ++;
+		}
+		
+		//break;
+	}
+	
+// 	avgPoint2.setX( avgPoint.x() / count );
+// 	avgPoint2.setY( avgPoint.y() / count );
+	avgPoint2 /= count;
+
+	
+	p.setPen(QPen(Qt::red, 30.));
+	//p.drawPolygon(userPoly);
+	
+	p.setPen(QPen(Qt::green, 10.));
+	p.setBrush(QColor(0,0,0,127));
+	p.drawEllipse(avgPoint, penWidth, penWidth);
+	
+	p.setPen(QPen(Qt::yellow, 10.));
+	p.setBrush(QColor(0,0,0,127));
+	p.drawEllipse(avgPoint2, penWidth, penWidth);
+	
+/*	
 	p.setPen(QPen(Qt::blue,penWidth));
 // 	QPointF s1 = line.p1() - itemWorldRect.topLeft();
 // 	QPointF s2 = line.p2() - itemWorldRect.topLeft();
@@ -1630,7 +1770,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 // 	p.setPen(QPen(Qt::darkGreen,penWidth));
 // 	p.drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
 	
-	
+*/
 	p.end();
 	
 	m_userItem->setPixmap(QPixmap::fromImage(image));
@@ -1645,6 +1785,317 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	m_userItem->setVisible(true);
 
 }
+
+QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dBm1)
+{
+	MapApInfo *inf0 = apInfo(ap0);
+	MapApInfo *inf1 = apInfo(ap1);
+	
+	if(inf0->lossFactor.isNull())
+	{
+		QPointF lossFactor0 = deriveObservedLossFactor(ap0);
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		inf0->lossFactor = lossFactor0;
+	}
+		
+	if(inf1->lossFactor.isNull())
+	{
+		QPointF lossFactor1 = deriveObservedLossFactor(ap1);
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		inf1->lossFactor = lossFactor1;
+	}
+	
+	// Get location of APs (in pixels, obviously)
+	QPointF p0 = inf0->point;
+	QPointF p1 = inf1->point;
+	
+	// Get a line from one AP to the other (need this for length and angle)
+	QLineF apLine(p1,p0);
+	
+	double lc = apLine.length();
+	double la = dBmToDistance(dBm0, ap0) * m_meterPx; // dBmToDistance returns meters, convert to pixels
+	double lb = dBmToDistance(dBm1, ap1) * m_meterPx;
+	
+// 	qDebug() << "[dump1] "<<la<<lb<<lc;
+// 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
+// 	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
+// 	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
+// 	
+	/*
+	
+	  C
+	  *
+	  |`.
+	 b|  `. a
+	  |    `.
+	  |      `.
+	A *--------* B
+	      c
+	
+	
+	*/
+	
+	// Calculate the angle (A)
+	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
+	double angA = acos(cosA)* 180.0 / Pi;
+	
+	// Create a line from the appros AP and set it's angle to the calculated angle
+	QLineF userLine(p1,QPointF());
+	userLine.setAngle(angA + apLine.angle());
+	userLine.setLength(lb);
+	
+	
+	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): ang(A):"<<angA<<", cos(A):"<<cosA;
+	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): apLine.angle:"<<apLine.angle();
+	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
+	
+	
+	// Return the end-point of the line we just created - that's the point where 
+	// the signals of the two APs intersect (supposedly, any error in the result is largely from dBmToDistance(), and, by extension, deriveObservedLossFactor())
+	return userLine.p2();
+}
+
+double MapGraphicsScene::deriveLossFactor(QString apMac, int pRx, double distMeters, double gRx)
+{
+	const double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+	const double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
+	
+	MapApInfo *info = apInfo(apMac);
+	double pTx = info->txPower;
+	double gTx = info->txGain;
+	
+	double logDist       = log10(distMeters);
+	double adjustedPower = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+	double n             = 1./(logDist / adjustedPower)/10.;
+	
+	return n;
+}
+
+QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
+{
+	const double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+	const double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
+	
+	MapApInfo *info = apInfo(apMac);
+	double pTx = info->txPower;
+	double gTx = info->txGain;
+	
+	int shortCutoff = info->shortCutoff;
+	
+	QPointF lossFactor(2.,2.);
+	
+	int method = 1;
+	if(method == 1)
+	{
+		// Use a reworked distance formula to calculate lossFactor for each point, then average together
+			
+		double shortFactor = 0.,
+		       longFactor  = 0.;
+		
+		int    shortCount  = 0,
+		       longCount   = 0;
+		
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(val->hasAp(apMac))
+			{
+				double pRx = val->signalForAp(apMac, true); // true = return raw dBM
+				double gRx = val->rxGain;
+				
+				// Assuming: logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+				// Rearranging gives:
+				// logDist = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)) / (10n)
+				// =
+				// 1/10n = logDist / (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi))
+				// =
+				// n = 1/(logDist / (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)))/10
+				//
+				// Paraphrased: 
+				// adjustedPower = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi))
+				// logDist = 1/10n * adjustedPower 
+				// 	(or simply: logDist = adjustedPower/(10n))
+				// n = 1/(logDist/adjustedPower)/10
+				// Where logDist = log(distFromAp * metersPerPixel)
+				// NOTE: Any log above is base 10 as in log10(), above, not natrual logs as in log()
+				
+				double logDist       = log10(QLineF(info->point,val->point).length() / m_meterPx);
+				double adjustedPower = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+				double n             = 1./(logDist / adjustedPower)/10.;
+				
+				if(pRx > shortCutoff)
+				{
+					shortFactor += n;
+					shortCount  ++;
+				}
+				else
+				{
+					longFactor  += n;
+					longCount   ++;
+				}
+			}
+		}
+		
+		if(!shortCount)
+		{
+			shortFactor = 2.;
+			shortCount  = 1;
+		}
+		
+		if(!longCount)
+		{
+			longFactor = 1.;
+			longCount  = 1;
+		}
+		
+		lossFactor = QPointF( longFactor /  longCount,
+				     shortFactor / shortCount);
+	
+		// TODO calc MSE for the resultant N as error += ( (dBmToDistance(dBm, lossFactor)-realDist)^2 ) foreach reading; error/= readings
+	
+	}
+	else
+	if(method == 2)
+	{
+		// Try to minimize MSE using a gradient decent search for n
+		// Stop when MSE < 0.1 OR num iterations > 1_000_000 OR (zig-zag TODO)
+		
+		const double errorCutoff = 0.01; // minimum eror
+		const int maxIterations = 1000000;
+		
+		double error = 1.0; // starting error, meaningless
+		int numIterations = 0;
+		
+		double shortFactor = 6.0; // starting factor guesses
+		double longFactor  = 2.0; // starting factor guesses
+		
+		double stepFactor = 0.001; // minimum step 
+		double stepChangeFactor = 0.0001; // amount to change step by 
+		double shortStep = -0.5; // start with large steps, decrease as we get closer
+		double longStep  = -0.5; // start with large steps, decrease as we get closer
+		
+		int shortCutoff = info->shortCutoff; // typically -49 dBm, ghreater than this, pRx is assumed less than 15 meters to AP, less than -49, assumed further than 15m from AP
+		
+		// Values to prevent zig-zagging around local minima
+		double lastError = 0.0;
+		double lastError1 = 0.0;
+		bool zigZag = false;
+		
+		while(error > errorCutoff && numIterations < maxIterations && !zigZag)
+		{
+			double shortErrorSum = 0.;
+			int shortErrorCount  = 0;
+			
+			double longErrorSum  = 0.;
+			int longErrorCount   = 0;
+			
+			foreach(SigMapValue *val, m_sigValues)
+			{
+				if(val->hasAp(apMac))
+				{
+					double pRx = val->signalForAp(apMac, true); // true = return raw dBM
+					double gRx = val->rxGain;
+					double realDist = QLineF(info->point,val->point).length() / m_meterPx;
+				
+					double n = pRx < shortCutoff ? longFactor : shortFactor;
+					
+					double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+					double invLog  = pow(10, logDist); // distance in meters
+					
+					double err = realDist - invLog; //pow(invLog - realDist, 2);
+					
+					if(pRx < shortCutoff)
+					{
+						longErrorSum   += err;
+						longErrorCount ++;
+					}
+					else
+					{
+						shortErrorSum   += err;
+						shortErrorCount ++;
+					}
+				}
+			}
+			
+			double shortErrAvg = shortErrorSum / shortErrorCount;
+			double longErrAvg  =  longErrorSum /  longErrorCount;
+			error = (fabs(shortErrAvg) + fabs(longErrAvg)) / 2; // used for termination
+			
+			if(lastError1 == error)
+				zigZag = true;
+			
+			lastError1 = lastError;
+			lastError = error;
+			
+			shortStep = ((shortErrAvg > 0) ? -1 : 1) * fabs(shortStep) * stepChangeFactor;
+			longStep  = ((longErrAvg  > 0) ? -1 : 1) * fabs(longStep)  * stepChangeFactor;
+			
+			int ss = shortStep < 0 ? -1:1;
+			int ls = longStep  < 0 ? -1:1;
+			shortStep = qMax(stepFactor, fabs(shortStep)) * ss;
+			longStep  = qMax(stepFactor, fabs(longStep))  * ls;
+			
+			shortFactor += shortStep;
+			longFactor  += longStep;
+			
+			qDebug() << "MapGraphicsScene::deriveObservedLossFactor(): "<<numIterations<<":"<<error<<" (z:"<<zigZag<<"): shortErr:"<<shortErrAvg<<", longErr:"<<longErrAvg<<", shortFactor:"<<shortFactor<<", longFactor:"<<longFactor<<", shortStep:"<<shortStep<<", longStep:"<<longStep;
+			
+			numIterations ++;
+		}
+
+		lossFactor = QPointF( longFactor, shortFactor );
+	}
+
+	//qDebug() << "MapGraphicsScene::deriveObservedLossFactor(): "<<apMac<<": Derived: "<<lossFactor;
+	//qDebug() << "MapGraphicsScene::deriveObservedLossFactor(): "<<apMac<<": Debug: pTx:"<<pTx<<", gTx:"<<gTx<<" shortCutoff:"<<shortCutoff;
+	
+	return lossFactor;
+}
+
+double MapGraphicsScene::dBmToDistance(int dBm, QString apMac, double gRx)
+{
+	MapApInfo *info = apInfo(apMac);
+	QPointF n  = info->lossFactor;
+	int cutoff = info->shortCutoff;
+	double pTx = info->txPower;
+	double gTx = info->txGain;
+	return dBmToDistance(dBm, n, cutoff, pTx, gTx, gRx);
+}
+
+double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCutoff, double txPower, double txGain,  double rxGain)
+{
+// 	double n   = /* 1.60*/0; /// TUNE THIS 
+// 	n = apMacToDbm[ap1] < -49 ? 1.6 : 2.0;
+// 	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+// 	double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
+// 	double pTx = 11.80; // (dBm) - Transmit power, [1] est stock WRT54GL at 19 mW, [1]=http://forums.speedguide.net/showthread.php?253953-Tomato-and-Linksys-WRT54GL-transmit-power
+// 	double pRx = apMacToDbm[ap1]; /// Our measurement
+// 	double gTx =  5.00; // (dBi) - Gain of stock WRT54GL antennas
+// 	double gRx =  3.00; // (dBi) - Estimated gain of laptop antenna, neg dBi. Internal atennas for phones/laptops range from (-3,+3)
+	
+	// NOTE Formula used below is from from http://web.mysites.ntu.edu.sg/aschfoh/public/Shared%20Documents/pub/04449717-icics07.pdf
+	// double logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log(m) - 20*log(4*Pi));
+	
+	// Possibly integrate method of solving loss factor as described in http://continuouswave.com/whaler/reference/pathLoss.html 
+	
+	// Alternative forumla given at http://www.moxa.com/newsletter/connection/2008/03/Figure_out_transmission_distance_from_wireless_device_specs.htm#04
+	// Merging the two provided gives:
+	// r=pow(10,(pTx+(gTx+gRx)*n-pRx)/20) / (41.88 * f) where r is in km and f is the frequency, e.g. 2442
+	
+	
+	// n is the loss factor describing obstacles, walls, reflection, etc, can be derived from existing data with driveObservedLossFactor()
+	double n   = dBm < shortCutoff ? lossFactor.x() : lossFactor.y();
+	
+	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+	double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
+	
+	double logDist = (1/(10*n)) * (txPower - dBm + txGain + rxGain - Xa + 20*log10(m) - 20*log10(4*Pi));
+	double distMeters = pow(10, logDist); // distance in meters
+	
+	//qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain;
+	
+	return distMeters;
+}
+	
 	
 void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 {
@@ -1655,15 +2106,18 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
+	#ifdef Q_OS_ANDROID
 	double half = m_longPressSpinner->boundingRect().width()/2;
 	int fingertipAdjust = 0;
-	#ifdef Q_OS_ANDROID
+	
 	// TODO Is there some OS preference that indicates right or left handed usage?
 	//fingertipAdjust = -half/3;
 	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
-	#endif
 	
 	m_longPressSpinner->setPos(m_pressPnt - QPointF(half - fingertipAdjust,half));
+	#else
+	m_longPressSpinner->setPos(m_pressPnt);
+	#endif
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
@@ -2806,7 +3260,7 @@ void MapGraphicsScene::renderComplete(QPicture pic)
 	
 	if(m_firstRender) // first render after load, init view
 	{
-		m_mapWindow->gv()->resetTransform();
+		m_mapWindow->gv()->reset();
 		m_mapWindow->gv()->scaleView(m_viewScale);
 		m_mapWindow->gv()->horizontalScrollBar()->setValue(m_scrollHPos);
 		m_mapWindow->gv()->verticalScrollBar()->setValue(m_scrollVPos);
@@ -3263,7 +3717,8 @@ void MapGraphicsScene::saveResults(QString filename)
 		data.setValue("mfg",		info->mfg);
 		data.setValue("txpower",	info->txPower);
 		data.setValue("txgain",		info->txGain);
-		data.setValue("lossfactor",	info->lossFactor);
+		data.setValue("lossfactor",	qPointFToString(info->lossFactor));
+		data.setValue("shortcutoff",	info->shortCutoff);
 	}
 	data.endArray();
 		
@@ -3360,10 +3815,15 @@ void MapGraphicsScene::loadResults(QString filename)
 		QColor color   = data.value("color").toString();
 		bool render    = data.value("renderap", true).toBool();
 		
-		QString mfg    = data.value("mfg", "").toString();
-		double txPower = data.value("txpower",	11.8).toDouble();  // dBm, Linksys WRT54 Default TX power (approx)
-		double txGain  = data.value("txgain",    5.0).toDouble();  // dBi, Linksys WRT54 Stock Antenna Gain (approx)
-		double lossf   = data.value("lossfactor", 1.0).toDouble(); // loss factor - arbitrary tuning parameter, typically in the range of [-1.0,5.0]
+		QString mfg    = data.value("mfg", "").toString(); // TODO build chart of [txpower,txgain] based on mfg [which can be drived from MAC OUI]
+		double txPower = data.value("txpower",	11.8).toDouble();  // dBm, 11.9 dBm = 19 mW (approx) = Linksys WRT54 Default TX power (approx)
+		double txGain  = data.value("txgain",    5.0).toDouble();  // dBi,  5.0 dBi = Linksys WRT54 Stock Antenna Gain (approx)
+		QPointF lossf  = qPointFFromString(data.value("lossfactor", "").toString());
+				// lossfactor.x() and .y() are arbitrary tuning parameters X and Y, typically in the range of [-1.0,5.0]
+				// (formula variable 'n' for short and far dBms, respectively)
+		int shortCutoff = data.value("shortcutoff", -49).toInt();
+				   // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
+				   // (less than shortCutoff [close to AP], use X, greater [farther from AP] - use Y)
 		
 		if(!color.isValid())
 		{
@@ -3382,6 +3842,7 @@ void MapGraphicsScene::loadResults(QString filename)
 		info->txPower	= txPower;
 		info->txGain	= txGain;
 		info->lossFactor = lossf;
+		info->shortCutoff = shortCutoff;
 		
 		if(marked)
 			addApMarker(point, apMac);
@@ -3393,8 +3854,9 @@ void MapGraphicsScene::loadResults(QString filename)
 	qDebug() << "MapGraphicsScene::loadResults(): Reading numReadings: "<<numReadings;
 	for(int i=0; i<numReadings; i++)
 	{
-		/*qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
-		if(i != numReadings - 2)
+		/*
+		qDebug() << "MapGraphicsScene::loadResults(): i: "<<i<<" / "<<numReadings;
+		if(i != numReadings - 3)
 			continue; /// NOTE just for debugging triangulation/trilateration - REMOVE for production!
 		*/	
 		data.setArrayIndex(i);

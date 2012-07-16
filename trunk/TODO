@@ -13,7 +13,7 @@ Core Items TODO:
 		- For now, added #ifndef Q_OS_ANDROID - TODO make it configurable
 	- NEED TO BE ABLE TO REMOVE MARKERS
 	
-Enhancmenets:
+Enhancements:
 	- Add RSSI sparkline to HUD next to each AP (or behind/over the AP text to save space) 
 	- Add FTP upload/download "feature" to upload/download backgrounds/wmz files for "cloud" storage
 		- Example C++ code:
@@ -29,6 +29,7 @@ Enhancmenets:
 			my $oui_cmd = "wget http://iphone.aruljohn.com/mac/mac.pl?mac=$mac -O - 2>/dev/null";
 			my $oui_raw = `$oui_cmd`;
 			my ($mfg) = $oui_raw =~ /<h2>(.*?)<\/h2>/i;
+	- Add "instant mark" (no longpress)
 
 
 Android TODO:
