@@ -7,6 +7,10 @@
 //#include <QGeoPositionInfoSource>
 #endif
 
+#ifdef OPENCV_ENABLED
+#include "KalmanFilter.h"
+#endif
+
 #include "WifiDataCollector.h"
 
 class MapGraphicsView : public QGraphicsView
@@ -407,6 +411,10 @@ protected:
 	int m_scrollHPos;
 	int m_scrollVPos;
 	double m_viewScale;
+	
+	#ifdef OPENCV_ENABLED
+	KalmanFilter m_kalman;
+	#endif
 	
 	
 };
