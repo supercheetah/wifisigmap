@@ -573,6 +573,11 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
 	QTimer::singleShot(1000, this, SLOT(debugTest()));
+	
+	#ifdef OPENCV_ENABLED
+	m_kalman.predictionBegin(0,0);
+	#endif
+
 }
 
 MapGraphicsScene::~MapGraphicsScene()
@@ -1734,8 +1739,20 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 			
 		p.setBrush(QColor(0,0,0,127));
 		p.drawEllipse(avgPoint2, penWidth, penWidth);
-	}
 		
+		#ifdef OPENCV_ENABLED
+		m_kalman.predictionUpdate((float)avgPoint2.x(), (float)avgPoint2.y());
+		
+		float x = avgPoint2.x(), y = avgPoint2.y();
+		m_kalman.predictionReport(x, y);
+		QPointF thisPredict(x,y);
+		
+		p.setPen(QPen(Qt::blue, 15.));
+			
+		p.setBrush(QColor(0,0,0,127));
+		p.drawEllipse(thisPredict, penWidth, penWidth);
+		#endif
+	}
 	
 /*	
 	p.setPen(QPen(Qt::blue,penWidth));
