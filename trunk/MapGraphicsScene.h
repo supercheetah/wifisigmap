@@ -200,6 +200,8 @@ public:
 		, txPower(11.9)
 		, txGain(5.0)
 		, lossFactor(2.,2.)
+		, lossFactorKey(0) // init to 0, not -1, because -1 means user specified lossFactor,
+		// but 0 means auto calculate (and store points used in lossFactoryKey to regenerate if # points changes)
 		, shortCutoff(-49)
 		{}
 		
@@ -216,6 +218,7 @@ public:
 	double  txGain;  // dBi,  5.0 dBi = Linksys WRT54 Stock Antenna Gain (approx)
 	QPointF lossFactor; // arbitrary tuning parameters X and Y, typically in the range of [-1.0,5.0]
 			    // (formula variable 'n' for short and far dBms, respectively)
+	int lossFactorKey; // A 'cache key' - when auto-deriving loss factor, this is set to the # of points used, or -1 if the user manually specifies loss factor (TODO) 
 	int shortCutoff; // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
 			 // (less than shortFactorCutoff [close to AP], use X, greater [farther from AP] - use Y)
 	

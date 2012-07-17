@@ -1203,8 +1203,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		return;
 
 	/// JUST for debugging
-// 	realPoint = m_sigValues.last()->point;
-// 	results   = m_sigValues.last()->scanResults;
+	realPoint = m_sigValues.last()->point;
+	results   = m_sigValues.last()->scanResults;
 	
 
 
@@ -1658,43 +1658,54 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
 		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
 		
-		qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1;
+		qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
 		
-		userPoly << calcPoint;
-		
-		QColor color0 = baseColorForAp(ap0);
-		if(!drawnFlag.contains(ap0))
+		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+		else
 		{
-			drawnFlag.insert(ap0, true);
+			userPoly << calcPoint;
+			
+			QColor color0 = baseColorForAp(ap0);
+			if(!drawnFlag.contains(ap0))
+			{
+				drawnFlag.insert(ap0, true);
+				
+				p.setPen(QPen(color0, penWidth));
+				
+				if(isnan(r0))
+					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+				else
+					p.drawEllipse(p0, r0, r0);
+			}
+			
+			QColor color1 = baseColorForAp(ap1);
+	
+			if(!drawnFlag.contains(ap1))
+			{
+				drawnFlag.insert(ap1, true);
+				
+				p.setPen(QPen(color1, penWidth));
+				
+				if(isnan(r1))
+					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+				else
+					p.drawEllipse(p1, r1, r1);
+				
+			}
 			
 			p.setPen(QPen(color0, penWidth));
-			p.drawEllipse(p0, r0, r0);
-		}
-		
-		QColor color1 = baseColorForAp(ap1);
-
-		if(!drawnFlag.contains(ap1))
-		{
-			drawnFlag.insert(ap1, true);
+			p.drawLine(p0, calcPoint);
 			
 			p.setPen(QPen(color1, penWidth));
-			p.drawEllipse(p1, r1, r1);
+			p.drawLine(p1, calcPoint);
+			
+			avgPoint2 += calcPoint;
+			count ++;
 		}
 		
 		p.setPen(QPen(Qt::gray, penWidth));
 		p.drawLine(p0, p1);
-		
-		p.setPen(QPen(color0, penWidth));
-		p.drawLine(p0, calcPoint);
-		
-		p.setPen(QPen(color1, penWidth));
-		p.drawLine(p1, calcPoint);
-		
-		if(!isnan(calcPoint.x()) && !isnan(calcPoint.y()))
-		{
-			avgPoint2 += calcPoint;
-			count ++;
-		}
 		
 		//break;
 	}
@@ -1711,11 +1722,20 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	p.setPen(QPen(Qt::green, 10.));
 	p.setBrush(QColor(0,0,0,127));
-	p.drawEllipse(avgPoint, penWidth, penWidth);
+	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+		p.drawEllipse(avgPoint, penWidth, penWidth);
 	
-	p.setPen(QPen(Qt::yellow, 10.));
-	p.setBrush(QColor(0,0,0,127));
-	p.drawEllipse(avgPoint2, penWidth, penWidth);
+	if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
+	{
+		if(avgPoint == avgPoint2)
+			p.setPen(QPen(Qt::yellow, 10.));
+		else
+			p.setPen(QPen(Qt::red, 10.));
+			
+		p.setBrush(QColor(0,0,0,127));
+		p.drawEllipse(avgPoint2, penWidth, penWidth);
+	}
+		
 	
 /*	
 	p.setPen(QPen(Qt::blue,penWidth));
@@ -1799,18 +1819,24 @@ QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dB
 	MapApInfo *inf0 = apInfo(ap0);
 	MapApInfo *inf1 = apInfo(ap1);
 	
-	if(inf0->lossFactor.isNull())
+	if(inf0->lossFactor.isNull() ||
+	  (inf0->lossFactorKey > -1 && inf0->lossFactorKey != m_sigValues.size()))
 	{
 		QPointF lossFactor0 = deriveObservedLossFactor(ap0);
+		
 		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
-		inf0->lossFactor = lossFactor0;
+		inf0->lossFactor    = lossFactor0;
+		inf0->lossFactorKey = m_sigValues.size();
 	}
 		
-	if(inf1->lossFactor.isNull())
+	if(inf1->lossFactor.isNull() ||
+	  (inf1->lossFactorKey > -1 && inf1->lossFactorKey != m_sigValues.size()))
 	{
 		QPointF lossFactor1 = deriveObservedLossFactor(ap1);
+		
 		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
-		inf1->lossFactor = lossFactor1;
+		inf1->lossFactor    = lossFactor1;
+		inf1->lossFactorKey = m_sigValues.size();
 	}
 	
 	// Get location of APs (in pixels, obviously)
@@ -1828,7 +1854,7 @@ QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dB
 // 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
 // 	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
 // 	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
-// 	
+	
 	/*
 	
 	  C
@@ -1840,22 +1866,20 @@ QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dB
 	A *--------* B
 	      c
 	
-	
 	*/
 	
 	// Calculate the angle (A)
 	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
-	double angA = acos(cosA)* 180.0 / Pi;
+	double angA = acos(cosA) * 180.0 / Pi;
 	
 	// Create a line from the appros AP and set it's angle to the calculated angle
 	QLineF userLine(p1,QPointF());
 	userLine.setAngle(angA + apLine.angle());
 	userLine.setLength(lb);
 	
-	
-	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): ang(A):"<<angA<<", cos(A):"<<cosA;
-	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): apLine.angle:"<<apLine.angle();
-	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): ang(A):"<<angA<<", cos(A):"<<cosA;
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): apLine.angle:"<<apLine.angle();
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
 	
 	
 	// Return the end-point of the line we just created - that's the point where 
@@ -2448,7 +2472,8 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 			p.drawEllipse(0,0,iconSize,iconSize);
 			
 			// Render signal percentage
-			QString sigString = QString("%1%").arg((int)(result.value * 100));
+			//QString sigString = QString("%1%").arg((int)(result.value * 100));
+			QString sigString = QString("%1d").arg((int)(result.dbm));
 			
 			// Calculate text location centered in icon
 			p.setFont(font);
