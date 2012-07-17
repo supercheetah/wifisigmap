@@ -109,12 +109,12 @@ MapWindow::MapWindow(QWidget *parent)
 	/// NOTE just for testing
 	//m_scene->loadResults("wmz/phc-firsttest.wmz");
 	//m_scene->loadResults("wmz/test.wmz");
-	//m_scene->loadResults("wmz/phcfirstrun.wmz");
+	m_scene->loadResults("wmz/phcfirstrun-track2.wmz");
 	//m_scene->loadResults("wmz/foobar.wmz");
 	//m_scene->loadResults("wmz/test-track3.wmz");
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/pci4000-livedata2.wmz");
-	m_scene->loadResults("wmz/pci-track-test.wmz");
+	//m_scene->loadResults("wmz/pci-track-test.wmz");
 	
 }
 
