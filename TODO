@@ -56,3 +56,17 @@ Location Notes:
 		http://math.stackexchange.com/questions/38925/least-squares-intersection-of-three-circles
 		http://stackoverflow.com/questions/5760582/how-to-define-the-intersection-of-three-circles
 	- Use Kalman filtering to smooth results
+
+Research Notes:
+	- Test bilinear/bicubic interpolation
+		- one example: http://cboard.cprogramming.com/game-programming/87890-bilinear-interpolation.html
+		- wikipedia:
+			- http://en.wikipedia.org/wiki/Bicubic_interpolation
+	- Use Kalman filter on dBm values
+	- Use window average function on dBms
+	- Setup quantifiable testing methodology to test accuracy of various methods
+	- Use bilinear interpolation to convert dBms to distances...?
+	- Test an ANN on dBm to distances?
+	
+		
+		
