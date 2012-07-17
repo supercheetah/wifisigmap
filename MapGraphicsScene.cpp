@@ -1204,15 +1204,6 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 // 		
 // 	firstScan = false;
 	
-	if(m_sigValues.isEmpty())
-		return;
-
-	/// JUST for debugging
-	realPoint = m_sigValues.last()->point;
-	results   = m_sigValues.last()->scanResults;
-	
-
-
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
 	
 	// Sort the results high-low
@@ -1220,6 +1211,15 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	m_lastScanResults = results;
 	update(); // allow HUD to update
+	
+	if(m_sigValues.isEmpty())
+		return;
+	
+	/// JUST for debugging
+	// 	realPoint = m_sigValues.last()->point;
+	// 	results   = m_sigValues.last()->scanResults;
+	//
+	
 	
 	QPointF userLocation  = QPointF(-1000,-1000);
 
@@ -1646,12 +1646,15 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 
 	QPointF avgPoint2(0.,0.);
 	count = 0;
-	
+
 // 	int numAps = apsVisible.size();
 	for(int i=0; i<numAps; i++)
 	{
-		QString ap0 = apsVisible[i];
-		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+// 		QString ap0 = apsVisible[i];
+// 		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+
+		QString ap0 = apsVisible[0];
+		QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
 		
 		QPointF p0 = apInfo(ap0)->point;
 		QPointF p1 = apInfo(ap1)->point;
@@ -1709,8 +1712,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 			count ++;
 		}
 		
-		p.setPen(QPen(Qt::gray, penWidth));
-		p.drawLine(p0, p1);
+		//p.setPen(QPen(Qt::gray, penWidth));
+		//p.drawLine(p0, p1);
 		
 		//break;
 	}
