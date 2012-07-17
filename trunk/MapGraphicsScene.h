@@ -207,7 +207,11 @@ public:
 		, lossFactorKey(0) // init to 0, not -1, because -1 means user specified lossFactor,
 		// but 0 means auto calculate (and store points used in lossFactoryKey to regenerate if # points changes)
 		, shortCutoff(-49)
-		{}
+		{
+			#ifdef OPENCV_ENABLED
+			kalman.predictionBegin(0,0);
+			#endif
+		}
 		
 	QString mac;
 	QString essid;
@@ -226,7 +230,9 @@ public:
 	int shortCutoff; // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
 			 // (less than shortFactorCutoff [close to AP], use X, greater [farther from AP] - use Y)
 	
-	
+	#ifdef OPENCV_ENABLED
+	KalmanFilter kalman;
+	#endif
 };
 
 class MapRenderOptions

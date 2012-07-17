@@ -1242,8 +1242,24 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		{
 			apsVisible << result.mac;
 			apMacToSignal.insert(result.mac, result.value);
+
+			#ifdef OPENCV_ENABLED
+			// Use Kalman to filter the dBm value
+			MapApInfo *info = apInfo(result.mac);
+			info->kalman.predictionUpdate(result.dbm, 0);
+
+			float value = (float)result.dbm, tmp = 0;
+			info->kalman.predictionReport(value, tmp);
+			apMacToDbm.insert(result.mac, (int)value);
+			result.dbm = (int)value;
+			
+			#else
+
 			apMacToDbm.insert(result.mac, result.dbm);
-			qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm; 
+			
+			#endif
+
+			qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
 		}
 	}
 	
