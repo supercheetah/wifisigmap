@@ -65,7 +65,13 @@ class SigMapValue
 public:
 	SigMapValue(QPointF p, QList<WifiDataResult> results)
 		: point(p)
-		, rxGain(0.)
+		, rxGain(
+		#ifdef Q_OS_ANDROID
+			-3
+		#else
+			+3
+		#endif
+		)
 		, rxMac("")
 		, timestamp(QDateTime::currentDateTime())
 		, lat(0.)

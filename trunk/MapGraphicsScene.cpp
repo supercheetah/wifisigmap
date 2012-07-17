@@ -3874,7 +3874,7 @@ void MapGraphicsScene::loadResults(QString filename)
 		QPointF point = qPointFFromString(data.value("point").toString());
 		
 		// Load other fields
-		double rxGain  = data.value("rxgain",0.).toDouble();
+		double rxGain  = data.value("rxgain",-3.).toDouble();
 		QString rxMac  = data.value("rxMac","").toString();
 		uint timestamp = data.value("timestamp",0).toUInt();
 		double lat     = data.value("lat",0.).toDouble();
