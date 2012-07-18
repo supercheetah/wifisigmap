@@ -267,6 +267,7 @@ public:
 		RenderRadial,
 		RenderCircles,
 		RenderTriangles,
+		RenderRectangles,
 	};
 	
 	RenderMode renderMode() { return m_renderMode; }

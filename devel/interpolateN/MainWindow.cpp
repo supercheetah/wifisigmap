@@ -487,6 +487,34 @@ MainWindow::MainWindow()
 		<< qPointValue(QPointF(w/2,h/2),	1.0)
 		<< qPointValue(QPointF(w,w),		0.5);
 
+//  	#define val(x) ( ((double)x) / 6. )
+//  	QList<qPointValue> points = QList<qPointValue>()
+//  		<< qPointValue(QPointF(0,0),	val(0))
+//  		
+// 		<< qPointValue(QPointF(w/4*1,h/4*1),	val(1))
+// 		<< qPointValue(QPointF(w/4*2,h/4*1),	val(2))
+// 		<< qPointValue(QPointF(w/4*3,h/4*1),	val(4))
+// 		<< qPointValue(QPointF(w/4*4,h/4*1),	val(1))
+// 		
+// 		<< qPointValue(QPointF(w/4*1,h/4*2),	val(6))
+// 		<< qPointValue(QPointF(w/4*2,h/4*2),	val(3))
+// 		<< qPointValue(QPointF(w/4*3,h/4*2),	val(5))
+// 		<< qPointValue(QPointF(w/4*4,h/4*2),	val(2))
+// 		
+// 		<< qPointValue(QPointF(w/4*1,h/4*3),	val(4))
+// 		<< qPointValue(QPointF(w/4*2,h/4*3),	val(2))
+// 		<< qPointValue(QPointF(w/4*3,h/4*3),	val(1))
+// 		<< qPointValue(QPointF(w/4*4,h/4*3),	val(5))
+// 		
+// 		<< qPointValue(QPointF(w/4*1,h/4*4),	val(5))
+// 		<< qPointValue(QPointF(w/4*2,h/4*4),	val(4))
+// 		<< qPointValue(QPointF(w/4*3,h/4*4),	val(2))
+// 		<< qPointValue(QPointF(w/4*4,h/4*4),	val(3))
+// 		
+// 		;
+// 
+// 	#undef val
+	
 	
 		
 	
@@ -558,13 +586,17 @@ MainWindow::MainWindow()
 	QList<QList<qPointValue> > quads;
 	
 	// Arbitrary rendering choices
+//	QImage img(w,h, QImage::Format_ARGB32_Premultiplied);
 	QImage img(400,400, QImage::Format_ARGB32_Premultiplied);
 	
 	QPainter p(&img);
 	// Move painter 50,50 so we have room for text (when debugging I rendered values over every point)
 	p.fillRect(img.rect(), Qt::white);
-	p.translate(50,50);
-	
+//	int topX=0, topY=0;
+ 	int topX=50, topY=50;
+  	p.translate(topX,topY);
+
+// 	
 	// This is the last stage of the algorithm - go thru the new point cloud and construct the actual sub-rectangles
 	// by starting with each point and proceding clockwise around the rectangle, getting the nearest point in each direction (X+,Y), (X,Y+) and (X-,Y)
 	foreach(qPointValue tl, outputList)
@@ -589,12 +621,12 @@ MainWindow::MainWindow()
 			// Here's the actual rendering of the interpolated quad
 			for(int y=(int)tl.point.y(); y<br.point.y(); y++)
 			{
-				QRgb* scanline = (QRgb*)img.scanLine(y+50);
+				QRgb* scanline = (QRgb*)img.scanLine(y+topY);
 				for(int x=(int)tl.point.x(); x<br.point.x(); x++)
 				{
 					double value = quadInterpolate(quad, (double)x, (double)y);
 					QColor color = colorForValue(value);
-					scanline[x+50] = color.rgba();
+					scanline[x+topX] = color.rgba();
 				}
 			}
 			
