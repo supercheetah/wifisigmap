@@ -238,6 +238,34 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 	return outputs;
 }
 
+qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool requireValid=false)
+{
+	/// \a dir: 0=X+, 1=Y+, 2=X-, 3=Y-
+	
+	qPointValue minPnt;
+	double minDist = (double)INT_MAX;
+	double origin  = dir == 0 || dir == 2 ? point.x() : point.y();
+
+	foreach(qPointValue v, list)
+	{
+		if(requireValid && !v.isValid())
+			continue;
+			
+		double val  = dir == 0 || dir == 2 ? v.point.x() : v.point.y();
+		double dist = fabs(val - origin);
+		if(((dir == 0 && v.point.y() == point.y() && val > origin) ||
+		    (dir == 1 && v.point.x() == point.x() && val > origin) ||
+		    (dir == 2 && v.point.y() == point.y() && val < origin) ||
+		    (dir == 3 && v.point.x() == point.x() && val < origin) )  &&
+		    dist < minDist)
+		{
+			minPnt = v;
+			minDist = dist;
+		}
+	}
+	
+	return minPnt;
+}
 
 QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> existingPoints, QRectF bounds, QPointF p1, QPointF p2, int dir)
 {
@@ -335,38 +363,44 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 				if(!hasPoint(existingPoints, point2) &&
 				   !hasPoint(outputs, point2))
 				{
-					// Get values for the ends of the line (assuming interpolated above)
-					qPointValue ic1 = getPoint(existingPoints, line2.p1());
-					if(ic1.isNull())
-						ic1 = getPoint(outputs, line2.p1());
+					// Intersected point, find nerest point +/-
 					
-					qPointValue ic2 = getPoint(existingPoints, line2.p2());
-					if(ic2.isNull())
-						ic2 = getPoint(outputs, line2.p2());
-						
-					if(ic1.isNull())
-					{
-						qDebug() << "ic1 logic error, quiting";
-						exit(-1);
-					}
+// 					// Get values for the ends of the line (assuming interpolated above)
+// 					qPointValue ic1 = getPoint(existingPoints, line2.p1());
+// 					if(ic1.isNull())
+// 						ic1 = getPoint(outputs, line2.p1());
+// 					
+// 					qPointValue ic2 = getPoint(existingPoints, line2.p2());
+// 					if(ic2.isNull())
+// 						ic2 = getPoint(outputs, line2.p2());
+// 						
+// 					if(ic1.isNull())
+// 					{
+// 						qDebug() << "ic1 logic error, quiting";
+// 						exit(-1);
+// 					}
+// 					
+// 					if(ic2.isNull())
+// 					{
+// 						qDebug() << "ic2 logic error, quiting";
+// 						exit(-1);
+// 					}
+
+					QList<qPointValue> combined;
+					combined << existingPoints << outputs;
 					
-					if(ic2.isNull())
-					{
-						qDebug() << "ic2 logic error, quiting";
-						exit(-1);
-					}
+					qPointValue pntAfter  = nearestPoint(combined, point2,     dir); // same dir
+					qPointValue pntBefore = nearestPoint(combined, point2, 5 - dir); // oposite dir (dir is 1 based, hence 5- instead of 4-)
+					double innerLineLength = QLineF(pntAfter.point, pntBefore.point).length();
 					
-					double innerPval[4] = { ic1.value, ic1.value/2, ic2.value/2, ic2.value };
+					double innerPval[4] = { pntBefore.value, pntBefore.value/2+pntBefore.value, pntAfter.value-pntAfter.value/2, pntAfter.value };
 			
-					double innerLineLength = line2.length();
-			
-					
 					
 					// Note we are using perpendicular point components to the cubicInterpolate() call above
 					double unitVal = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
 					double value = cubicInterpolate(innerPval, unitVal);
 					outputs << qPointValue(point2, value);
-					qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] New point: "<<point2<<", value:"<<value<<", corners: "<<ic1.value<<","<<ic2.value;
+					//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] New point: "<<point2<<", value:"<<value<<", before/after: "<<pntBefore.value<<" @ " << pntBefore.point << "," << pntAfter.value << " @ " << pntAfter.point;
 				}
 			}
 				
@@ -379,34 +413,6 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 }
 
 
-qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool requireValid=false)
-{
-	/// \a dir: 0=X+, 1=Y+, 2=X-, 3=Y-
-	
-	qPointValue minPnt;
-	double minDist = (double)INT_MAX;
-	double origin  = dir == 0 || dir == 2 ? point.x() : point.y();
-
-	foreach(qPointValue v, list)
-	{
-		if(requireValid && !v.isValid())
-			continue;
-			
-		double val  = dir == 0 || dir == 2 ? v.point.x() : v.point.y();
-		double dist = fabs(val - origin);
-		if(((dir == 0 && v.point.y() == point.y() && val > origin) ||
-		    (dir == 1 && v.point.x() == point.x() && val > origin) ||
-		    (dir == 2 && v.point.y() == point.y() && val < origin) ||
-		    (dir == 3 && v.point.x() == point.x() && val < origin) )  &&
-		    dist < minDist)
-		{
-			minPnt = v;
-			minDist = dist;
-		}
-	}
-	
-	return minPnt;
-}
 
 MainWindow::MainWindow()
 {
@@ -484,7 +490,7 @@ MainWindow::MainWindow()
 	QList<qPointValue> points = QList<qPointValue>()
 		<< qPointValue(QPointF(0,0), 		0.0)
 		//<< qPointValue(QPointF(w/3*2,h/3),	1.0)
-		<< qPointValue(QPointF(w/4*3,h/4),	1.0)
+		<< qPointValue(QPointF(w/4*3,h/4),	0.0)
 		<< qPointValue(QPointF(w/4,h/4*2),	1.0)
 		<< qPointValue(QPointF(w,w),		0.0);
 
