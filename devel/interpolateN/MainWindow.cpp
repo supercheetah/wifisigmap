@@ -482,10 +482,11 @@ MainWindow::MainWindow()
 // 		<< qPointValue(QPointF(0,h), 		0.0);
 
 	QList<qPointValue> points = QList<qPointValue>()
-		<< qPointValue(QPointF(0,0), 		0.5)
+		<< qPointValue(QPointF(0,0), 		0.0)
 		//<< qPointValue(QPointF(w/3*2,h/3),	1.0)
-		<< qPointValue(QPointF(w/2,h/2),	1.0)
-		<< qPointValue(QPointF(w,w),		0.5);
+		<< qPointValue(QPointF(w/4*3,h/4),	1.0)
+		<< qPointValue(QPointF(w/4,h/4*2),	1.0)
+		<< qPointValue(QPointF(w,w),		0.0);
 
 //  	#define val(x) ( ((double)x) / 6. )
 //  	QList<qPointValue> points = QList<qPointValue>()
@@ -630,16 +631,16 @@ MainWindow::MainWindow()
 				}
 			}
 			
-// 			QVector<QPointF> vec;
-// 			vec <<tl.point<<tr.point<<br.point<<bl.point;
-// 			p.setPen(QColor(0,0,0,127));
-// 			p.drawPolygon(vec);
-// 			
-// 			p.setPen(Qt::gray);
-// 			p.drawText(tl.point, QString().sprintf("%.02f",tl.value));
-// 			p.drawText(tr.point, QString().sprintf("%.02f",tr.value));
-// 			p.drawText(bl.point, QString().sprintf("%.02f",bl.value));
-// 			p.drawText(br.point, QString().sprintf("%.02f",br.value));
+			QVector<QPointF> vec;
+			vec <<tl.point<<tr.point<<br.point<<bl.point;
+			p.setPen(QColor(0,0,0,127));
+			p.drawPolygon(vec);
+
+			p.setPen(Qt::gray);
+			p.drawText(tl.point, QString().sprintf("%.02f",tl.value));
+			p.drawText(tr.point, QString().sprintf("%.02f",tr.value));
+			p.drawText(bl.point, QString().sprintf("%.02f",bl.value));
+			p.drawText(br.point, QString().sprintf("%.02f",br.value));
 		}
 	}
 	
