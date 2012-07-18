@@ -23,7 +23,7 @@ static const double Pi2 = Pi * 2.;
 
 // #ifdef Q_OS_ANDROID
 	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderCircles
-	//#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
+//	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
 // #else
 // 	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRadial
 // #endif
@@ -1214,7 +1214,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	m_lastScanResults = results;
 	update(); // allow HUD to update
 	
-	//return;
+	return;
 	
 	if(m_sigValues.isEmpty())
 		return;
@@ -2583,6 +2583,8 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	item->setZValue(99);
 	
+	item->setOpacity(0);
+	
 	// Add pointer to the item in the scene to the signal value for turning on/off per user
 	val->marker = item;
 	
@@ -3100,6 +3102,36 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 }
 
 
+
+qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool requireValid=false)
+{
+	/// \a dir: 0=X+, 1=Y+, 2=X-, 3=Y-
+	
+	qPointValue minPnt;
+	double minDist = (double)INT_MAX;
+	double origin  = dir == 0 || dir == 2 ? point.x() : point.y();
+
+	foreach(qPointValue v, list)
+	{
+		if(requireValid && !v.isValid())
+			continue;
+			
+		double val  = dir == 0 || dir == 2 ? v.point.x() : v.point.y();
+		double dist = fabs(val - origin);
+		if(((dir == 0 && v.point.y() == point.y() && val > origin) ||
+		    (dir == 1 && v.point.x() == point.x() && val > origin) ||
+		    (dir == 2 && v.point.y() == point.y() && val < origin) ||
+		    (dir == 3 && v.point.x() == point.x() && val < origin) )  &&
+		    dist < minDist)
+		{
+			minPnt = v;
+			minDist = dist;
+		}
+	}
+	
+	return minPnt;
+}
+
 QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> existingPoints, QRectF bounds, QPointF p1, QPointF p2, int dir)
 {
 	QLineF boundLine(p1,p2);
@@ -3196,38 +3228,44 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 				if(!hasPoint(existingPoints, point2) &&
 				   !hasPoint(outputs, point2))
 				{
-					// Get values for the ends of the line (assuming interpolated above)
-					qPointValue ic1 = getPoint(existingPoints, line2.p1());
-					if(ic1.isNull())
-						ic1 = getPoint(outputs, line2.p1());
+					// Intersected point, find nerest point +/-
 					
-					qPointValue ic2 = getPoint(existingPoints, line2.p2());
-					if(ic2.isNull())
-						ic2 = getPoint(outputs, line2.p2());
-						
-					if(ic1.isNull())
-					{
-						qDebug() << "ic1 logic error, quiting";
-						exit(-1);
-					}
+// 					// Get values for the ends of the line (assuming interpolated above)
+// 					qPointValue ic1 = getPoint(existingPoints, line2.p1());
+// 					if(ic1.isNull())
+// 						ic1 = getPoint(outputs, line2.p1());
+// 					
+// 					qPointValue ic2 = getPoint(existingPoints, line2.p2());
+// 					if(ic2.isNull())
+// 						ic2 = getPoint(outputs, line2.p2());
+// 						
+// 					if(ic1.isNull())
+// 					{
+// 						qDebug() << "ic1 logic error, quiting";
+// 						exit(-1);
+// 					}
+// 					
+// 					if(ic2.isNull())
+// 					{
+// 						qDebug() << "ic2 logic error, quiting";
+// 						exit(-1);
+// 					}
+
+					QList<qPointValue> combined;
+					combined << existingPoints << outputs;
 					
-					if(ic2.isNull())
-					{
-						qDebug() << "ic2 logic error, quiting";
-						exit(-1);
-					}
+					qPointValue pntAfter  = nearestPoint(combined, point2,     dir); // same dir
+					qPointValue pntBefore = nearestPoint(combined, point2, 5 - dir); // oposite dir (dir is 1 based, hence 5- instead of 4-)
+					double innerLineLength = QLineF(pntAfter.point, pntBefore.point).length();
 					
-					double innerPval[4] = { ic1.value, ic1.value/2, ic2.value/2, ic2.value };
+					double innerPval[4] = { pntBefore.value, pntBefore.value/2+pntBefore.value, pntAfter.value-pntAfter.value/2, pntAfter.value };
 			
-					double innerLineLength = line2.length();
-			
-					
 					
 					// Note we are using perpendicular point components to the cubicInterpolate() call above
 					double unitVal = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
 					double value = cubicInterpolate(innerPval, unitVal);
 					outputs << qPointValue(point2, value);
-					qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] New point: "<<point2<<", value:"<<value<<", corners: "<<ic1.value<<","<<ic2.value;
+					//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] New point: "<<point2<<", value:"<<value<<", before/after: "<<pntBefore.value<<" @ " << pntBefore.point << "," << pntAfter.value << " @ " << pntAfter.point;
 				}
 			}
 				
@@ -3238,37 +3276,6 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 	
 	return outputs;
 }
-
-
-qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool requireValid=false)
-{
-	/// \a dir: 0=X+, 1=Y+, 2=X-, 3=Y-
-	
-	qPointValue minPnt;
-	double minDist = (double)INT_MAX;
-	double origin  = dir == 0 || dir == 2 ? point.x() : point.y();
-
-	foreach(qPointValue v, list)
-	{
-		if(requireValid && !v.isValid())
-			continue;
-			
-		double val  = dir == 0 || dir == 2 ? v.point.x() : v.point.y();
-		double dist = fabs(val - origin);
-		if(((dir == 0 && v.point.y() == point.y() && val > origin) ||
-		    (dir == 1 && v.point.x() == point.x() && val > origin) ||
-		    (dir == 2 && v.point.y() == point.y() && val < origin) ||
-		    (dir == 3 && v.point.x() == point.x() && val < origin) )  &&
-		    dist < minDist)
-		{
-			minPnt = v;
-			minDist = dist;
-		}
-	}
-	
-	return minPnt;
-}
-
 
 void SigMapRenderer::render()
 {
@@ -3315,7 +3322,7 @@ void SigMapRenderer::render()
 	if(m_gs->m_renderMode == MapGraphicsScene::RenderRectangles)
 	{
 		QRectF rect(0,0,300,300);
-		double w = rect.width(), h = rect.height();
+		//double w = rect.width(), h = rect.height();
 	
 		// Rectangle Bicubic Interpolation
 		
@@ -3394,7 +3401,7 @@ void SigMapRenderer::render()
 // 		{
 		QString apMac = apMacToEssid.keys().at(1);
 		QList<qPointValue> points;
-		MapApInfo *info = m_gs->apInfo(apMac);
+		//MapApInfo *info = m_gs->apInfo(apMac);
 			
 		//QPointF center = info->point;
 		
@@ -3437,7 +3444,7 @@ void SigMapRenderer::render()
 		
 	
 		// Sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
-		//qSort(points.begin(), points.end(), qPointValue_sort_point);
+		qSort(points.begin(), points.end(), qPointValue_sort_point);
 		
 		// Find the bounds of the point cloud given so we can then subdivide it into smaller rectangles as needed:
 		QRectF bounds;
@@ -3505,7 +3512,7 @@ void SigMapRenderer::render()
 		QImage tmpImg(origSize, QImage::Format_ARGB32_Premultiplied);
 		QPainter p2(&tmpImg);
 		p2.fillRect(tmpImg.rect(), Qt::transparent);
-		p2.end();
+		//p2.end();
 		
 // 		// Arbitrary rendering choices
 // 	//	QImage img(w,h, QImage::Format_ARGB32_Premultiplied);
@@ -3552,16 +3559,17 @@ void SigMapRenderer::render()
 					}
 				}
 				
-	// 			QVector<QPointF> vec;
-	// 			vec <<tl.point<<tr.point<<br.point<<bl.point;
-	// 			p.setPen(QColor(0,0,0,127));
-	// 			p.drawPolygon(vec);
-	// 			
-	// 			p.setPen(Qt::gray);
-	// 			p.drawText(tl.point, QString().sprintf("%.02f",tl.value));
-	// 			p.drawText(tr.point, QString().sprintf("%.02f",tr.value));
-	// 			p.drawText(bl.point, QString().sprintf("%.02f",bl.value));
-	// 			p.drawText(br.point, QString().sprintf("%.02f",br.value));
+				QVector<QPointF> vec;
+				vec <<tl.point<<tr.point<<br.point<<bl.point;
+				//p2.setPen(QColor(0,0,0,127));
+				p2.setPen(Qt::white);
+				p2.drawPolygon(vec);
+				
+				p2.setPen(Qt::gray);
+				p2.drawText(tl.point, QString().sprintf("%.02f",tl.value));
+				p2.drawText(tr.point, QString().sprintf("%.02f",tr.value));
+				p2.drawText(bl.point, QString().sprintf("%.02f",bl.value));
+				p2.drawText(br.point, QString().sprintf("%.02f",br.value));
 			}
 		}
 		
@@ -3618,7 +3626,7 @@ void SigMapRenderer::render()
 			}
 		}
 		*/
-		//img.save("interpolate.jpg");
+		tmpImg.save("interpolate.jpg");
 	
 		//setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
 		
@@ -4249,7 +4257,7 @@ void SigMapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
 	//qDebug() << "SigMapItem::paint: option->exposedRect:"<<option->exposedRect<<", m_offset:"<<m_offset<<", m_img.size():"<<m_img.size();
 		
 	painter->save();
-	painter->setOpacity(0.75);
+	//painter->setOpacity(0.75);
 	painter->setClipRect( option->exposedRect );
 	
 	if(m_internalCache && 
