@@ -424,7 +424,8 @@ void WifiDataCollector::scanWifi()
 	interface = findWlanIf();
 	if(interface.isEmpty())
 		// scan3.txt is just some sample data I captured for use in development
-		debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
+		//debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
+		debugTextFile = QString("scan3.txt");
 #endif
 
 	// Read input from debug file or the actual wifi card
