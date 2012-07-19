@@ -67,6 +67,7 @@ Research Notes:
 	- Setup quantifiable testing methodology to test accuracy of various methods
 	- Use bilinear interpolation to convert dBms to distances...?
 	- Test an ANN on dBm to distances?
+	- Integrate with lightmaps demo from qt 4.7
 	
 		
 		
