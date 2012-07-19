@@ -32,7 +32,7 @@
 				if(qt_origMsgHandler)
 					qt_origMsgHandler(type,msg);
 				else
-					fprintf(stderr, "Debug: %s\n", msg);
+					fprintf(stderr, "%s\n", msg);
 				break;
 			case QtWarningMsg:
 				if(qt_debugSocket->state() == QAbstractSocket::ConnectedState)
