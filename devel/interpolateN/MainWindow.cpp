@@ -1,5 +1,17 @@
 #include <QtGui>
 
+#define qDrawTextCp(p,pnt,string,c1,c2) 	\
+	p.setPen(c1);			\
+	p.drawText(pnt + QPoint(-1, -1), string);	\
+	p.drawText(pnt + QPoint(+1, -1), string);	\
+	p.drawText(pnt + QPoint(+1, +1), string);	\
+	p.drawText(pnt + QPoint(-1, +1), string);	\
+	p.setPen(c2);			\
+	p.drawText(pnt, string);	\
+	
+#define qDrawTextOp(p,pnt,string) 	\
+	qDrawTextCp(p,pnt,string,Qt::black,Qt::white);
+
 class MainWindow : public QLabel {
 	public:
 		MainWindow();
@@ -14,9 +26,14 @@ int main(int argc, char **argv)
 	return app.exec();
 }
 
+#define fuzzyIsEqual(a,b) ( fabs(a - b) < 0.00001 )
+//#define fuzzyIsEqual(a,b) ( ((int) a) == ((int) b) )
+
+
 QColor colorForValue(double v)
 {
-	return QColor::fromHsv((int)((1-v) * 359), 255, 255);
+	int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
+	return QColor::fromHsv(hue, 255, 255);
 }
 
 class qPointValue {
@@ -79,7 +96,7 @@ double nCubicInterpolate (int n, double* p, double coordinates[]) {
 	}
 }
 
-bool newQuad = false;
+//bool newQuad = false;
 double quadInterpolate(QList<qPointValue> corners, double x, double y)
 {
 	double w = corners[2].point.x() - corners[0].point.x();
@@ -117,7 +134,7 @@ double quadInterpolate(QList<qPointValue> corners, double x, double y)
 		//{
 			//qDebug() << "bicubicInterpolate: unit:"<<unitX<<","<<unitY<<": p2:"<<p2<<", w:"<<w<<", h:"<<h<<", x:"<<x<<", y:"<<y<<", corners:"<<corners[0].point<<corners[1].point<<corners[2].point<<corners[3].point<<", v:"<<c1<<c2<<c3<<c4;
 			
-			newQuad = false;
+			//newQuad = false;
 		//}
 		
 		return p2;
@@ -141,9 +158,9 @@ double quadInterpolate(QList<qPointValue> corners, double x, double y)
 
 bool qPointValue_sort_point(qPointValue a, qPointValue b)
 {
-	return a.point.y() == b.point.y() ?
-		a.point.x() < b.point.x() :
-		a.point.y() < b.point.y();
+	return  fuzzyIsEqual(a.point.y(), (int)b.point.y()) ?
+		(int)a.point.x()  < (int)b.point.x() :
+		(int)a.point.y()  < (int)b.point.y();
 }
 
 bool hasPoint(QList<qPointValue> list, QPointF point)
@@ -189,8 +206,27 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 	{
 		c2 = getPoint(inputs, boundLine.p2());
 	}
-		
-	double pval[4] = { c1.value, c1.value/2, c2.value/2, c2.value };
+	
+	if(dir == 1 || dir == 3)
+	{
+		if(c1.point.x() > c2.point.x())
+		{
+			qPointValue tmp = c1;
+			c1 = c2;
+			c2 = tmp;
+		}
+	}
+	else
+	{
+		if(c1.point.y() > c2.point.y())
+		{
+			qPointValue tmp = c1;
+			c1 = c2;
+			c2 = tmp;
+		}
+	}
+	
+	double pval[4] = { c1.value, c1.value, c2.value, c2.value };
 	 
 	double lineLength = boundLine.length();
 	
@@ -253,10 +289,10 @@ qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool r
 			
 		double val  = dir == 0 || dir == 2 ? v.point.x() : v.point.y();
 		double dist = fabs(val - origin);
-		if(((dir == 0 && v.point.y() == point.y() && val > origin) ||
-		    (dir == 1 && v.point.x() == point.x() && val > origin) ||
-		    (dir == 2 && v.point.y() == point.y() && val < origin) ||
-		    (dir == 3 && v.point.x() == point.x() && val < origin) )  &&
+		if(((dir == 0 && fuzzyIsEqual(v.point.y(), point.y()) && val > origin) ||
+		    (dir == 1 && fuzzyIsEqual(v.point.x(), point.x()) && val > origin) ||
+		    (dir == 2 && fuzzyIsEqual(v.point.y(), point.y()) && val < origin) ||
+		    (dir == 3 && fuzzyIsEqual(v.point.x(), point.x()) && val < origin) )  &&
 		    dist < minDist)
 		{
 			minPnt = v;
@@ -451,17 +487,22 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 						 //          + (x - corners[0].point.x()) / w * corners[2].value;
 						
 						double p1  = (unit12 - point2.y()) / unitLen1 * val11
-						           + (point2.y() - unit11) / unitLen2 * val12;
+						           + (point2.y() - unit11) / unitLen1 * val12;
 
 						//double val1 = fr1 * (unit1 / 2.);
 						//double val2 =  p1 * (unit2 / 2.);
 
 						//value = val1 + val2;
 						value = (fr1 + p1) / 2.;
-// 						qDebug() << "dir[1||3]: unit1[1,2]:["<<unit11<<","<<unit12<<"], val1[1,2]:["<<val11<<","<<val12<<"]";
-// 						qDebug() << "dir[1||3]: unit2[1,2]:["<<unit21<<","<<unit22<<"], val2[1,2]:["<<val21<<","<<val22<<"]";
-// 						qDebug() << "dir[1||3]: unitLen[1,2]:["<<unitLen1<<","<<unitLen2<<"],unit[1,2]:["<<unit1<<","<<unit2<<"]";
-// 						qDebug() << "dir[1||3]: fr1:"<<fr1<<", p1:"<<p1<<", val1:"<<val1<<", val2:"<<val2<<", value:"<<value;
+						if(value < 0 || value > 1)
+						{
+							qDebug() << "** Value out of range: "<<value<<", calcs:";
+							qDebug() << "\t dir[1||3]: point2:"<<point2<<", p1a:"<<((unit12 - point2.y()) / unitLen1) <<", p1b:" << ((point2.y() - unit11) / unitLen2);
+							qDebug() << "\t dir[1||3]: unit1[1,2]:["<<unit11<<","<<unit12<<"], val1[1,2]:["<<val11<<","<<val12<<"]";
+							qDebug() << "\t dir[1||3]: unit2[1,2]:["<<unit21<<","<<unit22<<"], val2[1,2]:["<<val21<<","<<val22<<"]";
+							qDebug() << "\t dir[1||3]: unitLen[1,2]:["<<unitLen1<<","<<unitLen2/*<<"],unit[1,2]:["<<unit1<<","<<unit2*/<<"]";
+							qDebug() << "\t dir[1||3]: fr1:"<<fr1<<", p1:"<<p1<</*", val1:"<<val1<<", val2:"<<val2<<*/", value:"<<value;
+						}
 					}
 					else
 					//if(dir == 1 || dir == 3)
@@ -492,7 +533,7 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 						//          + (x - corners[0].point.x()) / w * corners[2].value;
 						
 						double p1  = (unit12 - point2.x()) / unitLen1 * val11
-						           + (point2.x() - unit11) / unitLen2 * val12;
+						           + (point2.x() - unit11) / unitLen1 * val12;
 						
 						//double val1 = fr1 * (unit1 / 2.);
 						//double val2 =  p1 * (unit2 / 2.);
@@ -501,11 +542,14 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 						value = (fr1 + p1) / 2.;
 					}
 
-// 					qDebug() << "testLine: bound:"<<boundLine<<" -> line:"<<line<<" ["<<dir<<"/2]";
-// 					qDebug() << "[inner] " << dir << ": New point: "<<point2<<" \t value:"<<QString().sprintf("%.02f",value).toDouble()<< "\n"
-// 							<< " \t before/after: "<<pntBefore.value<<" @ " << pntBefore.point << " -> " << pntAfter.value << " @ " << pntAfter.point << "\n"
-// 							<< " \t pre/post:     "<<pntPre.value   <<" @ " << pntPre.point    << " -> " << pntPost.value << " @ " << pntPost.point;
-
+					if(value < 0 || value > 1)
+					{
+						qDebug() << "testLine: bound:"<<boundLine<<" -> line:"<<line<<" ["<<dir<<"/2]";
+						qDebug() << "[inner] " << dir << ": New point: "<<point2<<" \t value:"<<QString().sprintf("%.02f",value).toDouble()<< "\n"
+								<< " \t before/after: "<<pntBefore.value<<" @ " << pntBefore.point << " -> " << pntAfter.value << " @ " << pntAfter.point << "\n"
+								<< " \t pre/post:     "<<pntPre.value   <<" @ " << pntPre.point    << " -> " << pntPost.value << " @ " << pntPost.point;
+					}
+					
 					outputs << qPointValue(point2, isnan(value) ? 0 :value);
 				}
 			}
@@ -523,7 +567,8 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 MainWindow::MainWindow()
 {
 	
-	QRectF rect(0,0,300,300);
+	 QRectF rect(0,0,300,300);
+	//QRectF(89.856,539.641 1044.24x661.359)
 	double w = rect.width(), h = rect.height();
 
 	// Rectangle Bicubic Interpolation
@@ -593,7 +638,7 @@ MainWindow::MainWindow()
 // 		<< qPointValue(QPointF(w,h), 		0.0)
 // 		<< qPointValue(QPointF(0,h), 		0.0);
 
-// 	QList<qPointValue> points = QList<qPointValue>()
+	QList<qPointValue> points = QList<qPointValue>()
 // 		<< qPointValue(QPointF(0,0), 		0.0)
 // 
 // 		<< qPointValue(QPointF(w*.5,h*.25),	1.0)
@@ -605,24 +650,74 @@ MainWindow::MainWindow()
 // 		<< qPointValue(QPointF(w*.75,h*.5),	1.0)
 // 
 // 		<< qPointValue(QPointF(w,w),		0.0);
-
- 	QList<qPointValue> points = QList<qPointValue>()
 		<< qPointValue(QPointF(0,0), 		0.0)
-		<< qPointValue(QPointF(w,h),		0.0);
 
-	srand(0);
-/*
-	for(int i=0; i<2; i++)
-	{
-		points << qPointValue(QPointF((double)rand()/(double)RAND_MAX*w, (double)rand()/(double)RAND_MAX*h), (double)rand()/(double)RAND_MAX);
-		qDebug() << "Added point: "<<points.last().point<<", val:"<<points.last().value;
-	}
-*/
+// 		<< qPointValue(QPointF(w*.2,h*.2),	1.0)
+// 		<< qPointValue(QPointF(w*.5,h*.2),	1.0)
+// 		<< qPointValue(QPointF(w*.8,h*.2),	1.0)
+
+		<< qPointValue(QPointF(w*.2,h*.8),	1.0)
+		<< qPointValue(QPointF(w*.5,h*.8),	1.0)
+		<< qPointValue(QPointF(w*.8,h*.8),	1.0)
+
+		<< qPointValue(QPointF(w*.8,h*.5),	1.0)
+		<< qPointValue(QPointF(w*.8,h*.2),	1.0)
+		
+		//<< qPointValue(QPointF(w*.75,h),	1.0)
+
+		<< qPointValue(QPointF(w,w),		0.0)
+		;
+
+
+
+//  	QList<qPointValue> points = QList<qPointValue>()
+// 		<< qPointValue(QPointF(0,0), 		0.0)
+// 		<< qPointValue(QPointF(w,h),		0.0);
+
+	srand(time(NULL));
+
+// 	for(int i=0; i<100; i++)
+// 	{
+// 		points << qPointValue(QPointF((double)rand()/(double)RAND_MAX*w, (double)rand()/(double)RAND_MAX*h), (double)rand()/(double)RAND_MAX);
+// 		qDebug() << "points << qPointValue("<<points.last().point<<", "<<points.last().value<<");";
+// 	}
+	
+// 	points << qPointValue( QPointF(77.8459, 259.802), 0.980021);
+// 	points << qPointValue( QPointF(220.788, 23.7931), 0.445183);
+
+// 	points << qPointValue( QPointF(136.454, 214.625), 0.684312);
+// 	points << qPointValue( QPointF(2.11327, 169.876), 0.669569);
+// 	points << qPointValue( QPointF(150.927, 244.475), 0.25839);
+// 	points << qPointValue( QPointF(289.744, 107.131), 0.764456);
+// 	points << qPointValue( QPointF(8.46319, 294.867), 0.996068);
+//  
+
+
+
+// points << qPointValue( QPointF(145.152, 881.28), 0.8);
+// points << qPointValue( QPointF(89.856, 603.072), 0.183333);
+// points << qPointValue( QPointF(361.152, 1007.42), 0.216667);
+// points << qPointValue( QPointF(1134.1, 936.776), 0.1);
+// points << qPointValue( QPointF(884.8, 789.019), 0.0166667);
+// points << qPointValue( QPointF(832.851, 660.204), 0.183333);
+// points << qPointValue( QPointF(944.251, 539.641), 0.05);
+// points << qPointValue( QPointF(793.522, 979.344), 0.0833333);
+// points << qPointValue( QPointF(746.287, 1065.78), 0.266667);
+// points << qPointValue( QPointF(777.358, 1191.72), 0.1);
+// points << qPointValue( QPointF(1057, 1201), 0.0166667);
+// points << qPointValue( QPointF(975, 1043), 0.1);
+// 
+// 
+
+
+
+
+
 	// Fuzzing, above, produced these points, which aren't rendred properly:
-	points << qPointValue(QPointF(234.93, 118.315),  0.840188);
-	qDebug() << "Added point: "<<points.last().point<<", val:"<<points.last().value;
-	points << qPointValue(QPointF(59.2654, 273.494), 0.79844);
-	qDebug() << "Added point: "<<points.last().point<<", val:"<<points.last().value;
+// 	points << qPointValue(QPointF(234.93, 118.315),  0.840188);
+// 	qDebug() << "Added point: "<<points.last().point<<", val:"<<points.last().value;
+// 	points << qPointValue(QPointF(59.2654, 273.494), 0.79844);
+// 	qDebug() << "Added point: "<<points.last().point<<", val:"<<points.last().value;
 	
 
 	//exit(-1);
@@ -740,8 +835,15 @@ MainWindow::MainWindow()
 // 	
 	// This is the last stage of the algorithm - go thru the new point cloud and construct the actual sub-rectangles
 	// by starting with each point and proceding clockwise around the rectangle, getting the nearest point in each direction (X+,Y), (X,Y+) and (X-,Y)
+	
+	//QPointF p5 = outputList[5].point;
+	//QPointF p7 = outputList[7].point;
+	//qDebug() << "match? "<<((int)p5.y() == (int)p7.y())<<", p5:"<<p5<<", p7:"<<p7;
+	
+	int counter = 0;
 	foreach(qPointValue tl, outputList)
 	{
+		//qDebug() << "[quads]: pnt "<<(counter++)<<": "<<tl.point; 
 		QList<qPointValue> quad;
 		
 		qPointValue tr = nearestPoint(outputList, tl.point, 0);
@@ -756,7 +858,7 @@ MainWindow::MainWindow()
 			quad  << tl << tr << br << bl;
 			quads << (quad);
 			
-// 			qDebug() << "Quad[p]: "<<tl.point<<", "<<tr.point<<", "<<br.point<<", "<<bl.point;
+ 			//qDebug() << "Quad[p]: "<<tl.point<<", "<<tr.point<<", "<<br.point<<", "<<bl.point;
 // 			qDebug() << "Quad[v]: "<<tl.value<<tr.value<<br.value<<bl.value;
 		
 			// Here's the actual rendering of the interpolated quad
@@ -777,10 +879,14 @@ MainWindow::MainWindow()
 			p.drawPolygon(vec);
 
 			p.setPen(Qt::gray);
-			p.drawText(tl.point, QString().sprintf("%.02f",tl.value));
-			p.drawText(tr.point, QString().sprintf("%.02f",tr.value));
-			p.drawText(bl.point, QString().sprintf("%.02f",bl.value));
-			p.drawText(br.point, QString().sprintf("%.02f",br.value));
+			qDrawTextOp(p,tl.point, QString().sprintf("%.02f",tl.value));
+			qDrawTextOp(p,tr.point, QString().sprintf("%.02f",tr.value));
+			qDrawTextOp(p,bl.point, QString().sprintf("%.02f",bl.value));
+			qDrawTextOp(p,br.point, QString().sprintf("%.02f",br.value));
+		}
+		else
+		{
+			//qDebug() << "!Quad[p]: "<<tl.point<<" --> ("<<tr.point<<" || "<<br.point<<" || "<<bl.point<<")";
 		}
 	}
 
@@ -789,6 +895,20 @@ MainWindow::MainWindow()
 	foreach(qPointValue v, points)
 	{
 		p.drawEllipse(v.point, 5, 5);
+	}
+// 	
+	p.setPen(QPen());
+	p.setBrush(QColor(255,255,255,200));
+	counter = 0;
+	foreach(qPointValue v, outputList)
+	{
+		p.setPen(QPen());
+		if(!hasPoint(points, v.point))
+			p.drawEllipse(v.point, 5, 5);
+			
+// 		p.setPen(Qt::gray);
+// 		qDrawTextOp(p,v.point + QPointF(0, p.font().pointSizeF()*1.75), QString::number(counter++));
+		
 	}
 	
 	p.end();
