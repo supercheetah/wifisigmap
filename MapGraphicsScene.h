@@ -287,6 +287,10 @@ public:
 	MapApInfo* apInfo(WifiDataResult);
 	MapApInfo* apInfo(QString apMac);
 	
+	double meterPx() { return m_meterPx; }
+	bool showMyLocation() { return m_showMyLocation; }
+	bool autoGuessApLocations() { return m_autoGuessApLocations; }
+	
 public slots:
 	void saveResults(QString filename);
 	void loadResults(QString filename);
@@ -301,6 +305,9 @@ public slots:
 	void setRenderOpts(MapRenderOptions);
 
 	void setMeterPx(double meters);
+	
+	void setShowMyLocation(bool flag=true);
+	void setAutoGuessApLocations(bool flag=true);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -435,7 +442,8 @@ protected:
 	KalmanFilter m_kalman;
 	#endif
 	
-	
+	bool m_showMyLocation;
+	bool m_autoGuessApLocations;
 };
 
 #endif
