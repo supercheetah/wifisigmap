@@ -22,8 +22,8 @@ static const double Pi2 = Pi * 2.;
 #endif
 
 // #ifdef Q_OS_ANDROID
-	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderCircles
-//	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
+//	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderCircles
+	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
 // #else
 // 	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRadial
 // #endif
@@ -3136,7 +3136,7 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 {
 	QLineF boundLine(p1,p2);
 	QList<qPointValue> outputs;
-	
+
 // 	qPointValue c1, c2;
 // 	if(!hasPoint(existingPoints, boundLine.p1()) &&
 // 	   !hasPoint(outputs,        boundLine.p1()))
@@ -3148,7 +3148,7 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 // 	{
 // 		c1 = getPoint(inputs, boundLine.p1());
 // 	}
-// 	
+//
 // 	if(!hasPoint(existingPoints, boundLine.p2()) &&
 // 	   !hasPoint(outputs,        boundLine.p2()))
 // 	{
@@ -3159,11 +3159,11 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 // 	{
 // 		c2 = getPoint(inputs, boundLine.p2());
 // 	}
-// 		
+//
 // 	double pval[4] = { c1.value, c1.value/2, c2.value/2, c2.value };
-// 	 
+//
 // 	double lineLength = boundLine.length();
-	
+
 	foreach(qPointValue v, inputs)
 	{
 		QLineF line;
@@ -3186,7 +3186,7 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 			// line from point to LEFT
 			// (boundLine runs top-bottom on LEFT side of bounds)
 			line = QLineF(v.point, QPointF(bounds.left(),  v.point.y()));
-		
+
 // 		// test to see boundLine intersects line, if so, create point if none exists
 // 		QPointF point;
 // 		/*QLineF::IntersectType type = */boundLine.intersect(line, &point);
@@ -3201,7 +3201,7 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 // 				qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/1] New point: "<<point<<", value:"<<value<<", corners: "<<c1.value<<","<<c2.value;
 // 			}
 // 		}
-		
+
 
 		foreach(qPointValue v2, inputs)
 		{
@@ -3217,9 +3217,9 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 				// 4=(boundLine runs top-bottom on LEFT side of bounds)
 				// run line left right, see if intersects with 'line' above
 				line2 = QLineF(v2.point.x(), bounds.top(), v2.point.x(), bounds.bottom());
-			
+
 			//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] Testing: "<<line2;
-			
+
 			// test to see boundLine intersects line, if so, create point if none exists
 			QPointF point2;
 			/*QLineF::IntersectType type = */line.intersect(line2, &point2);
@@ -3229,22 +3229,22 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 				   !hasPoint(outputs, point2))
 				{
 					// Intersected point, find nerest point +/-
-					
+
 // 					// Get values for the ends of the line (assuming interpolated above)
 // 					qPointValue ic1 = getPoint(existingPoints, line2.p1());
 // 					if(ic1.isNull())
 // 						ic1 = getPoint(outputs, line2.p1());
-// 					
+//
 // 					qPointValue ic2 = getPoint(existingPoints, line2.p2());
 // 					if(ic2.isNull())
 // 						ic2 = getPoint(outputs, line2.p2());
-// 						
+//
 // 					if(ic1.isNull())
 // 					{
 // 						qDebug() << "ic1 logic error, quiting";
 // 						exit(-1);
 // 					}
-// 					
+//
 // 					if(ic2.isNull())
 // 					{
 // 						qDebug() << "ic2 logic error, quiting";
@@ -3253,29 +3253,136 @@ QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> 
 
 					QList<qPointValue> combined;
 					combined << existingPoints << outputs;
-					
-					qPointValue pntAfter  = nearestPoint(combined, point2,     dir); // same dir
-					qPointValue pntBefore = nearestPoint(combined, point2, 5 - dir); // oposite dir (dir is 1 based, hence 5- instead of 4-)
-					double innerLineLength = QLineF(pntAfter.point, pntBefore.point).length();
-					
-					double innerPval[4] = { pntBefore.value, pntBefore.value/2+pntBefore.value, pntAfter.value-pntAfter.value/2, pntAfter.value };
-			
-					
+
+					/// Third arg to nearestPoint() is a direction to search, 0-based: 0=X+, 1=Y+, 2=X-, 3=Y-
+
+					qPointValue pntAfter  = nearestPoint(combined, point2, dir+1); // same dir
+					qPointValue pntBefore = nearestPoint(combined, point2, dir-1); // oposite dir (dir is 1 based, nearestPoint expects 0 based)
+
+					qPointValue pntPre = nearestPoint(combined, point2, //dir); // perpendicular positive (dir is 1 based, nearestPoint expects 0 based)
+										dir == 1 ? 3 : // dir=1 is TL, arg=2 is X-
+										dir == 2 ? 4 :
+										dir == 3 ? 1 :
+										dir == 4 ? 2 : 2);
+
+					qPointValue pntPost = nearestPoint(combined, point2,
+										dir == 1 ? 1 : // dir=1 is TL, arg=2 is X-
+										dir == 2 ? 2 :
+										dir == 3 ? 3 :
+										dir == 4 ? 4 : 4);
+
+					//double innerLineLength = QLineF(pntAfter.point, pntBefore.point).length();
+
+					//double innerPval[4] = { pntBefore.value, pntBefore.value/2+pntBefore.value, pntAfter.value-pntAfter.value/2, pntAfter.value };
+					//double innerPval[4] = { pntPre.value, pntBefore.value, pntAfter.value, pntAfter.value };
+
 					// Note we are using perpendicular point components to the cubicInterpolate() call above
-					double unitVal = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
-					double value = cubicInterpolate(innerPval, unitVal);
+					//double unitVal = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
+					//double value = cubicInterpolate(innerPval, unitVal);
+
+					QLineF line1 = QLineF(pntAfter.point, pntBefore.point);
+					QLineF line2 = QLineF(pntPre.point,   pntPost.point);
+// 					double lenLine1 = line1.length();
+// 					double lenLine2 = line2.length();
+
+					//double unit1 = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
+
+					double value;
+					if(dir == 1 || dir == 3)
+					{
+						double unit11 = line2.y1() > line2.y2() ? line2.y2() : line2.y1(); // near
+						double unit12 = line2.y1() > line2.y2() ? line2.y1() : line2.y2(); // far
+
+						double val11  = line2.y1() > line2.y2() ? pntBefore.value : pntAfter.value;
+						double val12  = line2.y1() > line2.y2() ? pntAfter.value : pntBefore.value;
+
+						double unit21 = line1.x1() > line1.x2() ? line1.x2() : line1.x1(); // near
+						double unit22 = line1.x1() > line1.x2() ? line1.x1() : line1.x2(); // far
+
+						double val21  = line1.x1() > line1.x2() ? pntPre.value  : pntPost.value;
+						double val22  = line1.x1() > line1.x2() ? pntPost.value : pntPre.value;
+
+
+						double unitLen1 = unit12 - unit11;
+						double unitLen2 = unit22 - unit21;
+
+// 						double unit1 = (unit12 - point2.y()) / unitLen1;
+// 						double unit2 = (unit22 - point2.x()) / unitLen1;
+
+						double fr1 = (unit22 - point2.x()) / unitLen2 * val21
+						           + (point2.x() - unit21) / unitLen2 * val22;
+
+						//double fr2 = (corners[2].point.x() - x) / w * corners[3].value
+						 //          + (x - corners[0].point.x()) / w * corners[2].value;
+
+						double p1  = (unit12 - point2.y()) / unitLen1 * val11
+						           + (point2.y() - unit11) / unitLen2 * val12;
+
+						//double val1 = fr1 * (unit1 / 2.);
+						//double val2 =  p1 * (unit2 / 2.);
+
+						//value = val1 + val2;
+						value = (fr1 + p1) / 2.;
+// 						qDebug() << "dir[1||3]: unit1[1,2]:["<<unit11<<","<<unit12<<"], val1[1,2]:["<<val11<<","<<val12<<"]";
+// 						qDebug() << "dir[1||3]: unit2[1,2]:["<<unit21<<","<<unit22<<"], val2[1,2]:["<<val21<<","<<val22<<"]";
+// 						qDebug() << "dir[1||3]: unitLen[1,2]:["<<unitLen1<<","<<unitLen2<<"],unit[1,2]:["<<unit1<<","<<unit2<<"]";
+// 						qDebug() << "dir[1||3]: fr1:"<<fr1<<", p1:"<<p1<<", val1:"<<val1<<", val2:"<<val2<<", value:"<<value;
+					}
+					else
+					//if(dir == 1 || dir == 3)
+					{
+						double unit11 = line2.x1() > line2.x2() ? line2.x2() : line2.x1(); // near
+						double unit12 = line2.x1() > line2.x2() ? line2.x1() : line2.x2(); // far
+
+						double val11  = line2.x1() > line2.x2() ? pntBefore.value : pntAfter.value;
+						double val12  = line2.x1() > line2.x2() ? pntAfter.value : pntBefore.value;
+
+						double unit21 = line1.y1() > line1.y2() ? line1.y2() : line1.y1(); // near
+						double unit22 = line1.y1() > line1.y2() ? line1.y1() : line1.y2(); // far
+
+						double val21  = line1.y1() > line1.y2() ? pntPre.value  : pntPost.value;
+						double val22  = line1.y1() > line1.y2() ? pntPost.value : pntPre.value;
+
+
+						double unitLen1 = unit12 - unit11;
+						double unitLen2 = unit22 - unit21;
+
+// 						double unit1 = (unit12 - point2.y()) / unitLen1;
+// 						double unit2 = (unit22 - point2.x()) / unitLen1;
+
+						double fr1 = (unit22 - point2.y()) / unitLen2 * val21
+						           + (point2.y() - unit21) / unitLen2 * val22;
+
+						//double fr2 = (corners[2].point.x() - x) / w * corners[3].value
+						//          + (x - corners[0].point.x()) / w * corners[2].value;
+
+						double p1  = (unit12 - point2.x()) / unitLen1 * val11
+						           + (point2.x() - unit11) / unitLen2 * val12;
+
+						//double val1 = fr1 * (unit1 / 2.);
+						//double val2 =  p1 * (unit2 / 2.);
+
+						//value = val1 + val2;
+						value = (fr1 + p1) / 2.;
+					}
+
+// 					qDebug() << "testLine: bound:"<<boundLine<<" -> line:"<<line<<" ["<<dir<<"/2]";
+// 					qDebug() << "[inner] " << dir << ": New point: "<<point2<<" \t value:"<<QString().sprintf("%.02f",value).toDouble()<< "\n"
+// 							<< " \t before/after: "<<pntBefore.value<<" @ " << pntBefore.point << " -> " << pntAfter.value << " @ " << pntAfter.point << "\n"
+// 							<< " \t pre/post:     "<<pntPre.value   <<" @ " << pntPre.point    << " -> " << pntPost.value << " @ " << pntPost.point;
+
 					outputs << qPointValue(point2, value);
-					//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] New point: "<<point2<<", value:"<<value<<", before/after: "<<pntBefore.value<<" @ " << pntBefore.point << "," << pntAfter.value << " @ " << pntAfter.point;
 				}
 			}
-				
-		}		
-		
+
+		}
+
 	}
-	
-	
+
+
 	return outputs;
 }
+
 
 void SigMapRenderer::render()
 {
