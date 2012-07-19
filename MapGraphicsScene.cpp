@@ -22,8 +22,8 @@ static const double Pi2 = Pi * 2.;
 #endif
 
 // #ifdef Q_OS_ANDROID
-//	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderCircles
-	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
+	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderCircles
+//	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRectangles
 // #else
 // 	#define DEFAULT_RENDER_MODE MapGraphicsScene::RenderRadial
 // #endif
@@ -2178,18 +2178,17 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
-// 	#ifdef Q_OS_ANDROID
-// 	double half = m_longPressSpinner->boundingRect().width()/2;
-// 	int fingertipAdjust = 0;
-// 	
-// 	// TODO Is there some OS preference that indicates right or left handed usage?
-// 	//fingertipAdjust = -half/3;
-// 	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
-// 	
-// 	m_longPressSpinner->setPos(m_pressPnt - QPointF(half - fingertipAdjust,half));
-// 	#else
-	m_longPressSpinner->setPos(m_pressPnt);
-//	#endif
+
+	double half = m_longPressSpinner->boundingRect().width()/2;
+	int fingertipAdjust = 0;
+
+	#ifdef Q_OS_ANDROID
+	// TODO Is there some OS preference that indicates right or left handed usage?
+	fingertipAdjust = -half/3;
+	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
+	#endif
+	
+	m_longPressSpinner->setPos(m_pressPnt);// - QPointF(half + fingertipAdjust, half));
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
@@ -2583,7 +2582,7 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	item->setZValue(99);
 	
-	item->setOpacity(0);
+	//item->setOpacity(0);
 	
 	// Add pointer to the item in the scene to the signal value for turning on/off per user
 	val->marker = item;
@@ -4204,13 +4203,16 @@ LongPressSpinner::LongPressSpinner()
 {
 	m_goodPressFlag = false;
 	m_progress = 0.;
-	
-	QSizeF size = QSizeF(64.,64.);//.expandTo(QApplication::globalStrut());
+
+	double iconSize = 64.;
 #ifdef Q_OS_ANDROID
-	size = QSizeF(192,192);
+	iconSize= 192.;
 #endif
 
-	m_boundingRect = QRectF(QPointF(0,0),size);
+	QSizeF size = QSizeF(iconSize,iconSize);//.expandTo(QApplication::globalStrut());
+
+	//m_boundingRect = QRectF(QPointF(0,0),size);
+	m_boundingRect = QRectF(QPointF(-iconSize/2,-iconSize/2),size);
 	
 	connect(&m_goodPressTimer, SIGNAL(timeout()), this, SLOT(fadeTick()));
 	m_goodPressTimer.setInterval(333/20);
@@ -4278,15 +4280,16 @@ QRectF LongPressSpinner::boundingRect() const
 void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget */*widget*/)
 {
 	painter->save();
-	painter->setClipRect( option->exposedRect );
+	//painter->setClipRect( option->exposedRect );
 	
 	int iconSize = boundingRect().size().toSize().width();
+	//painter->translate(-iconSize/2,-iconSize/2);
 	
 	if(m_goodPressFlag)
 	{
 		// Draw inner gradient
 		QColor centerColor = Qt::green;
-		QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
+		QRadialGradient rg(boundingRect().center(),iconSize);
 		rg.setColorAt(0, centerColor/*.lighter(100)*/);
 		rg.setColorAt(1, centerColor.darker(500));
 		//p.setPen(Qt::black);
@@ -4301,7 +4304,7 @@ void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *
 		
 		// Draw inner gradient
 		QColor centerColor("#0277fd"); // cream blue
-		QRadialGradient rg(QPointF(iconSize/2,iconSize/2),iconSize);
+		QRadialGradient rg(boundingRect().center(),iconSize);
 		rg.setColorAt(0, centerColor/*.lighter(100)*/);
 		rg.setColorAt(1, centerColor.darker(500));
 		//p.setPen(Qt::black);
@@ -4940,4 +4943,11 @@ void MapGraphicsScene::setRenderOpts(MapRenderOptions opts)
 		val->marker->setVisible(m_renderOpts.showReadingMarkers);
 		
 	triggerRender();	
+}
+
+
+void MapGraphicsScene::setMeterPx(double m)
+{
+	m_meterPx = m;
+	m_footPx  = m / 3.28084;
 }

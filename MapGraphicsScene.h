@@ -13,6 +13,17 @@
 
 #include "WifiDataCollector.h"
 
+#ifdef Q_OS_ANDROID
+#define AndroidDialogHelper(widgetPtr, dialog) { \
+	if(widgetPtr) \
+	{	dialog.show(); \
+		dialog.move(mapToGlobal(QPoint(widgetPtr->width()/2  - dialog.width()/2, widgetPtr->height()/2 - dialog.height()/2 ))); \
+	} \
+}
+#else
+#define AndroidDialogHelper(widgetPtr, dialog) { Q_UNUSED(widgetPtr); Q_UNUSED(dialog); }
+#endif
+
 class MapGraphicsView : public QGraphicsView
 {
 	Q_OBJECT
@@ -288,6 +299,8 @@ public slots:
 	void setRenderAp(MapApInfo *ap, bool flag=true);
 	
 	void setRenderOpts(MapRenderOptions);
+
+	void setMeterPx(double meters);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -405,7 +418,6 @@ protected:
 	QList<WifiDataResult> m_lastScanResults;
 	
 	MapRenderOptions m_renderOpts;
-	void showRenderOptsDialog();
 	
 	LongPressSpinner *m_longPressSpinner;
 	

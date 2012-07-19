@@ -108,8 +108,12 @@ WifiDataCollector::WifiDataCollector()
 	// Thru repeated testing on my Android device, .75sec is the aparent *minimum*
 	// time necessary to wait between calls to "iwlist" in order for iwlist to 
 	// scan again (not generate an error about "transport endpoint" or "no scan results")
+	#ifdef Q_OS_ANDROID
 	m_scanTimer.setInterval(750);
-
+	#else
+	m_scanTimer.setInterval(10);
+	#endif
+	
 	// TODO - move this to the main app, then if it returns false, ask the user if they want to continue anyway or exit.
 	if(auditIwlistBinary())
 	{
@@ -524,10 +528,11 @@ void WifiDataCollector::scanWifi()
 			// Since MapGraphicsScene *only* stores r.rawData, update the rawData with "fake" readings
 			r.rawData["signal level"] = QString("%1 dBm").arg((int)r.dbm);
 	
-			//qDebug() << "WifiDataCollector::scanWifi(): Averaged MAC "<<r.mac<<": dBm: "<<r.dbm<<"dBm, value:"<<r.value;
+			//qDebug() << "WifiDataCollector::scanWifi(): Averaged "<<r.essid<<", MAC "<<r.mac<<": dBm: "<<r.dbm<<"dBm, value:"<<r.value;
 	
 			m_scanResults << r;
 		}
+		//qDebug() << "WifiDataCollector::scanWifi(): Found"<<m_scanResults.size()<<" APs nearby";
 		
 		if(m_scanNum >= m_numScans)
 			m_scanNum = 0;

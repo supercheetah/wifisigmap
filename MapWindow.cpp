@@ -192,6 +192,7 @@ void MapWindow::setupUi()
 
 void MapWindow::prefsSlot()
 {
+	/*
 	QStringList items;
 	items << "Radial Lines";
 	items << "Circle";
@@ -204,6 +205,26 @@ void MapWindow::prefsSlot()
 	{
 		m_scene->setRenderMode((MapGraphicsScene::RenderMode)items.indexOf(item));
 	}
+	*/
+
+// 	MapOptionsDialog d(m_scene);
+// 	d.show();
+// 	AndroidDialogHelper(this, d);
+// 	d.exec();
+// 	
+	/*
+	if(d.exec() == QDialog::Accepted)
+	{
+		
+		m_scene->setRenderMode(d.renderMode());
+		m_scene->setRenderOpts(d.renderOpts());
+		QHash<QString,bool> apFlags = d.renderApFlags();
+		foreach(QString ap, apFlags.keys())
+			m_scene->setRenderAp(ap, apFlags[ap]);
+
+		m_scene->setShowMyLocation(d.showMyLocation());
+	}
+	*/
 	
 }
 
@@ -250,6 +271,20 @@ void MapWindow::chooseBgSlot()
 	{
 		QSettings("wifisigmap").setValue("last-bg-file",fileName);
 		m_scene->setBgFile(fileName);
+
+		QInputDialog d(this);
+		d.setInputMode(QInputDialog::DoubleInput);
+		d.setLabelText("Pixels per meter:");
+		d.setDoubleMinimum(1.0);
+		d.setDoubleMaximum(1000000);
+		d.setDoubleDecimals(2);
+		d.setDoubleValue(42.);
+		d.show();
+		
+		AndroidDialogHelper(this, d);
+
+		if(d.exec() == QDialog::Accepted)
+			m_scene->setMeterPx(d.doubleValue());
 	}
 }
 
@@ -318,6 +353,7 @@ void MapWindow::saveSlot()
 
 void MapWindow::clearSlot()
 {
+	QSettings("wifisigmap").setValue("last-map-file","");
 	m_scene->clear();
 }
 
