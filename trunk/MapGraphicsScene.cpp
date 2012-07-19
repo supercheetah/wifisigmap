@@ -569,7 +569,11 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	connect(&m_scanIf, SIGNAL(scanFinished(QList<WifiDataResult>)), this, SLOT(scanFinished(QList<WifiDataResult>)));
 	
 	// Set up background and other misc items
-	clear(); 
+	clear();
+	
+	QSettings settings("wifisigmap");
+	m_showMyLocation       = settings.value("showMyLocation", true).toBool();
+	m_autoGuessApLocations = settings.value("autoGuessApLocations", true).toBool();
 
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
@@ -1214,632 +1218,643 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	m_lastScanResults = results;
 	update(); // allow HUD to update
 	
-	return;
+	if(!m_showMyLocation || !m_autoGuessApLocations)
+		return;
 	
 	if(m_sigValues.isEmpty())
 		return;
 	
-	/// JUST for debugging
-	// 	realPoint = m_sigValues.last()->point;
-	// 	results   = m_sigValues.last()->scanResults;
-	//
-	
-	
-	QPointF userLocation  = QPointF(-1000,-1000);
-
-	// Need at least two *known* APs registered on the map - with out that, we don't even need to check the results
-	if(m_apInfo.values().size() < 2)
-	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
-		return;
-	}
-	
-	// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
-	QStringList apsVisible;
-	QHash<QString,double> apMacToSignal;
-	QHash<QString,int> apMacToDbm;
-	foreach(WifiDataResult result, results)
-	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
-		if(!apMacToSignal.contains(result.mac) &&
-		    !apInfo(result.mac)->point.isNull())
-		{
-			apsVisible << result.mac;
-			apMacToSignal.insert(result.mac, result.value);
-
-			#ifdef OPENCV_ENABLED
-			// Use Kalman to filter the dBm value
-			MapApInfo *info = apInfo(result.mac);
-			info->kalman.predictionUpdate(result.dbm, 0);
-
-			float value = (float)result.dbm, tmp = 0;
-			info->kalman.predictionReport(value, tmp);
-			apMacToDbm.insert(result.mac, (int)value);
-			result.dbm = (int)value;
-			
-			#else
-
-			apMacToDbm.insert(result.mac, result.dbm);
-			
-			#endif
-
-			qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
-		}
-	}
-	
-	// Need at least two APs *visible* in results *AND* marked on the MAP
-	// (apsVisible only contains APs marked on the map AND in the latest scan results) 
-	if(apsVisible.size() < 2)
-	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs marked AND visble, unable to guess user location";
-		return;
-	}
-/*	
-	// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
-	// This is used to calculate the radius of the APs coverage.
-	QHash<QString,int>    apRatioCount;
-	QHash<QString,double> apRatioSums;
-	QHash<QString,double> apRatioAvgs;
-	
-	
-	foreach(QString apMac, apsVisible)
-	{
-		QPointF center = apInfo(apMac)->point;
 		
-		double maxDistFromCenter = -1;
-		double maxSigValue = 0.0;
-		foreach(SigMapValue *val, m_sigValues)
+	QSize origSize = m_bgPixmap.size();
+	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+	QPointF offset = QPointF();
+	
+	memset(image.bits(), 0, image.byteCount());
+	
+	if(m_showMyLocation)
+	{
+		/// JUST for debugging
+		// 	realPoint = m_sigValues.last()->point;
+		// 	results   = m_sigValues.last()->scanResults;
+		//
+		
+		
+		QPointF userLocation  = QPointF(-1000,-1000);
+	
+		// Need at least two *known* APs registered on the map - with out that, we don't even need to check the results
+		if(m_apInfo.values().size() < 2)
 		{
-			if(val->hasAp(apMac))
+			//qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
+			return;
+		}
+		
+		// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
+		QStringList apsVisible;
+		QHash<QString,double> apMacToSignal;
+		QHash<QString,int> apMacToDbm;
+		foreach(WifiDataResult result, results)
+		{
+			//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result; 
+			if(!apMacToSignal.contains(result.mac) &&
+			   !apInfo(result.mac)->point.isNull())
 			{
-				double dx = val->point.x() - center.x();
-				double dy = val->point.y() - center.y();
-				double distFromCenter = sqrt(dx*dx + dy*dy);
-				if(distFromCenter > maxDistFromCenter)
+				apsVisible << result.mac;
+				apMacToSignal.insert(result.mac, result.value);
+	
+				#ifdef OPENCV_ENABLED
+				// Use Kalman to filter the dBm value
+				MapApInfo *info = apInfo(result.mac);
+				info->kalman.predictionUpdate(result.dbm, 0);
+	
+				float value = (float)result.dbm, tmp = 0;
+				info->kalman.predictionReport(value, tmp);
+				apMacToDbm.insert(result.mac, (int)value);
+				result.dbm = (int)value;
+				
+				#else
+	
+				apMacToDbm.insert(result.mac, result.dbm);
+				
+				#endif
+	
+				qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
+			}
+		}
+		
+		// Need at least two APs *visible* in results *AND* marked on the MAP
+		// (apsVisible only contains APs marked on the map AND in the latest scan results) 
+		if(apsVisible.size() < 2)
+		{
+			//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs marked AND visble, unable to guess user location";
+			return;
+		}
+	/*	
+		// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
+		// This is used to calculate the radius of the APs coverage.
+		QHash<QString,int>    apRatioCount;
+		QHash<QString,double> apRatioSums;
+		QHash<QString,double> apRatioAvgs;
+		
+		
+		foreach(QString apMac, apsVisible)
+		{
+			QPointF center = apInfo(apMac)->point;
+			
+			double maxDistFromCenter = -1;
+			double maxSigValue = 0.0;
+			foreach(SigMapValue *val, m_sigValues)
+			{
+				if(val->hasAp(apMac))
 				{
-					maxDistFromCenter = distFromCenter;
-					maxSigValue = val->signalForAp(apMac);
+					double dx = val->point.x() - center.x();
+					double dy = val->point.y() - center.y();
+					double distFromCenter = sqrt(dx*dx + dy*dy);
+					if(distFromCenter > maxDistFromCenter)
+					{
+						maxDistFromCenter = distFromCenter;
+						maxSigValue = val->signalForAp(apMac);
+					}
+				}
+			}
+			
+			apRatioAvgs[apMac] = maxDistFromCenter;// / maxSigValue;
+			qDebug() << "[ratio calc] "<<apMac<<": maxDistFromCenter:"<<maxDistFromCenter<<", macSigValue:"<<maxSigValue<<", ratio:"<<apRatioAvgs[apMac]; 
+		}
+				
+		
+	// 	foreach(SigMapValue *val, m_sigValues)
+	// 	{
+	// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
+	// 		
+	// 		// Remember, apsVisible has all the APs *visible* in this scan result *AND* marked in the map 
+	// 		foreach(QString apMac, apsVisible)
+	// 		{
+	// 			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
+	// 			if(val->hasAp(apMac) &&
+	// 			  !apInfo(apMac)->point.isNull()) // TODO Since apsVisible are only APs marked, do we need to test this still?
+	// 			{
+	// 				QPointF delta = apInfo(apMac)->point - val->point;
+	// 				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
+	// 				//double dist = d;
+	// 				d = d / val->signalForAp(apMac);
+	// 				
+	// 				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
+	// 				
+	// 				// Incrememnt counters/sums
+	// 				if(!apRatioSums.contains(apMac))
+	// 				{
+	// 					apRatioSums.insert(apMac, d);
+	// 					apRatioCount.insert(apMac, 1);
+	// 				}
+	// 				else
+	// 				{
+	// 					apRatioSums[apMac] += d;
+	// 					apRatioCount[apMac] ++;
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// 	
+	// 	// Average the values found above to determine the pixel-signal ratio
+	// 	foreach(QString key, apRatioSums.keys())
+	// 	{
+	// 		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
+	// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
+	// 	}
+		
+		
+		// apsVisible implicitly is sorted strong->weak signal
+		QString ap0 = apsVisible[0];
+		QString ap1 = apsVisible[1];
+		QString ap2 = apsVisible.size() > 2 ? apsVisible[2] : "";
+		
+		//qDebug() << "MapGraphicsScene::scanFinished(): ap0: "<<ap0<<", ap1:"<<ap1; 
+		
+		double ratio0 = 0;
+		double ratio1 = 0;
+		double ratio2 = 0;
+		
+		if(apRatioAvgs.isEmpty())
+		{
+			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
+			return;
+		}
+		else
+		{
+			// It's possible two APs are VISIBLE and MARKED, *but* they don't have a signal reading for one of the APs, so we guess by using the ratio of the first AP in the apRatioAvgs hash 
+			if(!apRatioAvgs.contains(ap0))
+			{
+				ratio0 = apRatioAvgs[apRatioAvgs.keys().first()];
+				qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using first";
+			}
+			else
+				ratio0 = apRatioAvgs[ap0];
+				
+			if(!apRatioAvgs.contains(ap1))
+			{
+				ratio1 = apRatioAvgs[apRatioAvgs.keys().first()];
+				qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap1<<" to establish correct dBm to pixel ratio, cheating by using first";
+			}
+			else
+				ratio1 = apRatioAvgs[ap1];
+				
+			if(!apRatioAvgs.contains(ap2))
+			{
+				ratio2 = apRatioAvgs[apRatioAvgs.keys().first()];
+				qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap2<<" to establish correct dBm to pixel ratio, cheating by using first";
+			}
+			else
+				ratio2 = apRatioAvgs[ap2];
+		}
+		
+		
+		// this is safe to not check apInfo() for null ptr, since apInfo() auto-creates a MapApInfo object for any previously-unknown macs
+		QPointF p0 = apInfo(ap0)->point;
+		QPointF p1 = apInfo(ap1)->point;
+		QPointF p2 = !ap2.isEmpty() ? apInfo(ap2)->point : QPointF();
+		//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
+		
+		double r0 = apMacToSignal[ap0] * ratio0;
+		double r1 = apMacToSignal[ap1] * ratio1;
+		double r2 = apMacToSignal[ap2] * ratio2;
+		
+		qDebug() << "[radius] "<<ap0<<": r0:"<<r0<<", ratio0:"<<ratio0<<", signal:"<<apMacToSignal[ap0];
+		qDebug() << "[radius] "<<ap1<<": r1:"<<r1<<", ratio1:"<<ratio1<<", signal:"<<apMacToSignal[ap1];
+		qDebug() << "[radius] "<<ap2<<": r2:"<<r2<<", ratio2:"<<ratio2<<", signal:"<<apMacToSignal[ap2];
+		
+		QLineF line  = calcIntersect(p0,r0, p1,r1);
+		QLineF line2 = calcIntersect(p1,r1, p2,r2);
+		QLineF line3 = calcIntersect(p2,r2, p0,r0);
+		
+		// Make an image to contain x1,y1 and x2,y2, or at least the user's icon
+		QRectF itemWorldRect = QRectF(line.p1(), QSizeF(
+			line.p1().x() - line.p2().x(), 
+			line.p1().y() - line.p2().y()))
+				.normalized();
+		
+		//qDebug() << "MapGraphicsScene::scanFinished(): Calculated (x1,y1):"<<line.p1()<<", (x2,y2):"<<line.p2()<<", itemWorldRect:"<<itemWorldRect<<", center:"<<itemWorldRect.center();
+		//qDebug() << "MapGraphicsScene::scanFinished(): #2 debug: "<<ap2<<": "<<p2<<", radius: "<<r2;
+		
+		// Attempt http://stackoverflow.com/questions/9747227/2d-trilateration
+		
+		// Define:
+		// ex,x = (P2x - P1x) / sqrt((P2x - P1x)2 + (P2y - P1y)2)
+		// ex,y = (P2y - P1y) / sqrt((P2x - P1x)2 + (P2y - P1y)2)
+	
+		// Steps:
+		// 1. ex = (P2 - P1) / ‖||P2 - P1||
+		QPointF vex = (p1 - p0) / sqrt(dist2(p1, p0));
+		// 2. i = ex(P3 - P1)
+		QPointF vi  = vex * (p2 - p1);
+		// ey = (P3 - P1 - i · ex) / ||‖P3 - P1 - i · ex||
+		QPointF ey = (p2 - p1 - (vi * vex)) / dist23(p2,p0,vi*vex);
+		// d = ||‖P2 - P1‖||
+		double d = sqrt(dist2(p1,p0));
+		// j = ey(P3 - P1)
+		QPointF vj = vex * (p1 - p0);
+		// x = (r12 - r22 + d2) / 2d
+		double x = (r0*r0 - r1*r1 + d*d)/(2*d);(void)x;//ignore warning
+		// TODO: This line doesn't make sense: (type conversion?)
+		// y = (r12 - r32 + i2 + j2) / 2j - ix / j
+		//double y = (r0*r0 - r2*r2 + vi*vi + vj*vj) / (2*vj - vix/vij);
+		
+		
+		// That didn't work, so let's tri triangulation
+		
+		
+		
+	// 	  C
+	// 	  *
+	// 	  |`.
+	// 	 b|  `. a
+	// 	  |    `.
+	// 	  |      `.
+	// 	A *--------* B
+	// 	      c
+			
+		
+		QLineF apLine(p1,p0);
+		
+		QLineF realLine(p0,realPoint);
+		double realAngle = realLine.angle();
+		
+		QLineF realLine2(p1,realPoint);
+		double realAngle2 = realLine2.angle();
+		
+	// 	double la = r0; //realLine2.length(); //r0;
+	// 	double lb = r1; //realLine.length(); //r1;
+		double lc = apLine.length(); //sqrt(dist2(p1,p0));
+		
+		
+	// 	double fA = 1./(10.*n);
+	// 	double fB = pTx - pRx + gTx + gRx;
+	// 	double fC = -Xa + (20.*log10(m)) - (20.*log10(4.*Pi));
+	// 	
+		
+		QPointF lossFactor2 = deriveObservedLossFactor(ap2);	
+		QPointF lossFactor1 = deriveObservedLossFactor(ap1);
+		QPointF lossFactor0 = deriveObservedLossFactor(ap0);
+		
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		apInfo(ap2)->lossFactor = lossFactor2;
+		apInfo(ap1)->lossFactor = lossFactor1;
+		apInfo(ap0)->lossFactor = lossFactor0;
+		
+	// 	qDebug() << "[formula] codified comparrison (ap1): "<<dBmToDistance(apMacToDbm[ap1], ap1);
+	// 	qDebug() << "[formula] codified comparrison (ap0): "<<dBmToDistance(apMacToDbm[ap0], ap0);
+		
+		double lb = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
+		double la = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
+		
+		r2 = dBmToDistance(apMacToDbm[ap2], ap2) * m_meterPx;
+		
+		qDebug() << "[dump1] "<<la<<lb<<lc;
+		qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
+		qDebug() << "[dump3] "<<p0<<p1<<realPoint;
+		qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
+			
+	// 	la= 8;
+	// 	lb= 6;
+	// 	lc= 7;
+		
+	// 	la = 180;
+	// 	lb = 238;
+	// 	lc = 340;
+		
+		// cos A = (b2 + c2 - a2)/2bc
+		// cos B = (a2 + c2 - b2)/2ac
+		// cos C = (a2 + b2 - c2)/2ab
+		double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
+		double cosB = (la*la + lc*lc - lb*lb)/(2*la*lc);
+		double cosC = (la*la + lb*lb - lc*lc)/(2*la*lb);
+		double angA = acos(cosA)* 180.0 / Pi;
+		double angB = acos(cosB)* 180.0 / Pi;
+		double angC = acos(cosC)* 180.0 / Pi;
+		//double angC = 180 - angB - angA;
+				
+		
+		QLineF userLine(p1,QPointF());
+		QLineF userLine2(p0,QPointF());
+		
+		//double userLineAngle = 90+45-angB+apLine.angle()-180;
+		//userLineAngle *= -1;
+		//userLine.setAngle(angA + apLine.angle() + 90*3);
+		userLine.setAngle(angA + apLine.angle());
+	// 	userLine.setLength(r1);
+		userLine.setLength(lb);
+		
+		userLine2.setAngle(angA + angC + apLine.angle());
+	// 	userLine2.setLength(r0);
+		userLine2.setLength(la);
+		
+		double realAngle3 = realLine2.angleTo(realLine);
+		
+		double errA = realAngle  - angA;
+		double errB = realAngle2 - angB;
+		double errC = realAngle3 - angC;
+		
+		qDebug() << "Triangulation: ang(A-C):"<<angA<<angB<<angC<<", cos(A-C):"<<cosA<<cosB<<cosC;
+		qDebug() << "Triangulation: err(A-C):"<<errA<<errB<<errC;
+		qDebug() << "Triangulation: abs(A-C):"<<realAngle<<realAngle2<<apLine.angle();
+		qDebug() << "Triangulation: realAngle:"<<realAngle<<"/"<<realLine.length()<<", realAngle2:"<<realAngle2<<"/"<<realLine2.length();
+		qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<<", realAngle3:"<<realAngle3;
+		
+		//QPointF calcPoint = userLine.p2();
+		
+		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0], 
+						ap1, apMacToDbm[ap1]);
+		
+		userLine  = QLineF(p1, calcPoint);
+		userLine2 = QLineF(p0, calcPoint);
+		
+	*/	
+		
+	/*
+		QImage image(
+			(int)qMax((double)itemWorldRect.size().width(),  64.) + 10,
+			(int)qMax((double)itemWorldRect.size().height(), 64.) + 10,
+			QImage::Format_ARGB32_Premultiplied);
+	*/
+		QRect picRect = m_sigMapItem->picture().boundingRect();
+//		/*QPointF */offset = picRect.topLeft();
+			
+	// 	QImage image(picRect.size(), QImage::Format_ARGB32_Premultiplied);
+	// 	QPainter p(&image);
+	// 	p.translate(-offset);
+		
+// 		QSize origSize = m_bgPixmap.size();
+// 		QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
+//		offset = QPointF();
+		
+//		memset(image.bits(), 0, image.byteCount());
+		QPainter p(&image);
+		
+		//QPainter p(&image);
+		
+		//p.setPen(Qt::black);
+		
+	//	QRectF rect(QPointF(0,0),itemWorldRect.size());
+	// 	QRectF rect = itemWorldRect;
+	// 	QPointF center = rect.center();
+		
+		#ifdef Q_OS_ANDROID
+		QString size = "64x64";
+		#else
+		QString size = "32x32";
+		#endif
+		
+		double penWidth = 20.0;
+		
+		QHash<QString,bool> drawnFlag;
+		QHash<QString,int> badLossFactor;
+		
+		QVector<QPointF> userPoly;
+		
+		QPointF avgPoint(0.,0.);
+		int count = 0;
+		
+		int numAps = apsVisible.size();
+		for(int i=0; i<numAps; i++)
+		{
+			QString ap0 = apsVisible[i];
+			QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+			
+			QPointF p0 = apInfo(ap0)->point;
+			QPointF p1 = apInfo(ap1)->point;
+			
+			QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
+							ap1, apMacToDbm[ap1]);
+			
+			if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+			{
+				if(!badLossFactor.contains(ap0))
+					badLossFactor[ap0] = 0;
+				else
+					badLossFactor[ap0] = badLossFactor[ap0] + 1;
+				
+				if(!badLossFactor.contains(ap1))
+					badLossFactor[ap1] = 0;
+				else
+					badLossFactor[ap1] = badLossFactor[ap1] + 1;
+					
+				qDebug() << "\t NaN: "<<badLossFactor[ap0]<<" / "<<badLossFactor[ap1];
+			}
+			else
+			{
+				avgPoint += calcPoint;
+				count ++;
+			}
+		}
+		
+	// 	avgPoint.setX( avgPoint.x() / count );
+	// 	avgPoint.setY( avgPoint.y() / count );
+		avgPoint /= count;
+		
+		foreach(QString ap, apsVisible)
+		{
+			if(badLossFactor[ap] > 0)
+			{
+				MapApInfo *info = apInfo(ap);
+				
+				double avgMeterDist = QLineF(avgPoint, info->point).length() / m_meterPx;
+				double absLossFactor = deriveLossFactor(ap, apMacToDbm[ap], avgMeterDist/*, gRx*/);
+	
+				if(isnan(absLossFactor))
+				{
+					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+				}
+				else
+				{
+					QPointF lossFactor = info->lossFactor;
+					if(apMacToDbm[ap] > info->shortCutoff)
+						lossFactor.setY(absLossFactor);
+					else
+						lossFactor.setX(absLossFactor);
+	
+					info->lossFactor = lossFactor;
+	
+					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
 				}
 			}
 		}
-		
-		apRatioAvgs[apMac] = maxDistFromCenter;// / maxSigValue;
-		qDebug() << "[ratio calc] "<<apMac<<": maxDistFromCenter:"<<maxDistFromCenter<<", macSigValue:"<<maxSigValue<<", ratio:"<<apRatioAvgs[apMac]; 
-	}
-			
 	
-// 	foreach(SigMapValue *val, m_sigValues)
-// 	{
-// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
-// 		
-// 		// Remember, apsVisible has all the APs *visible* in this scan result *AND* marked in the map 
-// 		foreach(QString apMac, apsVisible)
-// 		{
-// 			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
-// 			if(val->hasAp(apMac) &&
-// 			  !apInfo(apMac)->point.isNull()) // TODO Since apsVisible are only APs marked, do we need to test this still?
-// 			{
-// 				QPointF delta = apInfo(apMac)->point - val->point;
-// 				double d = sqrt(delta.x()*delta.x() + delta.y()*delta.y());
-// 				//double dist = d;
-// 				d = d / val->signalForAp(apMac);
-// 				
-// 				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
-// 				
-// 				// Incrememnt counters/sums
-// 				if(!apRatioSums.contains(apMac))
-// 				{
-// 					apRatioSums.insert(apMac, d);
-// 					apRatioCount.insert(apMac, 1);
-// 				}
-// 				else
-// 				{
-// 					apRatioSums[apMac] += d;
-// 					apRatioCount[apMac] ++;
-// 				}
-// 			}
-// 		}
-// 	}
-// 	
-// 	// Average the values found above to determine the pixel-signal ratio
-// 	foreach(QString key, apRatioSums.keys())
-// 	{
-// 		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
-// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
-// 	}
+		QPointF avgPoint2(0.,0.);
+		count = 0;
 	
-	
-	// apsVisible implicitly is sorted strong->weak signal
-	QString ap0 = apsVisible[0];
-	QString ap1 = apsVisible[1];
-	QString ap2 = apsVisible.size() > 2 ? apsVisible[2] : "";
-	
-	//qDebug() << "MapGraphicsScene::scanFinished(): ap0: "<<ap0<<", ap1:"<<ap1; 
-	
-	double ratio0 = 0;
-	double ratio1 = 0;
-	double ratio2 = 0;
-	
-	if(apRatioAvgs.isEmpty())
-	{
-		qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
-		return;
-	}
-	else
-	{
-		// It's possible two APs are VISIBLE and MARKED, *but* they don't have a signal reading for one of the APs, so we guess by using the ratio of the first AP in the apRatioAvgs hash 
-		if(!apRatioAvgs.contains(ap0))
+	// 	int numAps = apsVisible.size();
+		for(int i=0; i<numAps; i++)
 		{
-			ratio0 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using first";
-		}
-		else
-			ratio0 = apRatioAvgs[ap0];
+	// 		QString ap0 = apsVisible[i];
+	// 		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+	
+			QString ap0 = apsVisible[0];
+			QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
 			
-		if(!apRatioAvgs.contains(ap1))
-		{
-			ratio1 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap1<<" to establish correct dBm to pixel ratio, cheating by using first";
-		}
-		else
-			ratio1 = apRatioAvgs[ap1];
+			QPointF p0 = apInfo(ap0)->point;
+			QPointF p1 = apInfo(ap1)->point;
 			
-		if(!apRatioAvgs.contains(ap2))
-		{
-			ratio2 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap2<<" to establish correct dBm to pixel ratio, cheating by using first";
-		}
-		else
-			ratio2 = apRatioAvgs[ap2];
-	}
-	
-	
-	// this is safe to not check apInfo() for null ptr, since apInfo() auto-creates a MapApInfo object for any previously-unknown macs
-	QPointF p0 = apInfo(ap0)->point;
-	QPointF p1 = apInfo(ap1)->point;
-	QPointF p2 = !ap2.isEmpty() ? apInfo(ap2)->point : QPointF();
-	//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
-	
-	double r0 = apMacToSignal[ap0] * ratio0;
-	double r1 = apMacToSignal[ap1] * ratio1;
-	double r2 = apMacToSignal[ap2] * ratio2;
-	
-	qDebug() << "[radius] "<<ap0<<": r0:"<<r0<<", ratio0:"<<ratio0<<", signal:"<<apMacToSignal[ap0];
-	qDebug() << "[radius] "<<ap1<<": r1:"<<r1<<", ratio1:"<<ratio1<<", signal:"<<apMacToSignal[ap1];
-	qDebug() << "[radius] "<<ap2<<": r2:"<<r2<<", ratio2:"<<ratio2<<", signal:"<<apMacToSignal[ap2];
-	
-	QLineF line  = calcIntersect(p0,r0, p1,r1);
-	QLineF line2 = calcIntersect(p1,r1, p2,r2);
-	QLineF line3 = calcIntersect(p2,r2, p0,r0);
-	
-	// Make an image to contain x1,y1 and x2,y2, or at least the user's icon
-	QRectF itemWorldRect = QRectF(line.p1(), QSizeF(
-		line.p1().x() - line.p2().x(), 
-		line.p1().y() - line.p2().y()))
-			.normalized();
-	
-	//qDebug() << "MapGraphicsScene::scanFinished(): Calculated (x1,y1):"<<line.p1()<<", (x2,y2):"<<line.p2()<<", itemWorldRect:"<<itemWorldRect<<", center:"<<itemWorldRect.center();
-	//qDebug() << "MapGraphicsScene::scanFinished(): #2 debug: "<<ap2<<": "<<p2<<", radius: "<<r2;
-	
-	// Attempt http://stackoverflow.com/questions/9747227/2d-trilateration
-	
-	// Define:
-	// ex,x = (P2x - P1x) / sqrt((P2x - P1x)2 + (P2y - P1y)2)
-	// ex,y = (P2y - P1y) / sqrt((P2x - P1x)2 + (P2y - P1y)2)
-
-	// Steps:
-	// 1. ex = (P2 - P1) / ‖||P2 - P1||
-	QPointF vex = (p1 - p0) / sqrt(dist2(p1, p0));
-	// 2. i = ex(P3 - P1)
-	QPointF vi  = vex * (p2 - p1);
-	// ey = (P3 - P1 - i · ex) / ||‖P3 - P1 - i · ex||
-	QPointF ey = (p2 - p1 - (vi * vex)) / dist23(p2,p0,vi*vex);
-	// d = ||‖P2 - P1‖||
-	double d = sqrt(dist2(p1,p0));
-	// j = ey(P3 - P1)
-	QPointF vj = vex * (p1 - p0);
-	// x = (r12 - r22 + d2) / 2d
-	double x = (r0*r0 - r1*r1 + d*d)/(2*d);(void)x;//ignore warning
-	// TODO: This line doesn't make sense: (type conversion?)
-	// y = (r12 - r32 + i2 + j2) / 2j - ix / j
-	//double y = (r0*r0 - r2*r2 + vi*vi + vj*vj) / (2*vj - vix/vij);
-	
-	
-	// That didn't work, so let's tri triangulation
-	
-	
-	
-// 	  C
-// 	  *
-// 	  |`.
-// 	 b|  `. a
-// 	  |    `.
-// 	  |      `.
-// 	A *--------* B
-// 	      c
-		
-	
-	QLineF apLine(p1,p0);
-	
-	QLineF realLine(p0,realPoint);
-	double realAngle = realLine.angle();
-	
-	QLineF realLine2(p1,realPoint);
-	double realAngle2 = realLine2.angle();
-	
-// 	double la = r0; //realLine2.length(); //r0;
-// 	double lb = r1; //realLine.length(); //r1;
- 	double lc = apLine.length(); //sqrt(dist2(p1,p0));
-	
-	
-// 	double fA = 1./(10.*n);
-// 	double fB = pTx - pRx + gTx + gRx;
-// 	double fC = -Xa + (20.*log10(m)) - (20.*log10(4.*Pi));
-// 	
-	
-	QPointF lossFactor2 = deriveObservedLossFactor(ap2);	
-	QPointF lossFactor1 = deriveObservedLossFactor(ap1);
-	QPointF lossFactor0 = deriveObservedLossFactor(ap0);
-	
-	// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
-	apInfo(ap2)->lossFactor = lossFactor2;
-	apInfo(ap1)->lossFactor = lossFactor1;
-	apInfo(ap0)->lossFactor = lossFactor0;
-	
-// 	qDebug() << "[formula] codified comparrison (ap1): "<<dBmToDistance(apMacToDbm[ap1], ap1);
-// 	qDebug() << "[formula] codified comparrison (ap0): "<<dBmToDistance(apMacToDbm[ap0], ap0);
-	
-	double lb = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
-	double la = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
-	
-	r2 = dBmToDistance(apMacToDbm[ap2], ap2) * m_meterPx;
-	
-	qDebug() << "[dump1] "<<la<<lb<<lc;
-	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
-	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
-	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
-		
-// 	la= 8;
-// 	lb= 6;
-// 	lc= 7;
-	
-// 	la = 180;
-// 	lb = 238;
-// 	lc = 340;
-	
-	// cos A = (b2 + c2 - a2)/2bc
-	// cos B = (a2 + c2 - b2)/2ac
-	// cos C = (a2 + b2 - c2)/2ab
-	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
-	double cosB = (la*la + lc*lc - lb*lb)/(2*la*lc);
-	double cosC = (la*la + lb*lb - lc*lc)/(2*la*lb);
-	double angA = acos(cosA)* 180.0 / Pi;
-	double angB = acos(cosB)* 180.0 / Pi;
-	double angC = acos(cosC)* 180.0 / Pi;
-	//double angC = 180 - angB - angA;
+			QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
+							ap1, apMacToDbm[ap1]);
 			
-	
-	QLineF userLine(p1,QPointF());
-	QLineF userLine2(p0,QPointF());
-	
-	//double userLineAngle = 90+45-angB+apLine.angle()-180;
-	//userLineAngle *= -1;
-	//userLine.setAngle(angA + apLine.angle() + 90*3);
-	userLine.setAngle(angA + apLine.angle());
-// 	userLine.setLength(r1);
-	userLine.setLength(lb);
-	
-	userLine2.setAngle(angA + angC + apLine.angle());
-// 	userLine2.setLength(r0);
-	userLine2.setLength(la);
-	
-	double realAngle3 = realLine2.angleTo(realLine);
-	
-	double errA = realAngle  - angA;
-	double errB = realAngle2 - angB;
-	double errC = realAngle3 - angC;
-	
-	qDebug() << "Triangulation: ang(A-C):"<<angA<<angB<<angC<<", cos(A-C):"<<cosA<<cosB<<cosC;
-	qDebug() << "Triangulation: err(A-C):"<<errA<<errB<<errC;
-	qDebug() << "Triangulation: abs(A-C):"<<realAngle<<realAngle2<<apLine.angle();
-	qDebug() << "Triangulation: realAngle:"<<realAngle<<"/"<<realLine.length()<<", realAngle2:"<<realAngle2<<"/"<<realLine2.length();
-	qDebug() << "Triangulation: apLine.angle:"<<apLine.angle()<<", line1->line2 angle:"<<userLine.angleTo(userLine2)<<", realAngle3:"<<realAngle3;
-	
-	//QPointF calcPoint = userLine.p2();
-	
-	QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0], 
-					ap1, apMacToDbm[ap1]);
-	
-	userLine  = QLineF(p1, calcPoint);
-	userLine2 = QLineF(p0, calcPoint);
-	
-*/	
-	
-/*
-	QImage image(
-		(int)qMax((double)itemWorldRect.size().width(),  64.) + 10,
-		(int)qMax((double)itemWorldRect.size().height(), 64.) + 10,
-		QImage::Format_ARGB32_Premultiplied);
-*/
-	QRect picRect = m_sigMapItem->picture().boundingRect();
-	QPointF offset = picRect.topLeft();
-		
-// 	QImage image(picRect.size(), QImage::Format_ARGB32_Premultiplied);
-// 	QPainter p(&image);
-// 	p.translate(-offset);
-	
-	QSize origSize = m_bgPixmap.size();
-	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
-	offset = QPointF();
-	
-	memset(image.bits(), 0, image.byteCount());
-	QPainter p(&image);
-	
-	//QPainter p(&image);
-	
-	//p.setPen(Qt::black);
-	
-//	QRectF rect(QPointF(0,0),itemWorldRect.size());
-// 	QRectF rect = itemWorldRect;
-// 	QPointF center = rect.center();
-	
-	#ifdef Q_OS_ANDROID
-	QString size = "64x64";
-	#else
-	QString size = "32x32";
-	#endif
-	
-	double penWidth = 20.0;
-	
-	QHash<QString,bool> drawnFlag;
-	QHash<QString,int> badLossFactor;
-	
-	QVector<QPointF> userPoly;
-	
-	QPointF avgPoint(0.,0.);
-	int count = 0;
-	
-	int numAps = apsVisible.size();
-	for(int i=0; i<numAps; i++)
-	{
-		QString ap0 = apsVisible[i];
-		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
-		
-		QPointF p0 = apInfo(ap0)->point;
-		QPointF p1 = apInfo(ap1)->point;
-		
-		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
-						ap1, apMacToDbm[ap1]);
-		
-		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-		{
-			if(!badLossFactor.contains(ap0))
-				badLossFactor[ap0] = 0;
+			// We assume triangulate() already stored drived loss factor into apInfo()
+			double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
+			double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
+			
+			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+			
+			if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
 			else
-				badLossFactor[ap0] = badLossFactor[ap0] + 1;
-			
-			if(!badLossFactor.contains(ap1))
-				badLossFactor[ap1] = 0;
-			else
-				badLossFactor[ap1] = badLossFactor[ap1] + 1;
+			{
+				userPoly << calcPoint;
 				
-			qDebug() << "\t NaN: "<<badLossFactor[ap0]<<" / "<<badLossFactor[ap1];
-		}
-		else
-		{
-			avgPoint += calcPoint;
-			count ++;
-		}
-	}
-	
-// 	avgPoint.setX( avgPoint.x() / count );
-// 	avgPoint.setY( avgPoint.y() / count );
-	avgPoint /= count;
-	
-	foreach(QString ap, apsVisible)
-	{
-		if(badLossFactor[ap] > 0)
-		{
-			MapApInfo *info = apInfo(ap);
-			
-			double avgMeterDist = QLineF(avgPoint, info->point).length() / m_meterPx;
-			double absLossFactor = deriveLossFactor(ap, apMacToDbm[ap], avgMeterDist/*, gRx*/);
-
-			if(isnan(absLossFactor))
-			{
-				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
-			}
-			else
-			{
-				QPointF lossFactor = info->lossFactor;
-				if(apMacToDbm[ap] > info->shortCutoff)
-					lossFactor.setY(absLossFactor);
-				else
-					lossFactor.setX(absLossFactor);
-
-				info->lossFactor = lossFactor;
-
-				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
-			}
-		}
-	}
-
-	QPointF avgPoint2(0.,0.);
-	count = 0;
-
-// 	int numAps = apsVisible.size();
-	for(int i=0; i<numAps; i++)
-	{
-// 		QString ap0 = apsVisible[i];
-// 		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
-
-		QString ap0 = apsVisible[0];
-		QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+				QColor color0 = baseColorForAp(ap0);
+				if(!drawnFlag.contains(ap0))
+				{
+					drawnFlag.insert(ap0, true);
+					
+					p.setPen(QPen(color0, penWidth));
+					
+					if(isnan(r0))
+						qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+					else
+						p.drawEllipse(p0, r0, r0);
+				}
+				
+				QColor color1 = baseColorForAp(ap1);
 		
-		QPointF p0 = apInfo(ap0)->point;
-		QPointF p1 = apInfo(ap1)->point;
-		
-		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
-						ap1, apMacToDbm[ap1]);
-		
-		// We assume triangulate() already stored drived loss factor into apInfo()
-		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_meterPx;
-		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_meterPx;
-		
-		qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
-		
-		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
-		else
-		{
-			userPoly << calcPoint;
-			
-			QColor color0 = baseColorForAp(ap0);
-			if(!drawnFlag.contains(ap0))
-			{
-				drawnFlag.insert(ap0, true);
+				if(!drawnFlag.contains(ap1))
+				{
+					drawnFlag.insert(ap1, true);
+					
+					p.setPen(QPen(color1, penWidth));
+					
+					if(isnan(r1))
+						qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+					else
+						p.drawEllipse(p1, r1, r1);
+					
+				}
 				
 				p.setPen(QPen(color0, penWidth));
-				
-				if(isnan(r0))
-					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
-				else
-					p.drawEllipse(p0, r0, r0);
-			}
-			
-			QColor color1 = baseColorForAp(ap1);
-	
-			if(!drawnFlag.contains(ap1))
-			{
-				drawnFlag.insert(ap1, true);
+				p.drawLine(p0, calcPoint);
 				
 				p.setPen(QPen(color1, penWidth));
+				p.drawLine(p1, calcPoint);
 				
-				if(isnan(r1))
-					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
-				else
-					p.drawEllipse(p1, r1, r1);
-				
+				avgPoint2 += calcPoint;
+				count ++;
 			}
 			
-			p.setPen(QPen(color0, penWidth));
-			p.drawLine(p0, calcPoint);
+			//p.setPen(QPen(Qt::gray, penWidth));
+			//p.drawLine(p0, p1);
 			
-			p.setPen(QPen(color1, penWidth));
-			p.drawLine(p1, calcPoint);
-			
-			avgPoint2 += calcPoint;
-			count ++;
+			//break;
 		}
 		
-		//p.setPen(QPen(Qt::gray, penWidth));
-		//p.drawLine(p0, p1);
+	// 	avgPoint2.setX( avgPoint.x() / count );
+	// 	avgPoint2.setY( avgPoint.y() / count );
+		avgPoint2 /= count;
+	
 		
-		//break;
-	}
+		p.setPen(QPen(Qt::red, 30.));
+		//p.drawPolygon(userPoly);
 	
-// 	avgPoint2.setX( avgPoint.x() / count );
-// 	avgPoint2.setY( avgPoint.y() / count );
-	avgPoint2 /= count;
-
-	
-	p.setPen(QPen(Qt::red, 30.));
-	//p.drawPolygon(userPoly);
-
-	penWidth = 100;
-	
-	p.setPen(QPen(Qt::green, 10.));
-	p.setBrush(QColor(0,0,0,127));
-	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
-		p.drawEllipse(avgPoint, penWidth, penWidth);
-	
-	if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
-	{
-		if(avgPoint == avgPoint2)
-			p.setPen(QPen(Qt::yellow, 10.));
-		else
-			p.setPen(QPen(Qt::red, 10.));
-			
+		penWidth = 100;
+		
+		p.setPen(QPen(Qt::green, 10.));
 		p.setBrush(QColor(0,0,0,127));
-		p.drawEllipse(avgPoint2, penWidth, penWidth);
+		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+			p.drawEllipse(avgPoint, penWidth, penWidth);
 		
-		#ifdef OPENCV_ENABLED
-		m_kalman.predictionUpdate((float)avgPoint2.x(), (float)avgPoint2.y());
-		
-		float x = avgPoint2.x(), y = avgPoint2.y();
-		m_kalman.predictionReport(x, y);
-		QPointF thisPredict(x,y);
-		
-		p.setPen(QPen(Qt::blue, 15.));
+		if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
+		{
+			if(avgPoint == avgPoint2)
+				p.setPen(QPen(Qt::yellow, 10.));
+			else
+				p.setPen(QPen(Qt::red, 10.));
+				
+			p.setBrush(QColor(0,0,0,127));
+			p.drawEllipse(avgPoint2, penWidth, penWidth);
 			
-		p.setBrush(QColor(0,0,0,127));
-		p.drawEllipse(thisPredict, penWidth, penWidth);
-		#endif
+			#ifdef OPENCV_ENABLED
+			m_kalman.predictionUpdate((float)avgPoint2.x(), (float)avgPoint2.y());
+			
+			float x = avgPoint2.x(), y = avgPoint2.y();
+			m_kalman.predictionReport(x, y);
+			QPointF thisPredict(x,y);
+			
+			p.setPen(QPen(Qt::blue, 15.));
+				
+			p.setBrush(QColor(0,0,0,127));
+			p.drawEllipse(thisPredict, penWidth, penWidth);
+			#endif
+		}
+		
+	/*	
+		p.setPen(QPen(Qt::blue,penWidth));
+	// 	QPointF s1 = line.p1() - itemWorldRect.topLeft();
+	// 	QPointF s2 = line.p2() - itemWorldRect.topLeft();
+		QPointF s1 = line.p1();
+		QPointF s2 = line.p2();
+		
+		//p.drawLine(s1,s2);
+		
+		QImage user(tr(":/data/images/%1/stock-media-rec.png").arg(size));
+		p.drawImage((s1+s2)/2., user.scaled(128,128));
+		
+		p.setBrush(Qt::blue);
+	// 	p.drawRect(QRectF(s1.x()+3,s1.y()+3,6,6));
+	// 	p.drawRect(QRectF(s2.x()-3,s2.y()-3,6,6));
+		
+		p.setBrush(QBrush());
+		//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
+		p.setPen(QPen(Qt::white,penWidth));
+	// 	p.drawEllipse(p0, r0,r0);
+		p.drawEllipse(p0, la,la);
+		p.setPen(QPen(Qt::red,penWidth));
+	// 	p.drawEllipse(p1, r1,r1);
+		p.drawEllipse(p1, lb,lb);
+		p.setPen(QPen(Qt::green,penWidth));
+		if(!p2.isNull())
+			p.drawEllipse(p2, r2,r2);
+		
+		p.setPen(QPen(Qt::white,penWidth));
+		p.drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
+		p.setPen(QPen(Qt::red,penWidth));
+		p.drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
+		p.setPen(QPen(Qt::green,penWidth));
+		if(!p2.isNull())
+			p.drawRect(QRectF(p2-QPointF(5,5), QSizeF(10,10)));
+		
+	// 	p.setPen(QPen(Qt::red,penWidth));
+	// 	p.drawLine(line);
+	// 	p.drawLine(line2);
+	// 	p.drawLine(line3);
+		
+		penWidth *=2;
+		
+		p.setPen(QPen(Qt::white,penWidth));
+		p.drawLine(realLine);
+		p.setPen(QPen(Qt::gray,penWidth));
+		p.drawLine(realLine2);
+	
+		penWidth /=2;
+		p.setPen(QPen(Qt::darkGreen,penWidth));
+		p.drawLine(apLine);
+		p.setPen(QPen(Qt::darkYellow,penWidth));
+		p.drawLine(userLine);
+		p.setPen(QPen(Qt::darkRed,penWidth));
+		p.drawLine(userLine2);
+	
+	// 	p.setPen(QPen(Qt::darkYellow,penWidth));
+	// 	p.drawRect(QRectF(calcPoint-QPointF(5,5), QSizeF(10,10)));
+	// 	p.setPen(QPen(Qt::darkGreen,penWidth));
+	// 	p.drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
+		
+	*/
+		p.end();
 	}
-	
-/*	
-	p.setPen(QPen(Qt::blue,penWidth));
-// 	QPointF s1 = line.p1() - itemWorldRect.topLeft();
-// 	QPointF s2 = line.p2() - itemWorldRect.topLeft();
-	QPointF s1 = line.p1();
-	QPointF s2 = line.p2();
-	
-	//p.drawLine(s1,s2);
-	
-	QImage user(tr(":/data/images/%1/stock-media-rec.png").arg(size));
-	p.drawImage((s1+s2)/2., user.scaled(128,128));
-	
-	p.setBrush(Qt::blue);
-// 	p.drawRect(QRectF(s1.x()+3,s1.y()+3,6,6));
-// 	p.drawRect(QRectF(s2.x()-3,s2.y()-3,6,6));
-	
-	p.setBrush(QBrush());
-	//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
-	p.setPen(QPen(Qt::white,penWidth));
-// 	p.drawEllipse(p0, r0,r0);
-	p.drawEllipse(p0, la,la);
-	p.setPen(QPen(Qt::red,penWidth));
-// 	p.drawEllipse(p1, r1,r1);
-	p.drawEllipse(p1, lb,lb);
-	p.setPen(QPen(Qt::green,penWidth));
-	if(!p2.isNull())
-		p.drawEllipse(p2, r2,r2);
-	
-	p.setPen(QPen(Qt::white,penWidth));
-	p.drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
-	p.setPen(QPen(Qt::red,penWidth));
-	p.drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
-	p.setPen(QPen(Qt::green,penWidth));
-	if(!p2.isNull())
-		p.drawRect(QRectF(p2-QPointF(5,5), QSizeF(10,10)));
-	
-// 	p.setPen(QPen(Qt::red,penWidth));
-// 	p.drawLine(line);
-// 	p.drawLine(line2);
-// 	p.drawLine(line3);
-	
-	penWidth *=2;
-	
-	p.setPen(QPen(Qt::white,penWidth));
-	p.drawLine(realLine);
-	p.setPen(QPen(Qt::gray,penWidth));
-	p.drawLine(realLine2);
-
-	penWidth /=2;
-	p.setPen(QPen(Qt::darkGreen,penWidth));
-	p.drawLine(apLine);
-	p.setPen(QPen(Qt::darkYellow,penWidth));
-	p.drawLine(userLine);
-	p.setPen(QPen(Qt::darkRed,penWidth));
-	p.drawLine(userLine2);
-
-// 	p.setPen(QPen(Qt::darkYellow,penWidth));
-// 	p.drawRect(QRectF(calcPoint-QPointF(5,5), QSizeF(10,10)));
-// 	p.setPen(QPen(Qt::darkGreen,penWidth));
-// 	p.drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
-	
-*/
-	p.end();
 	
 	m_userItem->setPixmap(QPixmap::fromImage(image));
 	//m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
@@ -2178,17 +2193,8 @@ void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
 	}
 	m_longPressTimer.start();
 	m_pressPnt = mouseEvent->lastScenePos();
-
-	double half = m_longPressSpinner->boundingRect().width()/2;
-	int fingertipAdjust = 0;
-
-	#ifdef Q_OS_ANDROID
-	// TODO Is there some OS preference that indicates right or left handed usage?
-	fingertipAdjust = -half/3;
-	// Move the spinner slightly left to make it "look" more centered under the fingertip when using it right handed
-	#endif
 	
-	m_longPressSpinner->setPos(m_pressPnt);// - QPointF(half + fingertipAdjust, half));
+	m_longPressSpinner->setPos(m_pressPnt);
 	
 	m_longPressCountTimer.start();
 	m_longPressCount = 0;
@@ -4212,7 +4218,13 @@ LongPressSpinner::LongPressSpinner()
 	QSizeF size = QSizeF(iconSize,iconSize);//.expandTo(QApplication::globalStrut());
 
 	//m_boundingRect = QRectF(QPointF(0,0),size);
-	m_boundingRect = QRectF(QPointF(-iconSize/2,-iconSize/2),size);
+	double fingerTipAdjust = 0;
+ 	#ifdef Q_OS_ANDROID
+// 	// TODO Is there some OS preference that indicates right or left handed usage?
+ 	fingertipAdjust = (iconSize/2)/3;
+	#endif
+
+	m_boundingRect = QRectF(QPointF(-iconSize/2 - fingerTipAdjust,-iconSize/2),size);
 	
 	connect(&m_goodPressTimer, SIGNAL(timeout()), this, SLOT(fadeTick()));
 	m_goodPressTimer.setInterval(333/20);
@@ -4277,7 +4289,7 @@ QRectF LongPressSpinner::boundingRect() const
 	return m_boundingRect;
 }
 	
-void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget */*widget*/)
+void LongPressSpinner::paint(QPainter *painter, const QStyleOptionGraphicsItem */*option*/, QWidget */*widget*/)
 {
 	painter->save();
 	//painter->setClipRect( option->exposedRect );
@@ -4951,3 +4963,16 @@ void MapGraphicsScene::setMeterPx(double m)
 	m_meterPx = m;
 	m_footPx  = m / 3.28084;
 }
+
+void MapGraphicsScene::setShowMyLocation(bool flag)
+{
+	m_showMyLocation = flag;
+	QSettings("wifisigmap").setValue("showMyLocation", flag);
+}
+
+void MapGraphicsScene::setAutoGuessApLocations(bool flag)
+{
+	m_autoGuessApLocations = flag;
+	QSettings("wifisigmap").setValue("autoGuessApLocations", flag);
+}
+
