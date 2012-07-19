@@ -244,6 +244,13 @@ public:
 	#ifdef OPENCV_ENABLED
 	KalmanFilter kalman;
 	#endif
+	
+	QPointF locationGuess;
+
+	#ifdef OPENCV_ENABLED
+	KalmanFilter locationGuessKalman;
+	#endif
+
 };
 
 class MapRenderOptions
@@ -367,11 +374,17 @@ protected:
 	*/ 
 	double dBmToDistance(int dBm, QString apMac,   double rxGain=3.);
 	
-	/** \brief driveObservedLossFactor() calculates an approx lossFactor from observed signal readings for both short and long factors (x and y)
+	/** \brief deriveObservedLossFactor() calculates an approx lossFactor from observed signal readings for both short and long factors (x and y)
 	    NOTE: Assumes m_meterPx is set correctly to convert pixel distance on the current background (map) to meters
 	*/
 	QPointF deriveObservedLossFactor(QString apMac);
+
+	/** \brief deriveImpliedLossFactor() calculates an approx lossFactor from observed signal readings *based on location of readings* (it assumes AP locations are unknown) for both short and long factors (x and y)
+	    NOTE: Assumes m_meterPx is set correctly to convert pixel distance on the current background (map) to meters
+	*/
+	QPointF deriveImpliedLossFactor(QString apMac);
 	
+
 	/// \brief Calculate the appropriate loss factor which would give distMeters
 	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
 	

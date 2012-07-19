@@ -46,7 +46,72 @@ bool MapGraphicsScene_sort_WifiDataResult(WifiDataResult ra, WifiDataResult rb)
 }
 
 
-/// fillTriColor() is a routine I translated from Delphi, atrribution below. 
+
+
+static QString SigMapRenderer_sort_apMac;
+static QPointF SigMapRenderer_sort_center;
+
+bool SigMapRenderer_sort_SigMapValue_bySignal(SigMapValue *a, SigMapValue *b)
+{
+	QString apMac  = SigMapRenderer_sort_apMac;
+	if(!a || !b) return false;
+
+	double va = a && a->hasAp(apMac) ? a->signalForAp(apMac) : 0.;
+	double vb = b && b->hasAp(apMac) ? b->signalForAp(apMac) : 0.;
+	return va < vb;
+
+}
+
+bool SigMapRenderer_sort_SigMapValue(SigMapValue *a, SigMapValue *b)
+{
+	QString apMac  = SigMapRenderer_sort_apMac;
+	QPointF center = SigMapRenderer_sort_center;
+
+// 	double va = a && a->hasAp(apMac) ? a->signalForAp(apMac) : 0.;
+// 	double vb = b && b->hasAp(apMac) ? b->signalForAp(apMac) : 0.;
+// 	return va < vb;
+
+	double aDist = 0.0;
+	double bDist = 0.0;
+
+	// sqrt() commented out because its not needed just for sorting (e.g. a squared value compares the same as a sqrt'ed value)
+	if(a)
+	{
+		if(a->renderDataDirty)
+		{
+			QPointF calcPoint = a->point - center;
+			aDist = /*sqrt*/(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
+
+			a->renderLevel     = aDist;
+			a->renderDataDirty = false;
+		}
+		else
+		{
+			aDist = a->renderLevel;
+		}
+	}
+
+	if(b)
+	{
+		if(b->renderDataDirty)
+		{
+			QPointF calcPoint = b->point - center;
+			bDist = /*sqrt*/(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
+
+			b->renderLevel     = bDist;
+			b->renderDataDirty = false;
+		}
+		else
+		{
+			bDist = b->renderLevel;
+		}
+	}
+
+	return aDist > bDist;
+}
+
+
+/// fillTriColor() is a routine I translated from Delphi, atrribution below.
 
 class TRGBFloat {
 public:
@@ -1855,7 +1920,182 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	*/
 		p.end();
 	}
-	
+
+	if(m_autoGuessApLocations)
+	{
+		/// JUST for debugging
+		// 	realPoint = m_sigValues.last()->point;
+		// 	results   = m_sigValues.last()->scanResults;
+		//
+
+		// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
+		QStringList apsVisible;
+		QHash<QString,double> apMacToSignal;
+		QHash<QString,int> apMacToDbm;
+		
+		foreach(WifiDataResult result, results)
+		{
+			//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result;
+			if(!apMacToSignal.contains(result.mac))
+			{
+				apsVisible << result.mac;
+				apMacToSignal.insert(result.mac, result.value);
+
+				#ifdef OPENCV_ENABLED
+				// Use Kalman to filter the dBm value
+				MapApInfo *info = apInfo(result.mac);
+				info->kalman.predictionUpdate(result.dbm, 0);
+
+				float value = (float)result.dbm, tmp = 0;
+				info->kalman.predictionReport(value, tmp);
+				apMacToDbm.insert(result.mac, (int)value);
+				result.dbm = (int)value;
+
+				#else
+
+				apMacToDbm.insert(result.mac, result.dbm);
+
+				#endif
+
+				qDebug() << "[apLocationGuess:apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
+			}
+		}
+
+
+		if(m_sigValues.isEmpty())
+		{
+			qDebug() << "[apLocationGuess] No readings, can't guess anything";
+		}
+
+
+		QPainter p(&image);
+
+
+		#ifdef Q_OS_ANDROID
+		QString size = "64x64";
+		#else
+		QString size = "32x32";
+		#endif
+
+		double penWidth = 20.0;
+
+		QHash<QString,bool> drawnFlag;
+		QHash<QString,int> badLossFactor;
+
+		QVector<QPointF> userPoly;
+
+		QPointF avgPoint(0.,0.);
+		int count = 0;
+
+
+		QHash<QString, QList<SigMapValue*> > valuesByAp;
+		foreach(QString apMac, apsVisible)
+		{
+			// Build a list of values for this AP
+			valuesByAp.insert(apMac, QList<SigMapValue *>());
+			foreach(SigMapValue *val, m_sigValues)
+				if(val->hasAp(apMac))
+					valuesByAp[apMac].append(val);
+
+			// Sort values by signal
+			QList<SigMapValue *> list = valuesByAp[apMac];
+			qSort(list.begin(), list.end(), SigMapRenderer_sort_SigMapValue_bySignal);
+			valuesByAp[apMac] = list;
+
+
+			MapApInfo *info = apInfo(apMac);
+			
+			qDebug() << "[apLocationGuess] Found "<<list.size()<<" readings for apMac:"<<apMac<<", ESSID:" << info->essid;
+
+			if(list.isEmpty())
+				continue;
+			
+			QPointF avgPoint2(0.,0.);
+			count = 0;
+			int numVals = list.size();
+
+		// 	int numAps = apsVisible.size();
+			SigMapValue *val0 = list.first();
+			
+			for(int i=1; i<numVals; i++)
+			{
+				SigMapValue *val1 = list[i];
+				
+				QPointF calcPoint = triangulateAp(apMac, val0, val1);
+
+				// We assume triangulate() already stored drived loss factor into apInfo()
+				double r0 = dBmToDistance(val0->signalForAp(apMac, true), apMac) * m_meterPx;
+				double r1 = dBmToDistance(val1->signalForAp(apMac, true), apMac) * m_meterPx;
+
+				//qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+
+				if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+				else
+				{
+					//userPoly << calcPoint;
+
+					QColor color0 = baseColorForAp(apMac);
+
+					p.setPen(QPen(color0, penWidth));
+					p.drawLine(p0, calcPoint);
+
+					avgPoint2 += calcPoint;
+					count ++;
+				}
+
+				//break;
+			}
+
+			avgPoint2 /= count;
+
+			p.setPen(QPen(Qt::red, 30.));
+			//p.drawPolygon(userPoly);
+
+			penWidth = 100;
+
+			p.setPen(QPen(Qt::green, 10.));
+			p.setBrush(QColor(0,0,0,127));
+			if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+				p.drawEllipse(avgPoint, penWidth, penWidth);
+
+			if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
+			{
+// 				if(avgPoint == avgPoint2)
+// 					p.setPen(QPen(Qt::yellow, 10.));
+// 				else
+					p.setPen(QPen(Qt::green, 10.));
+
+				p.setBrush(QColor(0,0,0,127));
+				p.drawEllipse(avgPoint2, penWidth, penWidth);
+
+				#ifdef OPENCV_ENABLED
+				info->locationGuessKalman.predictionUpdate((float)avgPoint2.x(), (float)avgPoint2.y());
+
+				float x = avgPoint2.x(), y = avgPoint2.y();
+				info->locationGuessKalman.predictionReport(x, y);
+				QPointF thisPredict(x,y);
+
+				p.setPen(QPen(Qt::darkGreen, 15.));
+
+				p.setBrush(QColor(0,0,0,127));
+				p.drawEllipse(thisPredict, penWidth, penWidth);
+
+				info->locationGuess = thisPredict;
+
+				#else
+
+				info->locationGuess = avgPoint2;
+				
+				#endif
+				
+			}
+
+		}
+
+		p.end();
+	}
+
 	m_userItem->setPixmap(QPixmap::fromImage(image));
 	//m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
 	//m_userItem->setPos(itemWorldRect.center());
@@ -2138,6 +2378,89 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 	return lossFactor;
 }
 
+QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
+{
+	const double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
+	const double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
+
+	MapApInfo *info = apInfo(apMac);
+	double pTx = info->txPower;
+	double gTx = info->txGain;
+
+	int shortCutoff = info->shortCutoff;
+
+	QPointF lossFactor(2.,2.);
+
+	// Use a reworked distance formula to calculate lossFactor for each point, then average together
+
+	double shortFactor = 0.,
+		longFactor  = 0.;
+
+	int    shortCount  = 0,
+		longCount   = 0;
+
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		if(val->hasAp(apMac))
+		{
+			double pRx = val->signalForAp(apMac, true); // true = return raw dBM
+			double gRx = val->rxGain;
+
+			// TODO Rework formula and this algorithm to account for the distance between two points instead of point and AP
+
+			// Assuming: logDist = (1/(10*n)) * (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+			// Rearranging gives:
+			// logDist = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)) / (10n)
+			// =
+			// 1/10n = logDist / (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi))
+			// =
+			// n = 1/(logDist / (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi)))/10
+			//
+			// Paraphrased:
+			// adjustedPower = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi))
+			// logDist = 1/10n * adjustedPower
+			// 	(or simply: logDist = adjustedPower/(10n))
+			// n = 1/(logDist/adjustedPower)/10
+			// Where logDist = log(distFromAp * metersPerPixel)
+			// NOTE: Any log above is base 10 as in log10(), above, not natrual logs as in log()
+
+			double logDist       = log10(QLineF(info->point,val->point).length() / m_meterPx);
+			double adjustedPower = (pTx - pRx + gTx + gRx - Xa + 20*log10(m) - 20*log10(4*Pi));
+			double n             = 1. / (logDist / adjustedPower) / 10.;
+
+			if(pRx > shortCutoff)
+			{
+				shortFactor += n;
+				shortCount  ++;
+			}
+			else
+			{
+				longFactor  += n;
+				longCount   ++;
+			}
+		}
+	}
+
+	if(!shortCount)
+	{
+		shortFactor = 2.;
+		shortCount  = 1;
+	}
+
+	if(!longCount)
+	{
+		longFactor = 1.;
+		longCount  = 1;
+	}
+
+	lossFactor = QPointF( longFactor /  longCount,
+				shortFactor / shortCount);
+
+	// TODO calc MSE for the resultant N as error += ( (dBmToDistance(dBm, lossFactor)-realDist)^2 ) foreach reading; error/= readings
+	return lossFactor;
+}
+
+		
 double MapGraphicsScene::dBmToDistance(int dBm, QString apMac, double gRx)
 {
 	MapApInfo *info = apInfo(apMac);
@@ -2828,58 +3151,6 @@ SigMapRenderer::SigMapRenderer(MapGraphicsScene* gs)
 	: QObject(), m_gs(gs)
 {
 	qRegisterMetaType<QPicture>("QPicture");
-}
-
-
-static QString SigMapRenderer_sort_apMac;
-static QPointF SigMapRenderer_sort_center;
-
-bool SigMapRenderer_sort_SigMapValue(SigMapValue *a, SigMapValue *b)
-{
-	QString apMac  = SigMapRenderer_sort_apMac;
-	QPointF center = SigMapRenderer_sort_center;
-	
-// 	double va = a && a->hasAp(apMac) ? a->signalForAp(apMac) : 0.;
-// 	double vb = b && b->hasAp(apMac) ? b->signalForAp(apMac) : 0.;
-// 	return va < vb;
-	
-	double aDist = 0.0;
-	double bDist = 0.0;
-	
-	// sqrt() commented out because its not needed just for sorting (e.g. a squared value compares the same as a sqrt'ed value)
-	if(a)
-	{
-		if(a->renderDataDirty)
-		{
-			QPointF calcPoint = a->point - center;
-			aDist = /*sqrt*/(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
-			
-			a->renderLevel     = aDist;
-			a->renderDataDirty = false;
-		}
-		else
-		{
-			aDist = a->renderLevel;
-		}
-	}
-	
-	if(b)
-	{
-		if(b->renderDataDirty)
-		{
-			QPointF calcPoint = b->point - center;
-			bDist = /*sqrt*/(calcPoint.x() * calcPoint.x() + calcPoint.y() * calcPoint.y());
-			
-			b->renderLevel     = bDist;
-			b->renderDataDirty = false;
-		}
-		else
-		{
-			bDist = b->renderLevel;
-		}
-	}
-	
-	return aDist > bDist;
 }
 
 #define fuzzyIsEqual(a,b) ( fabs(a - b) < 0.00001 )
