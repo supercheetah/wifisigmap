@@ -274,7 +274,7 @@ void MapWindow::chooseBgSlot()
 
 		QInputDialog d(this);
 		d.setInputMode(QInputDialog::DoubleInput);
-		d.setLabelText("Pixels per meter:");
+		d.setLabelText("Pixels per foot:");
 		d.setDoubleMinimum(1.0);
 		d.setDoubleMaximum(1000000);
 		d.setDoubleDecimals(2);
@@ -284,7 +284,7 @@ void MapWindow::chooseBgSlot()
 		AndroidDialogHelper(this, d);
 
 		if(d.exec() == QDialog::Accepted)
-			m_scene->setMeterPx(d.doubleValue());
+			m_scene->setPixelsPerFoot(d.doubleValue());
 	}
 }
 
