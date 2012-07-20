@@ -636,6 +636,10 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	m_apGuessUpdateTimer.setInterval(50);
 	m_apGuessUpdateTimer.setSingleShot(true);
 	
+	// Delay rendering updates on signal markers so multiple calls in quick succession to setRenderAp() only triggers one rendering pass
+	connect(&m_updateSignalMarkerTimer, SIGNAL(timeout()), this, SLOT(updateSignalMarkers()));
+	m_updateSignalMarkerTimer.setInterval(50);
+	m_updateSignalMarkerTimer.setSingleShot(true);
 	
 	// Received every time a scan is completed in continous mode (continuous mode being the default)
 	connect(&m_scanIf, SIGNAL(scanFinished(QList<WifiDataResult>)), this, SLOT(scanFinished(QList<WifiDataResult>)));
@@ -651,6 +655,11 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 // 	m_pixelsPerFoot  = 12.;
 
 	setPixelsPerFoot(0.25/10);
+	
+	m_device = settings.value("device", "").toString();
+	
+	m_renderOpts.loadFromQSettings();
+	
 	
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
@@ -672,6 +681,13 @@ MapGraphicsScene::~MapGraphicsScene()
 	}
 }
 
+void MapGraphicsScene::setDevice(QString dev)
+{
+	m_device = dev;
+	
+	if(dev.contains("/") || dev.contains("\\")) // HACK to see if it's a file
+		m_scanIf.setDataTextfile(dev);
+}
 
 void MapGraphicsScene::debugTest()
 {
@@ -1025,9 +1041,12 @@ void MapGraphicsScene::positionUpdated(QtMobility::QGeoPositionInfo info)
 
 void MapGraphicsScene::triggerRender()
 {
+	if(m_renderUpdatesPaused)
+		return;
+		
 	if(m_renderTrigger.isActive())
 		m_renderTrigger.stop();
-	m_renderTrigger.start(0);
+	m_renderTrigger.start(50);
 	m_mapWindow->setStatusMessage("Rendering signal map...");
 }
 
@@ -2430,7 +2449,7 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 	if(method == 2)
 	{
 		// Try to minimize MSE using a gradient decent search for n
-		// Stop when MSE < 0.1 OR num iterations > 1_000_000 OR (zig-zag TODO)
+		// Stop when MSE < 0.1 OR num iterations > 1_000_000 OR zig-zag
 		
 		const double errorCutoff = 0.01; // minimum eror
 		const int maxIterations = 1000000;
@@ -2524,6 +2543,9 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 	return lossFactor;
 }
 
+// TODO 'implied' loss factor should be a loss factor we can use to triangulate the location of the *AP*.
+// So we need to derive a loss factor implied by the signal variance between readings at different (known) locations, given the distance between those locations.
+// The code below DOES NOT do any of that - it's just here as a placeholder till I get around to reworking it
 QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
 {
 	const double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
@@ -2647,7 +2669,7 @@ double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCut
 	double logDist = (1/(10*n)) * (txPower - dBm + txGain + rxGain - Xa + 20*log10(m) - 20*log10(4*Pi));
 	double distMeters = pow(10, logDist); // distance in meters
 	
-	qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist;
+	//qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist;
 	
 	return distMeters;
 }
@@ -2851,9 +2873,12 @@ void MapGraphicsScene::longPressTimeout()
 
 void MapGraphicsScene::setRenderMode(RenderMode r)
 {
-	m_colorListForMac.clear(); // color gradient style change based on render mode
-	m_renderMode = r;
-	triggerRender();
+	if(r != m_renderMode)
+	{
+		m_colorListForMac.clear(); // color gradient style change based on render mode
+		m_renderMode = r;
+		triggerRender();
+	}
 }
 
 /// ImageFilters class, inlined here for ease of implementation
@@ -2910,10 +2935,8 @@ QImage ImageFilters::blurred(const QImage& image, const QRect& /*rect*/, int rad
 
 /// End ImageFilters implementation
 
-
-SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
-{	
-	
+QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
+{
 #ifdef Q_OS_ANDROID
 	const int iconSize = 64;
 #else
@@ -2925,16 +2948,23 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	int numResults = results.size();
 	double angleStepSize = 360. / ((double)numResults);
 	
+	int resultCounter = 0;
+	
 	QRectF boundingRect;
 	QList<QRectF> iconRects;
 	for(int resultIdx=0; resultIdx<numResults; resultIdx++)
 	{
-		double rads = ((double)resultIdx) * angleStepSize * 0.0174532925;
-		double iconX = iconSizeHalf/2.5 * numResults * cos(rads);
-		double iconY = iconSizeHalf/2.5 * numResults * sin(rads);
-		QRectF iconRect = QRectF(iconX - iconSizeHalf, iconY - iconSizeHalf, (double)iconSize, (double)iconSize);
-		iconRects << iconRect;
-		boundingRect |= iconRect;
+		if(apInfo(results[resultIdx].mac)->renderOnMap)
+		{
+			double rads = ((double)resultCounter) * angleStepSize * 0.0174532925;
+			double iconX = iconSizeHalf/2.5 * numResults * cos(rads);
+			double iconY = iconSizeHalf/2.5 * numResults * sin(rads);
+			QRectF iconRect = QRectF(iconX - iconSizeHalf, iconY - iconSizeHalf, (double)iconSize, (double)iconSize);
+			iconRects << iconRect;
+			boundingRect |= iconRect;
+			
+			resultCounter ++;
+		}
 	}
 	
 	boundingRect.adjust(-1,-1,+2,+2);
@@ -2959,9 +2989,12 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	double zeroAdjX = boundingRect.x() < 0. ? fabs(boundingRect.x()) : 0.0; 
 	double zeroAdjY = boundingRect.y() < 0. ? fabs(boundingRect.y()) : 0.0;
 	
+	resultCounter = 0;
 	for(int resultIdx=0; resultIdx<numResults; resultIdx++)
 	{
 		WifiDataResult result = results[resultIdx];
+		if(!apInfo(results[resultIdx].mac)->renderOnMap)
+			continue;
 		
 		QColor centerColor = colorForSignal(result.value, result.mac);
 		
@@ -3027,12 +3060,22 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 			*/
 		}
 		p.restore();
+		
+		resultCounter ++;
 	}
 	
 	p.end();
 	
 	markerGroup = addDropShadow(markerGroup, (double)iconSize / 2.);
-		
+	
+	return markerGroup;
+}
+
+SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResult> results)
+{	
+	
+	QImage markerGroup = renderSignalMarker(results);
+	
 	//markerGroup.save("markerGroupDebug.jpg");
 	
 	// Create value record and graphics item
@@ -3057,7 +3100,7 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
 	item->setZValue(99);
 	
-	item->setOpacity(0);
+	//item->setOpacity(0);
 	
 	// Add pointer to the item in the scene to the signal value for turning on/off per user
 	val->marker = item;
@@ -4865,16 +4908,48 @@ void SigMapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
 
 /// End SigMapItem impl
 
+bool MapGraphicsScene::pauseRenderUpdates(bool flag)
+{
+	bool oldFlag = m_renderUpdatesPaused;
+	m_renderUpdatesPaused = flag;
+	
+	if(!flag)
+	{
+		triggerRender();
+		m_updateSignalMarkerTimer.start();
+	}
+	
+	return oldFlag;
+}
+
 void MapGraphicsScene::setRenderAp(MapApInfo *info, bool flag)
 {
 	info->renderOnMap = flag;
-	triggerRender();
+	
+	if(!m_renderUpdatesPaused)
+	{
+		if(m_updateSignalMarkerTimer.isActive())
+			m_updateSignalMarkerTimer.stop();
+		m_updateSignalMarkerTimer.start();
+		
+		triggerRender();
+	}
+}
+
+void MapGraphicsScene::updateSignalMarkers()
+{
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		// Re-render marker because the 'renderOnMap' flag for the AP contained therein may have changed
+		QImage markerGroup = renderSignalMarker(val->scanResults);
+		val->marker->setPixmap(QPixmap::fromImage(markerGroup));
+	}
 }
 
 void MapGraphicsScene::setRenderAp(QString mac, bool flag)
 {
-	apInfo(mac)->renderOnMap = flag;
-	triggerRender();
+	//apInfo(mac)->renderOnMap = flag;
+	setRenderAp(apInfo(mac), flag);
 }
 
 MapApInfo* MapGraphicsScene::apInfo(WifiDataResult r)
@@ -4887,7 +4962,6 @@ MapApInfo* MapGraphicsScene::apInfo(WifiDataResult r)
 	 
 	return inf;
 }
-
 
 MapApInfo* MapGraphicsScene::apInfo(QString apMac)
 {
@@ -5354,6 +5428,38 @@ void MapGraphicsScene::renderTriangle(QImage *img, QPointF center, SigMapValue *
 
 }
 
+void MapRenderOptions::loadFromQSettings()
+{
+	QSettings settings("wifisigmap");
+	
+	cacheMapRender     	= settings.value("ropts-cacheMapRender", 	true).toBool();
+	showReadingMarkers 	= settings.value("ropts-showReadingMarkers", 	true).toBool();
+	multipleCircles		= settings.value("ropts-multipleCircles", 	false).toBool();
+	fillCircles		= settings.value("ropts-fillCircles", 		true).toBool();
+	radialCircleSteps	= settings.value("ropts-radialCircleSteps", 	4 * 4 * 4).toInt();
+	radialLevelSteps	= settings.value("ropts-radialLevelSteps", 	(int)(100 / .25)).toInt();
+	radialAngleDiff		= settings.value("ropts-radialAngleDiff", 	45 * 3).toBool();
+	radialLevelDiff		= settings.value("ropts-radialLevelDiff", 	100 / 3).toBool();
+	radialLineWeight	= settings.value("ropts-radialLineWeight", 	200).toBool();
+
+}
+
+void MapRenderOptions::saveToQSettings()
+{
+	QSettings settings("wifisigmap");
+	
+	settings.setValue("ropts-cacheMapRender",	cacheMapRender);
+	settings.setValue("ropts-showReadingMarkers",	showReadingMarkers);
+	settings.setValue("ropts-multipleCircles",	multipleCircles);
+	settings.setValue("ropts-fillCircles",		fillCircles);
+	settings.setValue("ropts-radialCircleSteps",	radialCircleSteps);
+	settings.setValue("ropts-radialLevelSteps",	radialLevelSteps);
+	settings.setValue("ropts-radialAngleDiff",	radialAngleDiff);
+	settings.setValue("ropts-radialLevelDiff",	radialLevelDiff);
+	settings.setValue("ropts-radialLineWeight",	radialLineWeight);
+}
+
+
 void MapGraphicsScene::setRenderOpts(MapRenderOptions opts)
 {
 	m_renderOpts = opts;
@@ -5375,7 +5481,9 @@ void MapGraphicsScene::setRenderOpts(MapRenderOptions opts)
 	foreach(SigMapValue *val, m_sigValues)
 		val->marker->setVisible(m_renderOpts.showReadingMarkers);
 		
-	triggerRender();	
+	m_renderOpts.saveToQSettings();
+	
+	triggerRender();
 }
 
 
@@ -5395,11 +5503,17 @@ void MapGraphicsScene::setShowMyLocation(bool flag)
 {
 	m_showMyLocation = flag;
 	QSettings("wifisigmap").setValue("showMyLocation", flag);
+	if(!flag)
+		m_userItem->setVisible(false); // will be shown on next scanFinished()
 }
 
 void MapGraphicsScene::setAutoGuessApLocations(bool flag)
 {
 	m_autoGuessApLocations = flag;
 	QSettings("wifisigmap").setValue("autoGuessApLocations", flag);
+	if(flag)
+		updateApLocationOverlay(); // only updatd when adding signals, so update it here
+	else
+		m_apLocationOverlay->setVisible(false);
 }
 

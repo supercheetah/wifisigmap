@@ -256,6 +256,9 @@ public:
 class MapRenderOptions
 {
 public:
+	void loadFromQSettings();
+	void saveToQSettings();
+	
 	bool cacheMapRender;
 	bool showReadingMarkers;
 	bool multipleCircles;
@@ -284,11 +287,14 @@ public:
 	enum RenderMode {
 		RenderRadial,
 		RenderCircles,
-		RenderTriangles,
 		RenderRectangles,
+		RenderTriangles,
 	};
 	
 	RenderMode renderMode() { return m_renderMode; }
+	
+	// Pause rendering updates when applying things like setRenderAp() in a batch
+	bool pauseRenderUpdates(bool);
 	
 	QList<MapApInfo*> apInfo() { return m_apInfo.values(); }
 	MapApInfo* apInfo(WifiDataResult);
@@ -297,6 +303,10 @@ public:
 	double pixelsPerMeter() { return m_pixelsPerMeter; }
 	bool showMyLocation() { return m_showMyLocation; }
 	bool autoGuessApLocations() { return m_autoGuessApLocations; }
+	
+	QString currentDevice() { return m_device; }
+	
+	MapRenderOptions renderOpts() { return m_renderOpts; }
 	
 public slots:
 	void saveResults(QString filename);
@@ -316,6 +326,8 @@ public slots:
 	
 	void setShowMyLocation(bool flag=true);
 	void setAutoGuessApLocations(bool flag=true);
+	
+	void setDevice(QString device);
 	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -346,9 +358,12 @@ private slots:
 	void updateUserLocationOverlay();
 	void updateApLocationOverlay();
 	
+	void updateSignalMarkers();
+	
 protected:
 	friend class SigMapRenderer;
 	
+	QImage renderSignalMarker(QList<WifiDataResult> results);
 	SigMapValue *addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
 	QColor baseColorForAp(QString apMac);
@@ -467,6 +482,12 @@ protected:
 	bool m_autoGuessApLocations;
 	
 	QTimer m_apGuessUpdateTimer;
+	
+	QString m_device;
+	
+	QTimer m_updateSignalMarkerTimer;
+	
+	bool m_renderUpdatesPaused;
 };
 
 #endif

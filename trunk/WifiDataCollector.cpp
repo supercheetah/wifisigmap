@@ -36,7 +36,7 @@
 #else
 // Just guesses based on observations and the assumption that laptop antenna gains are better than the android's 
 #define DBM_MAX  -25
-#define DBM_MIN  -95
+#define DBM_MIN  -100
 #endif
 
 #ifdef Q_OS_WIN
@@ -442,11 +442,16 @@ void WifiDataCollector::scanWifi()
 	QString interface;
 	
 #ifndef Q_OS_ANDROID
-	interface = findWlanIf();
-	if(interface.isEmpty())
-		// scan3.txt is just some sample data I captured for use in development
-		//debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
-		debugTextFile = QString("scan3.txt");
+	if(!m_dataTextfile.isEmpty())
+		debugTextFile = m_dataTextfile;
+	else
+	{
+		interface = findWlanIf();
+		if(interface.isEmpty())
+			// scan3.txt is just some sample data I captured for use in development
+			//debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
+			debugTextFile = QString("scan3.txt");
+	}
 #endif
 
 	// Read input from debug file or the actual wifi card
@@ -641,27 +646,14 @@ QString WifiDataCollector::findWlanIf()
 #endif
 
 	QProcess proc;
-//	proc.setProcessChannelMode(QProcess::MergedChannels);
 	proc.start(IWCONFIG_BINARY);
-	
-// 	if(!proc.waitForFinished(10000))
-// 	{
-// 		qDebug() << "WifiDataCollector::findWlanIf(): Error: Timeout while waiting for" << IWCONFIG_BINARY << "to finish.";
-// 		return "";
-// 	}
 
 	if (!proc.waitForStarted())
-	{
-		qDebug() << "********************** Scanner start failed! " << proc.errorString();
 		QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
-	}
-
+	
 
 	if (!proc.waitForFinished(-1))
-	{
-		qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
 		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
-	}
 	
 	QString fileContents = proc.readAllStandardOutput();
 	//qDebug() << "WifiDataCollector::findWlanIf(): Raw output of" << IWCONFIG_BINARY << ": "<<fileContents;
@@ -677,6 +669,50 @@ QString WifiDataCollector::findWlanIf()
 	QString wlanIf = tokens.takeFirst();
 	//qDebug() << "WifiDataCollector::findWlanIf(): Success, found interface: "<<wlanIf;
 	return wlanIf;
+}
+
+/*! \brief Read 'iwconfig' and find all wireless interface with wireless extensions */
+QStringList WifiDataCollector::findWlanInterfaces()
+{
+	QStringList list;
+#ifdef Q_OS_WIN
+	return list;
+#endif
+
+	QProcess proc;
+	proc.start(IWCONFIG_BINARY);
+	
+	if (!proc.waitForStarted())
+	{
+		QMessageBox::information(0, "Debug", "start err:" + proc.errorString());
+	}
+
+
+	if (!proc.waitForFinished(-1))
+	{
+		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
+	}
+	
+	QString fileContents = proc.readAllStandardOutput();
+	
+	// Parse output (iwconfig is nice - it only prints wireless interfaces actually found to stdout)
+	QStringList tokens = fileContents.split("\n\n");
+	if(fileContents.isEmpty() || tokens.isEmpty())
+	{
+		return list;
+	}
+
+	foreach(QString token, tokens)
+	{
+		QStringList subtokens = token.split(" ");
+		if(subtokens.isEmpty())
+			continue;
+			
+		QString wlanIf = tokens.takeFirst();
+		list << wlanIf;
+	}
+
+	return list;
 }
 
 QString WifiDataCollector::getIwlistOutput(QString interface)
@@ -894,8 +930,9 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 			QStringList pair = line.split(QRegExp(":"));
 			if(pair.length() < 2)
 			{
-				qDebug() << "WifiDataCollector::parseRawBlock: Error: line invalid:"<<line;
-				return result; // not valid yet
+				//qDebug() << "WifiDataCollector::parseRawBlock: Error: line invalid:"<<line;
+				//return result; // not valid yet
+				continue;
 			}
 			QString key = pair.takeFirst().toLower().trimmed();
 			QString value = pair.join(":").trimmed();

@@ -1,6 +1,7 @@
 #include "MapWindow.h"
 
 #include "MapGraphicsScene.h"
+#include "OptionsDialog.h"
 
 #include <QTcpSocket>
 #include <QApplication>
@@ -207,24 +208,12 @@ void MapWindow::prefsSlot()
 	}
 	*/
 
-// 	MapOptionsDialog d(m_scene);
-// 	d.show();
-// 	AndroidDialogHelper(this, d);
-// 	d.exec();
-// 	
-	/*
-	if(d.exec() == QDialog::Accepted)
-	{
-		
-		m_scene->setRenderMode(d.renderMode());
-		m_scene->setRenderOpts(d.renderOpts());
-		QHash<QString,bool> apFlags = d.renderApFlags();
-		foreach(QString ap, apFlags.keys())
-			m_scene->setRenderAp(ap, apFlags[ap]);
-
-		m_scene->setShowMyLocation(d.showMyLocation());
-	}
-	*/
+	OptionsDialog d(m_scene);
+	d.show();
+	AndroidDialogHelper(this, d);
+	d.exec();
+	
+	
 	
 }
 
