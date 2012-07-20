@@ -109,7 +109,7 @@ WifiDataCollector::WifiDataCollector()
 	, m_scanNum(0)
 	, m_continuousMode(true)
 {
-	
+	// Register so it can be passed in a queued connection via signal/slots between threads
 	qRegisterMetaType<QList<WifiDataResult> >("QList<WifiDataResult> ");
 	
 	moveToThread(&m_scanThread);
@@ -120,6 +120,7 @@ WifiDataCollector::WifiDataCollector()
 	// scan again (not generate an error about "transport endpoint" or "no scan results")
 	#ifdef Q_OS_ANDROID
 	m_scanTimer.setInterval(750);
+	
 	#else
 	QString interface = findWlanIf();
 	if(interface.isEmpty())
