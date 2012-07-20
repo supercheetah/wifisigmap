@@ -1365,7 +1365,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	// Need at least two *known* APs registered on the map - with out that, we don't even need to check the results
 	if(m_apInfo.values().size() < 2)
 	{
-		qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
+		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two APs marked, unable to guess user location";
 		return;
 	}
 	
@@ -1377,7 +1377,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	{
 		MapApInfo *info = apInfo(result.mac);
 		
-		//qDebug() << "MapGraphicsScene::scanFinished(): Checking result: "<<result;
+		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Checking result: "<<result;
 		if(!apMacToSignal.contains(result.mac) &&
 		   !info->point.isNull())
 		{
@@ -1408,7 +1408,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	// (apsVisible only contains APs marked on the map AND in the latest scan results) 
 	if(apsVisible.size() < 2)
 	{
-		//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs marked AND visble, unable to guess user location";
+		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two known APs marked AND visble, unable to guess user location";
 		return;
 	}
 /*	
@@ -1447,12 +1447,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	
 // 	foreach(SigMapValue *val, m_sigValues)
 // 	{
-// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] val:"<<val; 
+// 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [ratio calc] val:"<<val; 
 // 		
 // 		// Remember, apsVisible has all the APs *visible* in this scan result *AND* marked in the map 
 // 		foreach(QString apMac, apsVisible)
 // 		{
-// 			//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] apMac:"<<apMac;
+// 			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [ratio calc] apMac:"<<apMac;
 // 			if(val->hasAp(apMac) &&
 // 			  !apInfo(apMac)->point.isNull()) // TODO Since apsVisible are only APs marked, do we need to test this still?
 // 			{
@@ -1461,7 +1461,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				//double dist = d;
 // 				d = d / val->signalForAp(apMac);
 // 				
-// 				//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
+// 				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [ratio calc] \t ap:"<<apMac<<", d:"<<d<<", val:"<<val->signalForAp(apMac)<<", dist:"<<dist; 
 // 				
 // 				// Incrememnt counters/sums
 // 				if(!apRatioSums.contains(apMac))
@@ -1482,7 +1482,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 	foreach(QString key, apRatioSums.keys())
 // 	{
 // 		apRatioAvgs[key] = apRatioSums[key] / apRatioCount[key];
-// 		//qDebug() << "MapGraphicsScene::scanFinished(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
+// 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [ratio calc] final avg for mac:"<<key<<", avg:"<<apRatioAvgs[key]<<", count:"<<apRatioCount[key]<<", sum:"<<apRatioSums[key];
 // 	}
 	
 	
@@ -1491,7 +1491,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	QString ap1 = apsVisible[1];
 	QString ap2 = apsVisible.size() > 2 ? apsVisible[2] : "";
 	
-	//qDebug() << "MapGraphicsScene::scanFinished(): ap0: "<<ap0<<", ap1:"<<ap1; 
+	//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): ap0: "<<ap0<<", ap1:"<<ap1; 
 	
 	double ratio0 = 0;
 	double ratio1 = 0;
@@ -1499,7 +1499,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	
 	if(apRatioAvgs.isEmpty())
 	{
-		qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
+		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Need at least one reading for ANY marked AP to establish even a 'best guess' ratio";
 		return;
 	}
 	else
@@ -1508,7 +1508,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		if(!apRatioAvgs.contains(ap0))
 		{
 			ratio0 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using first";
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Need at least one reading for "<<ap0<<" to establish correct dBm to pixel ratio, cheating by using first";
 		}
 		else
 			ratio0 = apRatioAvgs[ap0];
@@ -1516,7 +1516,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		if(!apRatioAvgs.contains(ap1))
 		{
 			ratio1 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap1<<" to establish correct dBm to pixel ratio, cheating by using first";
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Need at least one reading for "<<ap1<<" to establish correct dBm to pixel ratio, cheating by using first";
 		}
 		else
 			ratio1 = apRatioAvgs[ap1];
@@ -1524,7 +1524,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		if(!apRatioAvgs.contains(ap2))
 		{
 			ratio2 = apRatioAvgs[apRatioAvgs.keys().first()];
-			qDebug() << "MapGraphicsScene::scanFinished(): Need at least one reading for "<<ap2<<" to establish correct dBm to pixel ratio, cheating by using first";
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Need at least one reading for "<<ap2<<" to establish correct dBm to pixel ratio, cheating by using first";
 		}
 		else
 			ratio2 = apRatioAvgs[ap2];
@@ -1535,7 +1535,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	QPointF p0 = apInfo(ap0)->point;
 	QPointF p1 = apInfo(ap1)->point;
 	QPointF p2 = !ap2.isEmpty() ? apInfo(ap2)->point : QPointF();
-	//qDebug() << "MapGraphicsScene::scanFinished(): p0: "<<p0<<", p1:"<<p1;
+	//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): p0: "<<p0<<", p1:"<<p1;
 	
 	double r0 = apMacToSignal[ap0] * ratio0;
 	double r1 = apMacToSignal[ap1] * ratio1;
@@ -1555,8 +1555,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		line.p1().y() - line.p2().y()))
 			.normalized();
 	
-	//qDebug() << "MapGraphicsScene::scanFinished(): Calculated (x1,y1):"<<line.p1()<<", (x2,y2):"<<line.p2()<<", itemWorldRect:"<<itemWorldRect<<", center:"<<itemWorldRect.center();
-	//qDebug() << "MapGraphicsScene::scanFinished(): #2 debug: "<<ap2<<": "<<p2<<", radius: "<<r2;
+	//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Calculated (x1,y1):"<<line.p1()<<", (x2,y2):"<<line.p2()<<", itemWorldRect:"<<itemWorldRect<<", center:"<<itemWorldRect.center();
+	//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): #2 debug: "<<ap2<<": "<<p2<<", radius: "<<r2;
 	
 	// Attempt http://stackoverflow.com/questions/9747227/2d-trilateration
 	
@@ -1786,7 +1786,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			if(isnan(absLossFactor))
 			{
-				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
 			}
 			else
 			{
@@ -1798,13 +1798,17 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 				info->lossFactor = lossFactor;
 
-				qDebug() << "MapGraphicsScene::scanFinished(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
 			}
 		}
 	}
 
 	QPointF avgPoint2(0.,0.);
 	count = 0;
+
+	QList<QPointF> goodPoints;
+	QList<QPointF> badPoints;
+	QLineF firstSet;
 
 // 	int numAps = apsVisible.size();
 	for(int i=0; i<numAps; i++)
@@ -1825,13 +1829,132 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 		
-		qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
 		
-		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-			qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+		// The revised idea here is this:
+		// Need at least three APs to find AP with intersection of circles:
+		// Get the two lines the APs intersect 
+		// Store the first two points at into firstSet
+		// Next set, the next two points compared to first two - the two closest go into the goodPoints set, the rejected ones go into badPoints
+		// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
+		// At end, good points forms the probability cluster of where the user probably is
+		
+		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
+		
+		QPointF goodPoint;
+		
+		QLineF line  = calcIntersect(p0, r0, p1, r1);
+		if(line.isNull())
+		{
+			continue;
+		}
 		else
 		{
-			userPoly << calcPoint;
+			if(goodPoints.isEmpty())
+			{
+				if(firstSet.isNull())
+				{
+					firstSet = line;
+					// Cheat for the first intersection - just give the center of the line
+					goodPoint = (line.p1() + line.p2()) / 2;
+					
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint;
+				}
+				else
+				{
+					// This is the second AP intersection - here we compare both points in both lines
+					// The two points closest together are the 'good' points 
+					double min = 0;
+					QLineF good;
+					QLineF bad;
+					
+					double len11 = QLineF(firstSet.p1(), line.p1()).length();
+					{
+						min = len11;
+						good = QLineF(firstSet.p1(), line.p1());
+						bad  = QLineF(firstSet.p2(), line.p2());
+					}
+					
+					double len12 = QLineF(firstSet.p1(), line.p2()).length();
+					if(len12 < min)
+					{
+						min = len12;
+						good = QLineF(firstSet.p1(), line.p2());
+						bad  = QLineF(firstSet.p2(), line.p1());
+					}
+					
+					double len21 = QLineF(firstSet.p2(), line.p1()).length();
+					if(len21 < min)
+					{
+						min = len21;
+						good = QLineF(firstSet.p2(), line.p1());
+						bad  = QLineF(firstSet.p1(), line.p2());
+					}
+					
+					double len22 = QLineF(firstSet.p2(), line.p2()).length();
+					if(len22 < min)
+					{
+						min = len22;
+						good = QLineF(firstSet.p2(), line.p2());
+						bad  = QLineF(firstSet.p1(), line.p1());
+					}
+					
+					goodPoints << good.p1() << good.p2();
+					badPoints  << bad.p1()  << bad.p2();
+					
+					goodPoint = good.p2();
+					
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints; 
+				}
+			}
+			else
+			{
+				// Calculate avg distance for both intersection points,
+				// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected 
+				double goodSum1=0, goodSum2=0;
+				foreach(QPointF good, goodPoints)
+				{
+					goodSum1 += QLineF(good, line.p1()).length();
+					goodSum2 += QLineF(good, line.p2()).length();
+				}
+				
+				double count = (double)goodPoints.size();
+				double goodAvg1 = goodSum1 / count,
+				goodAvg2 = goodSum2 / count;
+				
+				if(goodAvg1 < goodAvg2)
+				{
+					qDebug() << 
+					goodPoints << line.p1();
+					badPoints  << line.p2();
+					
+					goodPoint = line.p1();
+					
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+				}
+				else
+				{
+					goodPoints << line.p2();
+					badPoints  << line.p1();
+					
+					goodPoint = line.p2();
+					
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+				}
+			}
+		}
+		
+		calcPoint = goodPoint;
+		
+		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+		{
+		//	qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+		}
+		else
+		{
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+		
+			if(!goodPoint.isNull())
+				userPoly << goodPoint;
 			
 			QColor color0 = baseColorForAp(ap0);
 			if(!drawnFlag.contains(ap0))
@@ -1841,7 +1964,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				p.setPen(QPen(color0, penWidth));
 				
 				if(isnan(r0))
-					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
 				else
 					p.drawEllipse(p0, r0, r0);
 			}
@@ -1855,7 +1978,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				p.setPen(QPen(color1, penWidth));
 				
 				if(isnan(r1))
-					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
 				else
 					p.drawEllipse(p1, r1, r1);
 				
@@ -1891,8 +2014,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	avgPoint2 /= count;
 
 	
-	p.setPen(QPen(Qt::red, 30.));
-	//p.drawPolygon(userPoly);
+	{
+		p.save();
+		p.setPen(QPen(Qt::black, 5));
+		p.setBrush(QColor(0,0,255,127));
+		p.drawPolygon(userPoly);
+		p.restore();
+	}
 
 	penWidth = 20;
 	
@@ -2099,10 +2227,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 			//double r0 = dBmToDistance(val0->signalForAp(apMac, true), apMac) * m_pixelsPerMeter;
 			//double r1 = dBmToDistance(val1->signalForAp(apMac, true), apMac) * m_pixelsPerMeter;
 
-			qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] ap:"<<apMac<<", reading"<<i<<": calcPoint:"<<calcPoint;
+			qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", reading"<<i<<": calcPoint:"<<calcPoint;
 
 			if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-				qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] Can't render ellipse - calcPoint is NaN";
+				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] Can't render ellipse - calcPoint is NaN";
 			else
 			{
 				//userPoly << calcPoint;
@@ -2145,7 +2273,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
 			p.drawEllipse(avgPoint, penWidth, penWidth);
 
-		qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] ap:"<<apMac<<", avgPoint2:"<<avgPoint2<<", count:"<<count;
+		qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", avgPoint2:"<<avgPoint2<<", count:"<<count;
 
 		if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
 		{
