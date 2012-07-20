@@ -1318,10 +1318,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		m_userItem->setVisible(false);
 		return;
 	}
-	
+
+	// We still can estimate location without any signal readings - we'll just use default loss factors
+	/*
 	if(m_sigValues.isEmpty())
 		return;
-	
+	*/
 	QSize origSize = m_bgPixmap.size();
 	QImage image(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
 	QPointF offset = QPointF();
