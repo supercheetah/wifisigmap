@@ -671,6 +671,13 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	m_kalman.predictionBegin(0,0);
 	#endif
 
+	/*
+	// Just test and exit
+	QStringList list = WifiDataCollector::findWlanInterfaces();
+	qDebug() << "Found IFs: "<<list;
+	exit(-1);
+	*/
+	
 }
 
 MapGraphicsScene::~MapGraphicsScene()
@@ -685,8 +692,11 @@ MapGraphicsScene::~MapGraphicsScene()
 
 void MapGraphicsScene::setDevice(QString dev)
 {
-	m_device = dev;
+	if(dev.isEmpty())
+		dev = m_scanIf.findWlanIf();
 	
+	m_device = dev;
+
 	QSettings("wifisigmap").setValue("device", dev);
 	
 	if(dev.contains("/") || dev.contains("\\")) // HACK to see if it's a file
