@@ -343,6 +343,9 @@ private slots:
 	
 	void scanFinished(QList<WifiDataResult>);
 	
+	void updateUserLocationOverlay();
+	void updateApLocationOverlay();
+	
 protected:
 	friend class SigMapRenderer;
 	
@@ -380,17 +383,19 @@ protected:
 	*/
 	QPointF deriveObservedLossFactor(QString apMac);
 
+	/// \brief Calculate the appropriate loss factor which would give distMeters
+	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
+	
+	QPointF triangulate(QString apMac1, int dBm1, QString apMac2, int dBm2);
+	
+	
 	/** \brief deriveImpliedLossFactor() calculates an approx lossFactor from observed signal readings *based on location of readings* (it assumes AP locations are unknown) for both short and long factors (x and y)
 	    NOTE: Assumes m_pixelsPerMeter is set correctly to convert pixel distance on the current background (map) to meters
 	*/
 	QPointF deriveImpliedLossFactor(QString apMac);
 	
-
-	/// \brief Calculate the appropriate loss factor which would give distMeters
-	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
-	
-	QPointF triangulate(QString apMac1, int dBm1, QString apMac2, int dBm2);
 	QPointF triangulateAp(QString apMac, SigMapValue *val0, SigMapValue *val1);
+	
 	
 	
 protected:
@@ -435,6 +440,7 @@ protected:
 	void triggerRender();
 	
 	QGraphicsPixmapItem *m_userItem;
+	QGraphicsPixmapItem *m_apLocationOverlay;
 	//QHash<QString,QGraphicsPixmapItem *> m_apGuessItems;
 	
 	QList<WifiDataResult> m_lastScanResults;
@@ -459,6 +465,8 @@ protected:
 	
 	bool m_showMyLocation;
 	bool m_autoGuessApLocations;
+	
+	QTimer m_apGuessUpdateTimer;
 };
 
 #endif

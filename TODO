@@ -40,14 +40,15 @@ Android TODO:
 	- Need zoom+/- buttons (think overlay on Google My Tracks - plus/minus buttons that come on bottom when touched and fade out after a few seconds)
 	- Dont cancel spin if move within +/- X pixels
 		- MUST have to use app on Kindle because Kindle Fire touch screen is VERY sensitive (won't hold still so it invalidates the longpress timer)
-
+	- Possibly integrate with compass/accel so the map orientation always points a certain direction (rotate the QGraphicsScene? Or just the map and sigvalitems?)
+	
 Later:
 	- Possible idea if needed/demand:
 		- UI/code to provide a URL for a bg image and download URL for use as bg
 	
 Idea:
-	- Create AP location calculator as well
-	- Change rendering of user location marker to a live painter (so we're not doing QPixmap::fromImage() eveyr call)
+	# - Create AP location calculator as well
+	# - Change rendering of user location marker to a live painter (so we're not doing QPixmap::fromImage() eveyr call)
  
 Location Notes:
 	- Calculate location of APs based on intersection of circles:
