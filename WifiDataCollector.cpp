@@ -709,8 +709,9 @@ QStringList WifiDataCollector::findWlanInterfaces()
 		if(subtokens.isEmpty())
 			continue;
 			
-		QString wlanIf = tokens.takeFirst();
-		list << wlanIf;
+		QString wlanIf = subtokens.takeFirst();
+		if(!wlanIf.isEmpty())
+			list << wlanIf;
 	}
 
 	return list;
