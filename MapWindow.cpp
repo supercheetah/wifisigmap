@@ -212,9 +212,6 @@ void MapWindow::prefsSlot()
 	d.show();
 	AndroidDialogHelper(this, d);
 	d.exec();
-	
-	
-	
 }
 
 void MapWindow::setStatusMessage(const QString& msg, int timeout)

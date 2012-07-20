@@ -656,7 +656,9 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 
 	setPixelsPerFoot(0.25/10);
 	
-	m_device = settings.value("device", "").toString();
+	setDevice(settings.value("device", "").toString());
+	
+	m_renderMode = (RenderMode)settings.value("rendermode", (int)DEFAULT_RENDER_MODE).toInt();
 	
 	m_renderOpts.loadFromQSettings();
 	
@@ -684,6 +686,8 @@ MapGraphicsScene::~MapGraphicsScene()
 void MapGraphicsScene::setDevice(QString dev)
 {
 	m_device = dev;
+	
+	QSettings("wifisigmap").setValue("device", dev);
 	
 	if(dev.contains("/") || dev.contains("\\")) // HACK to see if it's a file
 		m_scanIf.setDataTextfile(dev);
@@ -2878,6 +2882,8 @@ void MapGraphicsScene::setRenderMode(RenderMode r)
 		m_colorListForMac.clear(); // color gradient style change based on render mode
 		m_renderMode = r;
 		triggerRender();
+		
+		QSettings("wifisigmap").setValue("rendermode", (int)r);
 	}
 }
 
@@ -2946,10 +2952,17 @@ QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 	const double iconSizeHalf = ((double)iconSize)/2.;
 		
 	int numResults = results.size();
-	double angleStepSize = 360. / ((double)numResults);
 	
 	int resultCounter = 0;
 	
+	for(int resultIdx=0; resultIdx<numResults; resultIdx++)
+		if(apInfo(results[resultIdx].mac)->renderOnMap)
+			resultCounter ++;
+				
+	double angleStepSize = 360. / ((double)resultCounter);
+	
+	resultCounter = 0;
+		
 	QRectF boundingRect;
 	QList<QRectF> iconRects;
 	for(int resultIdx=0; resultIdx<numResults; resultIdx++)
@@ -2967,7 +2980,10 @@ QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 		}
 	}
 	
-	boundingRect.adjust(-1,-1,+2,+2);
+// 	if(resultCounter == 1)
+// 		boundingRect = iconRects[0] = QRectF(-iconSizeHalf, -iconSizeHalf, (double)iconSize, (double)iconSize);
+	
+	boundingRect.adjust(-10,-10,+10,+10);
 	
 	//qDebug() << "MapGraphicsScene::addSignalMarker(): boundingRect:"<<boundingRect;
 	
@@ -2998,7 +3014,7 @@ QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 		
 		QColor centerColor = colorForSignal(result.value, result.mac);
 		
-		QRectF iconRect = iconRects[resultIdx];
+		QRectF iconRect = iconRects[resultCounter];
 		iconRect.translate(zeroAdjX,zeroAdjY);
 		
 		//qDebug() << "MapGraphicsScene::addSignalMarker(): resultIdx:"<<resultIdx<<": iconRect:"<<iconRect<<", centerColor:"<<centerColor;
@@ -4005,8 +4021,18 @@ void SigMapRenderer::render()
 
 // 		foreach(QString apMac, apMacToEssid.keys())
 // 		{
-		QString apMac = apMacToEssid.keys().at(0);
-		qDebug() << "MAC: "<<apMac;
+		//QString apMac = apMacToEssid.keys().at(0);
+		
+		QString apMac;
+		foreach(MapApInfo *info, m_gs->m_apInfo)
+			if(info->renderOnMap)
+			{
+				apMac = info->mac;
+				break;
+			}
+		
+		
+		//qDebug() << "MAC: "<<apMac;
 		QList<qPointValue> points;
 		//MapApInfo *info = m_gs->apInfo(apMac);
 			
@@ -4018,8 +4044,13 @@ void SigMapRenderer::render()
 			{
 				qPointValue p = qPointValue( val->point, val->signalForAp(apMac) );
 				points << p;
-				qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
+				//qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
 			}
+		
+		// Set bounds to be at minimum the bounds of the background
+		points << qPointValue( QPointF(0,0), 0 );
+		if(!origSize.isEmpty())
+			points << qPointValue( QPointF((double)origSize.width(), (double)origSize.height()), 0 );
 		
 	
 	//  	#define val(x) ( ((double)x) / 6. )
@@ -4943,6 +4974,10 @@ void MapGraphicsScene::updateSignalMarkers()
 		// Re-render marker because the 'renderOnMap' flag for the AP contained therein may have changed
 		QImage markerGroup = renderSignalMarker(val->scanResults);
 		val->marker->setPixmap(QPixmap::fromImage(markerGroup));
+		
+		double w2 = (double)(markerGroup.width())/2.;
+		double h2 = (double)(markerGroup.height())/2.;
+		val->marker->setOffset(-w2,-h2);
 	}
 }
 
