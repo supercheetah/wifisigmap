@@ -29,6 +29,16 @@
 #endif
 #endif
 
+#ifdef Q_OS_ANDROID
+// Just guesses based on observations
+#define DBM_MAX  -40
+#define DBM_MIN -100
+#else
+// Just guesses based on observations and the assumption that laptop antenna gains are better than the android's 
+#define DBM_MAX  -25
+#define DBM_MIN  -95
+#endif
+
 #ifdef Q_OS_WIN
 #define UNICODE
 
@@ -556,8 +566,8 @@ double WifiDataCollector::dbmToPercent(int dbm)
 {
 	// TODO - evaluate and device a better algorithm for changing dbm->%
 	double dbmVal = (double)(dbm + 100.); // dBm is a neg #, like -95 dBm, so add 100 to flip it over zero
-	const double dbmMax  =  -40. + 100.; // these ranges TBD thru testing
-	const double dbmMin  = -100. + 100.;
+	const double dbmMax  = DBM_MAX + 100.; // these ranges TBD thru testing
+	const double dbmMin  = DBM_MIN + 100.;
 
 	double val = (dbmVal - dbmMin) / (dbmMax - dbmMin);
 	return val;
@@ -792,6 +802,8 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
                     IE: Unknown: DD090010180204F4000000
           */
 
+	//qDebug() << "WifiDataCollector::parseRawBlock(): "<<buffer;
+	
 	buffer = buffer.replace(QRegExp("^\\s*\\d+ - Address:"),"Address:");
 	QStringList lines = buffer.split("\n");
 
@@ -810,6 +822,9 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 
 		if(line.startsWith("Bit Rates"))
 		{
+			continue;
+			// Code below is buggy (last line gets dropped) - remove for now until I have time to debug
+			/*
 			line = line.replace("Bit Rates:","");
 
 			QStringList bitRates;
@@ -830,6 +845,7 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 				lines.prepend(line);
 
 			values["bit rates"] = bitRates.join("; ");
+			*/
 		}
 		else
 		if(line.startsWith("IE: Unknown:"))
@@ -841,15 +857,31 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 		{
 			line = line.replace("Address: ","");
 			values["address"] = line;
+			//qDebug() << "WifiDataCollector::parseRawBlock: [parse:mac] "<<line;
 		}
 		else
 		if(line.contains("Signal level"))
 		{
-			QRegExp sig("Signal level=(-?\\d+ dBm)", Qt::CaseInsensitive);
-			if(sig.indexIn(line) > -1)
+			QRegExp sigDbm("Signal level=(-?\\d+ dBm)", Qt::CaseInsensitive);
+			QRegExp sigLvl("Signal level=(\\d+)/(\\d+)", Qt::CaseInsensitive);
+			if(sigDbm.indexIn(line) > -1)
 			{
-				values["signal level"] = sig.cap(1);
+				values["signal level"] = sigDbm.cap(1);
 				//qDebug() << "WifiDataCollector::parseRawBlock: Debug: Extracted value:"<<values["signal level"]<<"from line:"<<line;
+				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:dBm] "<<values["signal level"];
+			}
+			else
+			if(sigLvl.indexIn(line) > -1)
+			{
+				// Create a fake dBm value based on our MIN/MAX assumptions defined at the top of this file
+				int val0 = sigLvl.cap(1).toInt();
+				int val1 = sigLvl.cap(2).toInt();
+				double value = (double)val0 / (double)val1;
+				double range = DBM_MAX - DBM_MIN;
+				int    dBm   = (int)(DBM_MIN + range * value);
+				values["signal level"] = QString("%1 dBm").arg(dBm);
+
+				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", range:"<<range<<", dNm:"<<dBm;
 			}
 			else
 			{
@@ -865,7 +897,11 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 				qDebug() << "WifiDataCollector::parseRawBlock: Error: line invalid:"<<line;
 				return result; // not valid yet
 			}
-			values[pair[0].toLower()] = pair[1];
+			QString key = pair.takeFirst().toLower().trimmed();
+			QString value = pair.join(":").trimmed();
+			values[key] = value;
+
+			//qDebug() << "WifiDataCollector::parseRawBlock: [parse:generic] "<<key<<" = "<<value;
 		}
 	}
 
