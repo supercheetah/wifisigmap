@@ -21,11 +21,14 @@ opencv: {
 }
 
 # Input
+FORMS += OptionsDialog.ui
 HEADERS += \
 	MapWindow.h \
 	MapGraphicsScene.h \
-	WifiDataCollector.h
+	WifiDataCollector.h \
+	OptionsDialog.h
 SOURCES += \
 	MapWindow.cpp \
 	MapGraphicsScene.cpp \
-	WifiDataCollector.cpp
+	WifiDataCollector.cpp \
+	OptionsDialog.cpp

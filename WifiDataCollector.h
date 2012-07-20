@@ -41,6 +41,11 @@ public:
 	
 	bool auditIwlistBinary();
 	QString findWlanIf();
+	static QStringList findWlanInterfaces();
+	
+	// Set data textfile to load data from a file instead of read it live (mainly for debugging/testing) 
+	void setDataTextfile(QString file) { m_dataTextfile = file; }
+	QString dataTextfile() { return m_dataTextfile; }
 
 	// Converts dBm in the range of [-100,-40] to a range of [0,1]
 	// dBm range used subject to change if needed in later revisions.
@@ -77,7 +82,7 @@ protected:
 	
 	QString readTextFile(QString file);
 	
-	
+	QString m_dataTextfile;	
 };
 
 #endif
