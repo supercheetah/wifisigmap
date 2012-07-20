@@ -640,6 +640,11 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	m_showMyLocation       = settings.value("showMyLocation", true).toBool();
 	m_autoGuessApLocations = settings.value("autoGuessApLocations", true).toBool();
 
+// 	m_meterPx = 42.;
+// 	m_footPx  = 12.;
+
+	setMeterPx(0.25/10);
+	
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
 	QTimer::singleShot(1000, this, SLOT(debugTest()));
@@ -1289,6 +1294,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	if(m_sigValues.isEmpty())
 		return;
 	
+	qDebug() << "MapGraphicsScene::scanFinished(): m_showMyLocation:"<<m_showMyLocation<<",  m_autoGuessApLocations:"<<m_autoGuessApLocations;
 		
 	QSize origSize = m_bgPixmap.size();
 	QImage image(origSize, QImage::Format_ARGB32_Premultiplied);
@@ -1303,14 +1309,15 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		// 	results   = m_sigValues.last()->scanResults;
 		//
 		
-		
+		while(1) {
+			
 		QPointF userLocation  = QPointF(-1000,-1000);
 	
 		// Need at least two *known* APs registered on the map - with out that, we don't even need to check the results
 		if(m_apInfo.values().size() < 2)
 		{
 			//qDebug() << "MapGraphicsScene::scanFinished(): Less than two APs marked, unable to guess user location";
-			return;
+			break;
 		}
 		
 		// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
@@ -1351,7 +1358,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		if(apsVisible.size() < 2)
 		{
 			//qDebug() << "MapGraphicsScene::scanFinished(): Less than two known APs marked AND visble, unable to guess user location";
-			return;
+			break;
 		}
 	/*	
 		// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
@@ -1919,6 +1926,9 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		
 	*/
 		p.end();
+
+		break;
+		};
 	}
 
 	if(m_autoGuessApLocations)
@@ -2024,21 +2034,24 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 				QPointF calcPoint = triangulateAp(apMac, val0, val1);
 
 				// We assume triangulate() already stored drived loss factor into apInfo()
-				double r0 = dBmToDistance(val0->signalForAp(apMac, true), apMac) * m_meterPx;
-				double r1 = dBmToDistance(val1->signalForAp(apMac, true), apMac) * m_meterPx;
+				//double r0 = dBmToDistance(val0->signalForAp(apMac, true), apMac) * m_meterPx;
+				//double r1 = dBmToDistance(val1->signalForAp(apMac, true), apMac) * m_meterPx;
 
-				//qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+				qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] ap:"<<apMac<<", reading"<<i<<": calcPoint:"<<calcPoint;
 
 				if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-					qDebug() << "MapGraphicsScene::scanFinished(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+					qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] Can't render ellipse - calcPoint is NaN";
 				else
 				{
 					//userPoly << calcPoint;
 
 					QColor color0 = baseColorForAp(apMac);
 
+					p.setPen(QPen(color0, penWidth, Qt::DashLine));
+					p.drawLine(val0->point, calcPoint);
+
 					p.setPen(QPen(color0, penWidth));
-					p.drawLine(p0, calcPoint);
+					p.drawLine(val1->point, calcPoint);
 
 					avgPoint2 += calcPoint;
 					count ++;
@@ -2052,23 +2065,29 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 			p.setPen(QPen(Qt::red, 30.));
 			//p.drawPolygon(userPoly);
 
-			penWidth = 100;
+			penWidth = 20;
 
 			p.setPen(QPen(Qt::green, 10.));
 			p.setBrush(QColor(0,0,0,127));
 			if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
 				p.drawEllipse(avgPoint, penWidth, penWidth);
 
+			qDebug() << "MapGraphicsScene::scanFinished(): [apLocationGuess] ap:"<<apMac<<", avgPoint2:"<<avgPoint2<<", count:"<<count;
+
 			if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
 			{
+				QImage markerGroup(":/data/images/ap-marker.png");
+				p.drawImage(avgPoint2 - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
+				//p.drawEllipse(avgPoint2, penWidth, penWidth);
+				
 // 				if(avgPoint == avgPoint2)
 // 					p.setPen(QPen(Qt::yellow, 10.));
 // 				else
-					p.setPen(QPen(Qt::green, 10.));
+					p.setPen(QPen(Qt::green, 4)); //10.));
 
-				p.setBrush(QColor(0,0,0,127));
+				p.setBrush(QColor(0,0,0,80));
 				p.drawEllipse(avgPoint2, penWidth, penWidth);
-
+				/*
 				#ifdef OPENCV_ENABLED
 				info->locationGuessKalman.predictionUpdate((float)avgPoint2.x(), (float)avgPoint2.y());
 
@@ -2088,7 +2107,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 				info->locationGuess = avgPoint2;
 				
 				#endif
-				
+				*/
 			}
 
 		}
@@ -2107,6 +2126,73 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	m_userItem->setVisible(true);
 
+}
+
+QPointF MapGraphicsScene::triangulateAp(QString apMac, SigMapValue *val0, SigMapValue *val1)
+{
+	//MapApInfo *info = apInfo(apMac);
+
+// 	if(info->lossFactor.isNull() ||
+// 	  (info->lossFactorKey > -1 && info->lossFactorKey != m_sigValues.size()))
+// 	{
+// 		QPointF lossFactor0 = deriveImpliedLossFactor(ap0);
+// 
+// 		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+// 		info->lossFactor    = lossFactor0;
+// 		info->lossFactorKey = m_sigValues.size();
+// 	}
+
+
+	// Get location of readings (in pixels, obviously)
+	QPointF p0 = val0->point;
+	QPointF p1 = val1->point;
+
+	int dBm0 = val0->signalForAp(apMac, true); // true = return dBm's not %
+	int dBm1 = val1->signalForAp(apMac, true); // ''
+
+	// Get a line from one AP to the other (need this for length and angle)
+	QLineF apLine(p1,p0);
+
+	double lc = apLine.length();
+	double la = dBmToDistance(dBm0, apMac) * m_meterPx; // dBmToDistance returns meters, convert to pixels
+	double lb = dBmToDistance(dBm1, apMac) * m_meterPx;
+
+//	qDebug() << "[dump0] "<<dBm0<<dBm1;
+//	qDebug() << "[dump1] "<<la<<lb<<lc;
+//	qDebug() << "[dump2] "<</*realAngle<<realAngle2<<*/apLine.angle();
+//	qDebug() << "[dump3] "<<p0<<p1/*<<realPoint*/;
+	//qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
+
+	/*
+
+	  C
+	  *
+	  |`.
+	 b|  `. a
+	  |    `.
+	  |      `.
+	A *--------* B
+	      c
+
+	*/
+
+	// Calculate the angle (A)
+	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
+	double angA = acos(cosA) * 180.0 / Pi;
+
+	// Create a line from the appros AP and set it's angle to the calculated angle
+	QLineF userLine(p1,QPointF());
+	userLine.setAngle(angA + apLine.angle());
+	userLine.setLength(lb);
+
+	qDebug() << "MapGraphicsScene::triangulateAp("<<apMac<<","<<val0<<","<<val1<<"): ang(A):"<<angA<<", cos(A):"<<cosA;
+	qDebug() << "MapGraphicsScene::triangulateAp("<<apMac<<","<<val0<<","<<val1<<"): apLine.angle:"<<apLine.angle();
+	qDebug() << "MapGraphicsScene::triangulateAp("<<apMac<<","<<val0<<","<<val1<<"): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
+
+
+	// Return the end-point of the line we just created - that's the point where
+	// the signals of the two APs intersect (supposedly, any error in the result is largely from dBmToDistance(), and, by extension, deriveObservedLossFactor())
+	return userLine.p2();
 }
 
 QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dBm1)
@@ -2501,7 +2587,7 @@ double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCut
 	double logDist = (1/(10*n)) * (txPower - dBm + txGain + rxGain - Xa + 20*log10(m) - 20*log10(4*Pi));
 	double distMeters = pow(10, logDist); // distance in meters
 	
-	//qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain;
+	qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist;
 	
 	return distMeters;
 }

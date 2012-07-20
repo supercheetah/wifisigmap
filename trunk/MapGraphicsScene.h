@@ -389,6 +389,7 @@ protected:
 	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
 	
 	QPointF triangulate(QString apMac1, int dBm1, QString apMac2, int dBm2);
+	QPointF triangulateAp(QString apMac, SigMapValue *val0, SigMapValue *val1);
 	
 	
 protected:
