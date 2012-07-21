@@ -1,5 +1,6 @@
 #include "MapWindow.h"
 
+#include "MapGraphicsView.h"
 #include "MapGraphicsScene.h"
 #include "OptionsDialog.h"
 

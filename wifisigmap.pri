@@ -26,9 +26,15 @@ HEADERS += \
 	MapWindow.h \
 	MapGraphicsScene.h \
 	WifiDataCollector.h \
-	OptionsDialog.h
+	OptionsDialog.h \
+	SigMapRenderer.h \
+	LongPressSpinner.h \
+	MapGraphicsView.h
 SOURCES += \
 	MapWindow.cpp \
 	MapGraphicsScene.cpp \
 	WifiDataCollector.cpp \
-	OptionsDialog.cpp
+	OptionsDialog.cpp \
+	SigMapRenderer.cpp \
+	LongPressSpinner.cpp \
+	MapGraphicsView.cpp
