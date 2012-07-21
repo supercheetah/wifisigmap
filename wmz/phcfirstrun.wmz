@@ -3,8 +3,8 @@ background=/tmp/phclayout.png
 h-pos=-195
 v-pos=109
 scale=0.5
-footpx=13
-meterpx=42
+footpx=5.83333333
+meterpx=17.6618553333
 
 [ap-locations]
 1\mac=00:2D:08:0E:92:14

@@ -100,11 +100,18 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 		QCheckBox *cb = new QCheckBox(QString("%1 (%2)").arg(info->essid).arg(info->mac));
 		
 		cb->setChecked(info->renderOnMap);
+
+		QPalette p = cb->palette();
+		p.setColor(QPalette::WindowText, m_scene->baseColorForAp(info->mac).darker());
+		cb->setPalette(p);
 		
 		m_apCheckboxes[info->mac] = cb;
 		
 		vbox->addWidget(cb);
 	}
+
+	setWindowTitle("Options");
+	setWindowIcon(QPixmap(":/data/images/icon.png"));
 }
 
 void OptionsDialog::renderModeChanged(int mode)

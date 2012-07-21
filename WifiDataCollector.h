@@ -38,10 +38,14 @@ public:
 	WifiDataCollector();
 	
 	QList<WifiDataResult> scanResults();
-	
+
 	bool auditIwlistBinary();
-	QString findWlanIf();
+	
+	static QString findWlanIf();
 	static QStringList findWlanInterfaces();
+
+	// If empty (default), uses first wlan device found
+	void setWlanDevice(QString dev="") {  m_wlanDevice = dev; }
 	
 	// Set data textfile to load data from a file instead of read it live (mainly for debugging/testing) 
 	void setDataTextfile(QString file) { m_dataTextfile = file; }
@@ -82,7 +86,9 @@ protected:
 	
 	QString readTextFile(QString file);
 	
-	QString m_dataTextfile;	
+	QString m_dataTextfile;
+
+	QString m_wlanDevice;
 };
 
 #endif
