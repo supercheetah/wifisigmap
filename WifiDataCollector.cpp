@@ -115,21 +115,7 @@ WifiDataCollector::WifiDataCollector()
 	moveToThread(&m_scanThread);
 	connect(&m_scanTimer, SIGNAL(timeout()), this, SLOT(scanWifi()));
 	
-	// Thru repeated testing on my Android device, .75sec is the aparent *minimum*
-	// time necessary to wait between calls to "iwlist" in order for iwlist to 
-	// scan again (not generate an error about "transport endpoint" or "no scan results")
-	#ifdef Q_OS_ANDROID
-	m_scanTimer.setInterval(750);
-	
-	#else
-	if(findWlanIf().isEmpty())
-		// We are running on a machine WITHOUT wireless, so we are going to use a dummy data source,
-		// therefore add artificial delay between scans
-		m_scanTimer.setInterval(500);
-	else
-		// iwlist will delay long enough between scans, we don't need to add more delay here on non-Android systems
-		m_scanTimer.setInterval(10);
-	#endif
+	updateScanInterval();
 	
 	// TODO - move this to the main app, then if it returns false, ask the user if they want to continue anyway or exit.
 	if(auditIwlistBinary())
@@ -142,6 +128,37 @@ WifiDataCollector::WifiDataCollector()
 		// Start a continous scan running (in the scan thread)
 		QTimer::singleShot(0, this, SLOT(startScan()));
 	}
+}
+
+void WifiDataCollector::setWlanDevice(QString dev)
+{
+	m_wlanDevice = dev;
+	updateScanInterval();
+}
+
+void WifiDataCollector::setDataTextfile(QString file)
+{
+	m_dataTextfile = file;
+	updateScanInterval();
+}
+
+void WifiDataCollector::updateScanInterval()
+{
+	// Thru repeated testing on my Android device, .75sec is the aparent *minimum*
+	// time necessary to wait between calls to "iwlist" in order for iwlist to
+	// scan again (not generate an error about "transport endpoint" or "no scan results")
+	#ifdef Q_OS_ANDROID
+	m_scanTimer.setInterval(750);
+
+	#else
+	if(!m_dataTextfile.isEmpty() || findWlanIf().isEmpty())
+		// We are running on a machine WITHOUT wireless, so we are going to use a dummy data source,
+		// therefore add artificial delay between scans
+		m_scanTimer.setInterval(500);
+	else
+		// iwlist will delay long enough between scans, we don't need to add more delay here on non-Android systems
+		m_scanTimer.setInterval(10);
+	#endif
 }
 
 class WifiResultAverage

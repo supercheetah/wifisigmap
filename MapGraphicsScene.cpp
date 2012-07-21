@@ -838,7 +838,18 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	if(m_sigValues.isEmpty())
 		return;
 	*/
+
+	//return;
+
+	
 	QSize origSize = m_bgPixmap.size();
+	if(origSize.width() * 2 * origSize.height() * 2 * 3 > 128*1024*1024)
+	{
+		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Size too large, not updating: "<<origSize;
+		return;
+	}
+
+
 	QImage image(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
 	QPointF offset = QPointF();
 	
@@ -870,8 +881,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		
 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Checking result: "<<result;
 		if(!apMacToSignal.contains(result.mac) &&
-		   !info->point.isNull())
+		  (!info->point.isNull() || !info->locationGuess.isNull()))
 		{
+			// Use location guess as 'point' for calculations below
+			if(!info->marked && info->locationGuess.isNull())
+				info->point = info->locationGuess;
+			
 			apsVisible << result.mac;
 			apMacToSignal.insert(result.mac, result.value);
 
@@ -903,6 +918,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
 		return;
 	}
+
+	m_mapWindow->setStatusMessage("Calculating location...", 1000);
 /*	
 	// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
 	// This is used to calculate the radius of the APs coverage.
@@ -1698,6 +1715,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 	m_userItem->setPos(0,0); //itemWorldRect.center());
 	
 	m_userItem->setVisible(true);
+
+	m_mapWindow->setStatusMessage("Location Updated!", 100);
 
 }
 
@@ -2997,6 +3016,14 @@ void SigMapItem::setPicture(QPicture pic)
 		QRect picRect = m_pic.boundingRect();
 		if(picRect.isValid())
 		{
+			if(picRect.size().width() * picRect.size().height() * 3 > 128*1024*1024)
+			{
+				qDebug() << "SigMapItem::setPicture(): Size too large, not setting: "<<picRect.size();
+				m_img = QImage();
+				update();
+				return;
+			}
+			
 			m_offset = picRect.topLeft();
 			
 			QImage img(picRect.size(), QImage::Format_ARGB32_Premultiplied);
@@ -3319,6 +3346,7 @@ void MapGraphicsScene::saveResults(QString filename)
 		data.setValue("txgain",		info->txGain);
 		data.setValue("lossfactor",	qPointFToString(info->lossFactor));
 		data.setValue("shortcutoff",	info->shortCutoff);
+		data.setValue("locationguess",	qPointFToString(info->locationGuess));
 	}
 	data.endArray();
 		
@@ -3380,9 +3408,7 @@ void MapGraphicsScene::loadResults(QString filename)
 	
 	int hPos = data.value("h-pos", 0).toInt();
 	int vPos = data.value("v-pos", 0).toInt();
-	m_mapWindow->gv()->horizontalScrollBar()->setValue(hPos);
-	m_mapWindow->gv()->verticalScrollBar()->setValue(vPos);
-	
+
 	// Store for setting up the view after render because
 	// the real "pixel meaning" of hPos may change if the render resizes the scene rect,
 	// so reapply after the scene rect may have changed for the first time.
@@ -3390,6 +3416,11 @@ void MapGraphicsScene::loadResults(QString filename)
 	m_scrollHPos = hPos;
 	m_scrollVPos = vPos;
 	m_viewScale = scale;
+
+	m_mapWindow->gv()->reset();
+	m_mapWindow->gv()->scaleView(m_viewScale);
+	m_mapWindow->gv()->horizontalScrollBar()->setValue(m_scrollHPos);
+	m_mapWindow->gv()->verticalScrollBar()->setValue(m_scrollVPos);
 	
 	// Read scale translation values
 	m_pixelsPerFoot  = data.value("footpx",  13.).toDouble();
@@ -3424,6 +3455,7 @@ void MapGraphicsScene::loadResults(QString filename)
 		int shortCutoff = data.value("shortcutoff", -49).toInt();
 				   // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
 				   // (less than shortCutoff [close to AP], use X, greater [farther from AP] - use Y)
+		QPointF guess  = qPointFFromString(data.value("locationguess", "").toString());
 		
 		if(!color.isValid())
 		{
@@ -3443,6 +3475,7 @@ void MapGraphicsScene::loadResults(QString filename)
 		info->txGain	= txGain;
 		info->lossFactor = lossf;
 		info->shortCutoff = shortCutoff;
+		info->locationGuess = guess;
 		
 		if(marked)
 			addApMarker(point, apMac);
