@@ -920,6 +920,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	}
 
 	m_mapWindow->setStatusMessage("Calculating location...", 1000);
+	qDebug() << "\n\nMapGraphicsScene::updateUserLocationOverlay(): Updating Location...";
 /*	
 	// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
 	// This is used to calculate the radius of the APs coverage.
@@ -1353,7 +1354,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			// Therefore, we will adjust the lossFactor for these APs inorder to provide
 			// an intersection by allocation part of the error to each AP
 
-			double errorDist = fabs(r0 - r1);
+			double errorDist = dist - (r0 + r1);
 			
 			double correctR0 = (r0 + errorDist * .75) / m_pixelsPerMeter;
 			double correctR1 = (r1 + errorDist * .75) / m_pixelsPerMeter;
@@ -1402,12 +1403,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			if(dist > r0 + r1)
 			{
 				// Distance still wrong, so force-set the proper distance
-				double errorDist = fabs(r0 - r1);
+				double errorDist = dist - (r0 + r1);
 
 				r0 += errorDist / 2;
 				r1 += errorDist / 2;
 
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1;
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 			}
 			
 		}
