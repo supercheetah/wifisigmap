@@ -352,6 +352,7 @@ protected:
 	double deriveLossFactor(QString apMac, int dBm, double distMeters, double rxGain=3.);
 	
 	QPointF triangulate(QString apMac1, int dBm1, QString apMac2, int dBm2);
+	QLineF  triangulate2(QString apMac1, int dBm1, QString apMac2, int dBm2);
 	
 	
 	/** \brief deriveImpliedLossFactor() calculates an approx lossFactor from observed signal readings *based on location of readings* (it assumes AP locations are unknown) for both short and long factors (x and y)

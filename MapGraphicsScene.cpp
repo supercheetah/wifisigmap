@@ -46,6 +46,89 @@ bool MapGraphicsScene_sort_SigMapValue_bySignal(SigMapValue *a, SigMapValue *b)
 
 }
 
+/* circle_circle_intersection() *
+ * Determine the points where 2 circles in a common plane intersect.
+ *
+ * int circle_circle_intersection(
+ *                                // center and radius of 1st circle
+ *                                double x0, double y0, double r0,
+ *                                // center and radius of 2nd circle
+ *                                double x1, double y1, double r1,
+ *                                // 1st intersection point
+ *                                double *xi, double *yi,
+ *                                // 2nd intersection point
+ *                                double *xi_prime, double *yi_prime)
+ *
+ * This is a public domain work. 3/26/2005 Tim Voght
+ *
+ */
+#include <stdio.h>
+#include <math.h>
+
+int circle_circle_intersection(double x0, double y0, double r0,
+                               double x1, double y1, double r1,
+                               double *xi, double *yi,
+                               double *xi_prime, double *yi_prime)
+{
+  double a, dx, dy, d, h, rx, ry;
+  double x2, y2;
+
+  /* dx and dy are the vertical and horizontal distances between
+   * the circle centers.
+   */
+  dx = x1 - x0;
+  dy = y1 - y0;
+
+  /* Determine the straight-line distance between the centers. */
+  //d = sqrt((dy*dy) + (dx*dx));
+  d = hypot(dx,dy); // Suggested by Keith Briggs
+
+  /* Check for solvability. */
+  if (d > (r0 + r1))
+  {
+    /* no solution. circles do not intersect. */
+    qDebug() << "circle_circle_intersection: no intersect: d:"<<d<<", r0:"<<r0<<", r1:"<<r1;
+    return 0;
+  }
+  if (d < fabs(r0 - r1))
+  {
+    /* no solution. one circle is contained in the other */
+    qDebug() << "circle_circle_intersection: one in the other";
+    return 0;
+  }
+
+  /* 'point 2' is the point where the line through the circle
+   * intersection points crosses the line between the circle
+   * centers.
+   */
+
+  /* Determine the distance from point 0 to point 2. */
+  a = ((r0*r0) - (r1*r1) + (d*d)) / (2.0 * d) ;
+
+  /* Determine the coordinates of point 2. */
+  x2 = x0 + (dx * a/d);
+  y2 = y0 + (dy * a/d);
+
+  /* Determine the distance from point 2 to either of the
+   * intersection points.
+   */
+  h = sqrt((r0*r0) - (a*a));
+
+  /* Now determine the offsets of the intersection points from
+   * point 2.
+   */
+  rx = -dy * (h/d);
+  ry = dx * (h/d);
+
+  /* Determine the absolute intersection points. */
+  *xi = x2 + rx;
+  *xi_prime = x2 - rx;
+  *yi = y2 + ry;
+  *yi_prime = y2 - ry;
+
+  return 1;
+}
+
 /// Main class of this file - MapGraphicsScene
 
 MapGraphicsScene::MapGraphicsScene(MapWindow *map)
@@ -1296,7 +1379,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			if(isnan(absLossFactor))
 			{
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Unable to correct, received NaN loss factor, avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
 			}
 			else
 			{
@@ -1308,7 +1391,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 				info->lossFactor = lossFactor;
 
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
+				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap<<": Corrected loss factor:" <<lossFactor<<", avgMeterDist:"<<avgMeterDist<<", absLossFactor:"<<absLossFactor;
 			}
 		}
 	}
@@ -1356,15 +1439,15 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			double errorDist = dist - (r0 + r1);
 			
-			double correctR0 = (r0 + errorDist * .75) / m_pixelsPerMeter;
-			double correctR1 = (r1 + errorDist * .75) / m_pixelsPerMeter;
+			double correctR0 = (r0 + errorDist*.6) / m_pixelsPerMeter;
+			double correctR1 = (r1 + errorDist*.6) / m_pixelsPerMeter;
 			
 			double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
 			double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
 
 			if(isnan(absLossFactor0))
 			{
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
 			}
 			else
 			{
@@ -1381,7 +1464,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			if(isnan(absLossFactor1))
 			{
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
 			}
 			else
 			{
@@ -1405,8 +1488,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				// Distance still wrong, so force-set the proper distance
 				double errorDist = dist - (r0 + r1);
 
-				r0 += errorDist / 2;
-				r1 += errorDist / 2;
+				r0 += errorDist * .6; // overlay a bit by using .6 instead of .5
+				r1 += errorDist * .6;
 
 				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 			}
@@ -1448,7 +1531,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		
 		// The revised idea here is this:
 		// Need at least three APs to find AP with intersection of circles:
-		// Get the two lines the APs intersect 
+		// Get the two lines the APs intersect
 		// Store the first two points at into firstSet
 		// Next set, the next two points compared to first two - the two closest go into the goodPoints set, the rejected ones go into badPoints
 		// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
@@ -1458,13 +1541,33 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		
 		QPointF goodPoint;
 		
-		QLineF line  = calcIntersect(p0, r0, p1, r1);
+		//QLineF line  = calcIntersect(p0, r0, p1, r1);
+		//QLineF line = triangulate2(ap0, apMacToDbm[ap0],
+		//			   ap1, apMacToDbm[ap1]);
+		double xi, yi, xi_prime, yi_prime;
+		int ret = circle_circle_intersection(
+					p0.x(), p0.y(), r0,
+					p1.x(), p1.y(), r1,
+					&xi, &yi,
+					&xi_prime, &yi_prime);
+		if(!ret)
+		{
+			qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
+			continue;
+		}
+
+		QLineF line(xi, yi, xi_prime, yi_prime);
+
+		
 		if(line.isNull())
 		{
 			continue;
 		}
 		else
 		{
+			p.setPen(QPen(Qt::gray, penWidth));
+			p.drawLine(line);
+			
 			if(goodPoints.isEmpty())
 			{
 				if(firstSet.isNull())
@@ -1478,7 +1581,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				else
 				{
 					// This is the second AP intersection - here we compare both points in both lines
-					// The two points closest together are the 'good' points 
+					// The two points closest together are the 'good' points
 					double min = 0;
 					QLineF good;
 					QLineF bad;
@@ -1519,13 +1622,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 					
 					goodPoint = good.p2();
 					
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints; 
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
 				}
 			}
 			else
 			{
 				// Calculate avg distance for both intersection points,
-				// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected 
+				// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected
 				double goodSum1=0, goodSum2=0;
 				foreach(QPointF good, goodPoints)
 				{
@@ -1539,7 +1642,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				
 				if(goodAvg1 < goodAvg2)
 				{
-					qDebug() << 
+					qDebug() <<
 					goodPoints << line.p1();
 					badPoints  << line.p2();
 					
@@ -2070,6 +2173,111 @@ QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dB
 	// Return the end-point of the line we just created - that's the point where 
 	// the signals of the two APs intersect (supposedly, any error in the result is largely from dBmToDistance(), and, by extension, deriveObservedLossFactor())
 	return userLine.p2();
+}
+
+QLineF MapGraphicsScene::triangulate2(QString ap0, int dBm0, QString ap1, int dBm1)
+{
+	MapApInfo *inf0 = apInfo(ap0);
+	MapApInfo *inf1 = apInfo(ap1);
+
+	if(inf0->lossFactor.isNull() ||
+	  (inf0->lossFactorKey > -1 && inf0->lossFactorKey != m_sigValues.size()))
+	{
+		QPointF lossFactor0 = deriveObservedLossFactor(ap0);
+
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		inf0->lossFactor    = lossFactor0;
+		inf0->lossFactorKey = m_sigValues.size();
+	}
+
+	if(inf1->lossFactor.isNull() ||
+	  (inf1->lossFactorKey > -1 && inf1->lossFactorKey != m_sigValues.size()))
+	{
+		QPointF lossFactor1 = deriveObservedLossFactor(ap1);
+
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		inf1->lossFactor    = lossFactor1;
+		inf1->lossFactorKey = m_sigValues.size();
+	}
+
+	// Get location of APs (in pixels, obviously)
+	QPointF p0 = inf0->point;
+	QPointF p1 = inf1->point;
+
+	// Get a line from one AP to the other (need this for length and angle)
+	QLineF apLine(p1,p0);
+
+	double lc = apLine.length();
+	double la = dBmToDistance(dBm0, ap0) * m_pixelsPerMeter; // dBmToDistance returns meters, convert to pixels
+	double lb = dBmToDistance(dBm1, ap1) * m_pixelsPerMeter;
+
+// 	qDebug() << "[dump1] "<<la<<lb<<lc;
+// 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();
+// 	qDebug() << "[dump3] "<<p0<<p1<<realPoint;
+// 	qDebug() << "[dump4] "<<realLine.angleTo(apLine)<<realLine2.angleTo(apLine)<<realLine2.angleTo(realLine);
+
+	/*
+
+	  C
+	  *
+	  |`.
+	 b|  `. a
+	  |    `.
+	  |      `.
+	A *--------* B
+	      c
+
+	*/
+
+	// http://local.wasp.uwa.edu.au/~pbourke/geometry/2circle/:
+/*	double ca   = (la*la - lb*lb + lc*lc) / (2*lc);
+	double ch2  = la*la + ca*ca;
+	double ch   = sqrt(ch2);
+	QPointF p2  = QPointF(p0.x() + ca * (p1.x() - p0.x()) / lc,
+			      p0.y() + ca * (p1.y() - p0.y()) / lc);
+	QPointF p3a = QPointF(p2.x() + ch * (p1.y() - p0.y()) / lc,
+			      p2.y() - ch * (p1.x() - p0.x()) / lc);
+	QPointF p3b = QPointF(p2.x() - ch * (p1.y() - p0.y()) / lc,
+			      p2.y() -+ch * (p1.x() - p0.x()) / lc);
+
+	qDebug() << "triangulate2(): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
+	qDebug() << "triangulate2(): ca:"<<ca<<", ch2:"<<ch2<<", ch:"<<ch;
+	Debug() << "triangulate2(): p2:"<<p2<<", p3a:"<<p3a<<", p3b:"<<p3b;*/
+
+	double xi, yi, xi_prime, yi_prime;
+	int ret = circle_circle_intersection(
+				p0.x(), p0.y(), la,
+				p1.x(), p1.y(), lb,
+				&xi, &yi,
+				&xi_prime, &yi_prime);
+	if(!ret)
+	{
+		qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
+		return QLineF();
+	}
+
+	return QLineF(xi, yi, xi_prime, yi_prime);
+	//return QLineF(p3a, p3b);
+
+	/*
+	// Calculate the angle (A)
+	double cosA = (lb*lb + lc*lc - la*la)/(2*lb*lc);
+	double angA = acos(cosA) * 180.0 / Pi;
+
+	// Create a line from the appros AP and set it's angle to the calculated angle
+	QLineF userLine(p1,QPointF());
+	userLine.setAngle(angA + apLine.angle());
+	userLine.setLength(lb);
+
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): ang(A):"<<angA<<", cos(A):"<<cosA;
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): apLine.angle:"<<apLine.angle();
+// 	qDebug() << "MapGraphicsScene::triangulate("<<ap0<<","<<dBm0<<","<<ap1<<","<<dBm1<<"): la:"<<la<<", lb:"<<lb<<", lc:"<<lc;
+
+
+	// Return the end-point of the line we just created - that's the point where
+	// the signals of the two APs intersect (supposedly, any error in the result is largely from dBmToDistance(), and, by extension, deriveObservedLossFactor())
+	return userLine.p2();
+	*/
 }
 
 double MapGraphicsScene::deriveLossFactor(QString apMac, int pRx, double distMeters, double gRx)
