@@ -323,82 +323,90 @@ void MapGraphicsScene::debugTest()
 	#endif
 }
 
-#if 0
 
-    /** Helper function to compute the angle change between two rotation matrices.
-     *  Given a current rotation matrix (R) and a previous rotation matrix
-     *  (prevR) computes the rotation around the x,y, and z axes which
-     *  transforms prevR to R.
-     *  outputs a 3 element vector containing the x,y, and z angle
-     *  change at indexes 0, 1, and 2 respectively.
-     * <p> Each input matrix is either as a 3x3 or 4x4 row-major matrix
-     * depending on the length of the passed array:
-     * <p>If the array length is 9, then the array elements represent this matrix
-     * <pre>
-     *   /  R[ 0]   R[ 1]   R[ 2]   \
-     *   |  R[ 3]   R[ 4]   R[ 5]   |
-     *   \  R[ 6]   R[ 7]   R[ 8]   /
-     *</pre>
-     * <p>If the array length is 16, then the array elements represent this matrix
-     * <pre>
-     *   /  R[ 0]   R[ 1]   R[ 2]   R[ 3]  \
-     *   |  R[ 4]   R[ 5]   R[ 6]   R[ 7]  |
-     *   |  R[ 8]   R[ 9]   R[10]   R[11]  |
-     *   \  R[12]   R[13]   R[14]   R[15]  /
-     *</pre>
-     * @param R current rotation matrix
-     * @param prevR previous rotation matrix
-     * @param angleChange an array of floats in which the angle change is stored
-     */
 
-    public static void getAngleChange( float[] angleChange, float[] R, float[] prevR) {
+/** Helper function to compute the angle change between two rotation matrices.
+*  Given a current rotation matrix (R) and a previous rotation matrix
+*  (prevR) computes the rotation around the x,y, and z axes which
+*  transforms prevR to R.
+*  outputs a 3 element vector containing the x,y, and z angle
+*  change at indexes 0, 1, and 2 respectively.
+* <p> Each input matrix is either as a 3x3 or 4x4 row-major matrix
+* depending on the length of the passed array:
+* <p>If the array length is 9, then the array elements represent this matrix
+* <pre>
+*   /  R[ 0]   R[ 1]   R[ 2]   \
+*   |  R[ 3]   R[ 4]   R[ 5]   |
+*   \  R[ 6]   R[ 7]   R[ 8]   /
+*</pre>
+* <p>If the array length is 16, then the array elements represent this matrix
+* <pre>
+*   /  R[ 0]   R[ 1]   R[ 2]   R[ 3]  \
+*   |  R[ 4]   R[ 5]   R[ 6]   R[ 7]  |
+*   |  R[ 8]   R[ 9]   R[10]   R[11]  |
+*   \  R[12]   R[13]   R[14]   R[15]  /
+*</pre>
+* @param R current rotation matrix
+* @param prevR previous rotation matrix
+* @param angleChange an array of floats in which the angle change is stored
+*/
+
+QVector<float> getAngleChange(QVector<float> R, QVector<float> prevR) 
+{
+	QVector<float> angleChange;
 	float rd1=0,rd4=0, rd6=0,rd7=0, rd8=0;
 	float ri0=0,ri1=0,ri2=0,ri3=0,ri4=0,ri5=0,ri6=0,ri7=0,ri8=0;
 	float pri0=0, pri1=0, pri2=0, pri3=0, pri4=0, pri5=0, pri6=0, pri7=0, pri8=0;
-	int i, j, k;
+	//int i, j, k;
 
-	if(R.length == 9) {
-	    ri0 = R[0];
-	    ri1 = R[1];
-	    ri2 = R[2];
-	    ri3 = R[3];
-	    ri4 = R[4];
-	    ri5 = R[5];
-	    ri6 = R[6];
-	    ri7 = R[7];
-	    ri8 = R[8];
-	} else if(R.length == 16) {
-	    ri0 = R[0];
-	    ri1 = R[1];
-	    ri2 = R[2];
-	    ri3 = R[4];
-	    ri4 = R[5];
-	    ri5 = R[6];
-	    ri6 = R[8];
-	    ri7 = R[9];
-	    ri8 = R[10];
+	if(R.size() == 9)
+	{
+		ri0 = R[0];
+		ri1 = R[1];
+		ri2 = R[2];
+		ri3 = R[3];
+		ri4 = R[4];
+		ri5 = R[5];
+		ri6 = R[6];
+		ri7 = R[7];
+		ri8 = R[8];
+	}
+	else if(R.size() == 16)
+	{
+		ri0 = R[0];
+		ri1 = R[1];
+		ri2 = R[2];
+		ri3 = R[4];
+		ri4 = R[5];
+		ri5 = R[6];
+		ri6 = R[8];
+		ri7 = R[9];
+		ri8 = R[10];
 	}
 
-	if(prevR.length == 9) {
-	    pri0 = R[0];
-	    pri1 = R[1];
-	    pri2 = R[2];
-	    pri3 = R[3];
-	    pri4 = R[4];
-	    pri5 = R[5];
-	    pri6 = R[6];
-	    pri7 = R[7];
-	    pri8 = R[8];
-	} else if(prevR.length == 16) {
-	    pri0 = R[0];
-	    pri1 = R[1];
-	    pri2 = R[2];
-	    pri3 = R[4];
-	    pri4 = R[5];
-	    pri5 = R[6];
-	    pri6 = R[8];
-	    pri7 = R[9];
-	    pri8 = R[10];
+	if(prevR.size() == 9)
+	{
+		pri0 = R[0];
+		pri1 = R[1];
+		pri2 = R[2];
+		pri3 = R[3];
+		pri4 = R[4];
+		pri5 = R[5];
+		pri6 = R[6];
+		pri7 = R[7];
+		pri8 = R[8];
+	}
+	else if(prevR.size() == 16)
+	{
+		pri0 = R[0];
+		pri1 = R[1];
+		pri2 = R[2];
+		pri3 = R[4];
+		pri4 = R[5];
+		pri5 = R[6];
+		pri6 = R[8];
+		pri7 = R[9];
+		pri8 = R[10];
 	}
 
 	// calculate the parts of the rotation difference matrix we need
@@ -410,35 +418,40 @@ void MapGraphicsScene::debugTest()
 	rd7 = pri2 * ri1 + pri5 * ri4 + pri8 * ri7; //rd[2][1]
 	rd8 = pri2 * ri2 + pri5 * ri5 + pri8 * ri8; //rd[2][2]
 
-	angleChange[0] = (float)Math.atan2(rd1, rd4);
-	angleChange[1] = (float)Math.asin(-rd7);
-	angleChange[2] = (float)Math.atan2(-rd6, rd8);
+	angleChange.resize(3);
+	angleChange[0] = (float)atan2(rd1, rd4);
+	angleChange[1] = (float)asin(-rd7);
+	angleChange[2] = (float)atan2(-rd6, rd8);
+	
+	return angleChange;
+}
 
-    }
-
-    /** Helper function to convert a rotation vector to a rotation matrix.
-     *  Given a rotation vector (presumably from a ROTATION_VECTOR sensor), returns a
-     *  9  or 16 element rotation matrix in the array R.  R must have length 9 or 16.
-     *  If R.length == 9, the following matrix is returned:
-     * <pre>
-     *   /  R[ 0]   R[ 1]   R[ 2]   \
-     *   |  R[ 3]   R[ 4]   R[ 5]   |
-     *   \  R[ 6]   R[ 7]   R[ 8]   /
-     *</pre>
-     * If R.length == 16, the following matrix is returned:
-     * <pre>
-     *   /  R[ 0]   R[ 1]   R[ 2]   0  \
-     *   |  R[ 4]   R[ 5]   R[ 6]   0  |
-     *   |  R[ 8]   R[ 9]   R[10]   0  |
-     *   \  0       0       0       1  /
-     *</pre>
-     *  @param rotationVector the rotation vector to convert
-     *  @param R an array of floats in which to store the rotation matrix
-     */
-    public static void getRotationMatrixFromVector(float[] R, float[] rotationVector) {
-	float q0 = (float)Math.sqrt(1 - rotationVector[0]*rotationVector[0] -
-				    rotationVector[1]*rotationVector[1] -
-				    rotationVector[2]*rotationVector[2]);
+/** Helper function to convert a rotation vector to a rotation matrix.
+*  Given a rotation vector (presumably from a ROTATION_VECTOR sensor), returns a
+*  9  or 16 element rotation matrix. \a desiredMatrixSize must be 9 or 16.
+*  If \a desiredMatrixSize == 9, the following matrix is returned:
+* <pre>
+*   /  R[ 0]   R[ 1]   R[ 2]   \
+*   |  R[ 3]   R[ 4]   R[ 5]   |
+*   \  R[ 6]   R[ 7]   R[ 8]   /
+*</pre>
+* If \a desiredMatrixSize == 16, the following matrix is returned:
+* <pre>
+*   /  R[ 0]   R[ 1]   R[ 2]   0  \
+*   |  R[ 4]   R[ 5]   R[ 6]   0  |
+*   |  R[ 8]   R[ 9]   R[10]   0  |
+*   \  0       0       0       1  /
+*</pre>
+*  @param rotationVector the rotation vector to convert
+*  @param R an array of floats in which to store the rotation matrix
+*/
+QVector<float> getRotationMatrixFromVector(QVector<float> rotationVector, int desiredMatrixSize = 9)
+{
+	QVector<float> R;
+	R.resize(desiredMatrixSize);
+	float q0 = (float)sqrt(1 - rotationVector[0]*rotationVector[0] -
+				   rotationVector[1]*rotationVector[1] -
+				   rotationVector[2]*rotationVector[2]);
 	float q1 = rotationVector[0];
 	float q2 = rotationVector[1];
 	float q3 = rotationVector[2];
@@ -453,39 +466,44 @@ void MapGraphicsScene::debugTest()
 	float q2_q3 = 2 * q2 * q3;
 	float q1_q0 = 2 * q1 * q0;
 
-	if(R.length == 9) {
-	    R[0] = 1 - sq_q2 - sq_q3;
-	    R[1] = q1_q2 - q3_q0;
-	    R[2] = q1_q3 + q2_q0;
-
-	    R[3] = q1_q2 + q3_q0;
-	    R[4] = 1 - sq_q1 - sq_q3;
-	    R[5] = q2_q3 - q1_q0;
-
-	    R[6] = q1_q3 - q2_q0;
-	    R[7] = q2_q3 + q1_q0;
-	    R[8] = 1 - sq_q1 - sq_q2;
-	} else if (R.length == 16) {
-	    R[0] = 1 - sq_q2 - sq_q3;
-	    R[1] = q1_q2 - q3_q0;
-	    R[2] = q1_q3 + q2_q0;
-	    R[3] = 0.0f;
-
-	    R[4] = q1_q2 + q3_q0;
-	    R[5] = 1 - sq_q1 - sq_q3;
-	    R[6] = q2_q3 - q1_q0;
-	    R[7] = 0.0f;
-
-	    R[8] = q1_q3 - q2_q0;
-	    R[9] = q2_q3 + q1_q0;
-	    R[10] = 1 - sq_q1 - sq_q2;
-	    R[11] = 0.0f;
-
-	    R[12] = R[13] = R[14] = 0.0f;
-	    R[15] = 1.0f;
+	if(desiredMatrixSize == 9)
+	{
+		R[0] = 1 - sq_q2 - sq_q3;
+		R[1] = q1_q2 - q3_q0;
+		R[2] = q1_q3 + q2_q0;
+	
+		R[3] = q1_q2 + q3_q0;
+		R[4] = 1 - sq_q1 - sq_q3;
+		R[5] = q2_q3 - q1_q0;
+	
+		R[6] = q1_q3 - q2_q0;
+		R[7] = q2_q3 + q1_q0;
+		R[8] = 1 - sq_q1 - sq_q2;
 	}
-    }
+	else if (desiredMatrixSize == 16)
+	{
+		R[0] = 1 - sq_q2 - sq_q3;
+		R[1] = q1_q2 - q3_q0;
+		R[2] = q1_q3 + q2_q0;
+		R[3] = 0.0f;
+	
+		R[4] = q1_q2 + q3_q0;
+		R[5] = 1 - sq_q1 - sq_q3;
+		R[6] = q2_q3 - q1_q0;
+		R[7] = 0.0f;
+	
+		R[8] = q1_q3 - q2_q0;
+		R[9] = q2_q3 + q1_q0;
+		R[10] = 1 - sq_q1 - sq_q2;
+		R[11] = 0.0f;
+	
+		R[12] = R[13] = R[14] = 0.0f;
+		R[15] = 1.0f;
+	}
+	return R;
+}
 
+#if 0
     /** Helper function to convert a rotation vector to a normalized quaternion.
      *  Given a rotation vector (presumably from a ROTATION_VECTOR sensor), returns a normalized
      *  quaternion in the array Q.  The quaternion is stored as [w, x, y, z]
@@ -567,7 +585,7 @@ void MapGraphicsScene::sensorReadingChanged()
 			float omegaMagnitude = sqrt(axisX*axisX + axisY*axisY + axisZ*axisZ);
 
 			// Normalize the rotation vector if it's big enough to get the axis
-			if (omegaMagnitude > 1.0) { // 1.0 was EPSILON
+			if (omegaMagnitude > 0.0001) { // 1.0 was EPSILON
 				axisX /= omegaMagnitude;
 				axisY /= omegaMagnitude;
 				axisZ /= omegaMagnitude;
@@ -587,8 +605,9 @@ void MapGraphicsScene::sensorReadingChanged()
 		}
 		timestamp = reading->timestamp();
 		//float deltaRotationMatrix[] = { 0,0,0, 0,0,0, 0,0,0 };
-		// TODO: Translate getRotationMatrixFromVector() [above] from Java to C++
-		//SensorManager.getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
+		QList<float> deltaRotationMatrix = getRotationMatrixFromVector(deltaRotationVector, 16);
+		static QMatrix4x4 rotationCurrent;
+		roationCurrent *= QMatrix4x4((qreal*)deltaRotationMatrix.data());
 		// User code should concatenate the delta rotation we computed with the current rotation
 		// in order to get the updated rotation.
 		//float rotationCurrent[] = { 1,1,1, 1,1,1, 1,1,1 };
@@ -989,7 +1008,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			
 			#endif
 
-			qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
+			//qDebug() << "[apMacToSignal] mac:"<<result.mac<<", val:"<<result.value<<", dBm:"<<result.dbm;
 		}
 	}
 	
@@ -1002,8 +1021,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		return;
 	}
 
-	m_mapWindow->setStatusMessage("Calculating location...", 1000);
-	qDebug() << "\n\nMapGraphicsScene::updateUserLocationOverlay(): Updating Location...";
+	//m_mapWindow->setStatusMessage("Calculating location...", 1000);
+	//qDebug() << "\n\nMapGraphicsScene::updateUserLocationOverlay(): Updating Location...";
 /*	
 	// For each AP, average the ratio of pixels-to-signalLevel by averaging the location of every reading for that AP in relation to the marked location of the AP.
 	// This is used to calculate the radius of the APs coverage.
@@ -1403,301 +1422,363 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	QList<QPointF> badPoints;
 	QLineF firstSet;
 
+	QStringList pairsTested;
+	
 // 	int numAps = apsVisible.size();
-	for(int i=1; i<numAps; i++)
+//	for(int i=1; i<numAps; i++)
+	bool needFirstGoodPoint = false;
+	for(int i=0; i<numAps; i++)
 	{
 // 		QString ap0 = apsVisible[i];
 // 		QString ap1 = (i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
 
-		QString ap0 = apsVisible[0];
-		QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
-
-		MapApInfo *info0 = apInfo(ap0);
-		MapApInfo *info1 = apInfo(ap1);
+// 		QString ap0 = apsVisible[0];
+// 		QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
 		
-		QPointF p0 = info0->point;
-		QPointF p1 = info1->point;
-		
-		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
-						ap1, apMacToDbm[ap1]);
-		
-		// We assume triangulate() already stored drived loss factor into apInfo()
-		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
-		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
-
-		double dist = QLineF(p1,p0).length();
-
-		if(dist > r0 + r1)
+		for(int j=0; j<numAps; j++)
 		{
-			// If d > r0 + r1 then there are no solutions, the circles are separate.
+		
+			QString key = QString("%1%2").arg(i<j?i:j).arg(i<j?j:i);
+			if(i == j || pairsTested.contains(key))
+			{
+				//qDebug() << "\t not testing ("<<i<<"/"<<j<<"): key:"<<key;
+				continue;
+			}
 			
-			// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
-			// therefore the solution given by dBmToDistance() must be wrong.
-
-			// Therefore, we will adjust the lossFactor for these APs inorder to provide
-			// an intersection by allocation part of the error to each AP
-
-			double errorDist = dist - (r0 + r1);
+			//qDebug() << "\t testing ("<<i<<"/"<<j<<"): key:"<<key;
 			
-			double correctR0 = (r0 + errorDist*.6) / m_pixelsPerMeter;
-			double correctR1 = (r1 + errorDist*.6) / m_pixelsPerMeter;
+			pairsTested << key;
 			
-			double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
-			double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
-
-			if(isnan(absLossFactor0))
-			{
-				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-			}
-			else
-			{
-				QPointF lossFactor = info0->lossFactor;
-				if(apMacToDbm[ap0] > info0->shortCutoff)
-					lossFactor.setY(absLossFactor0);
-				else
-					lossFactor.setX(absLossFactor0);
-
-				info0->lossFactor = lossFactor;
-
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Corrected loss factor for ap0:" <<lossFactor<<", correctR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-			}
-
-			if(isnan(absLossFactor1))
-			{
-				//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-			}
-			else
-			{
-				QPointF lossFactor = info1->lossFactor;
-				if(apMacToDbm[ap1] > info1->shortCutoff)
-					lossFactor.setY(absLossFactor1);
-				else
-					lossFactor.setX(absLossFactor1);
-
-				info0->lossFactor = lossFactor;
-
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Corrected loss factor for ap1:" <<lossFactor<<", correctR1:"<<correctR1<<", absLossFactor:"<<absLossFactor1;
-			}
-
-			// Recalculate distances
-			r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
-			r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
-
+			QString ap0 = apsVisible[i];
+			QString ap1 = apsVisible[j];
+			
+	
+			MapApInfo *info0 = apInfo(ap0);
+			MapApInfo *info1 = apInfo(ap1);
+			
+			QPointF p0 = info0->point;
+			QPointF p1 = info1->point;
+			
+			QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
+							ap1, apMacToDbm[ap1]);
+			
+			// We assume triangulate() already stored drived loss factor into apInfo()
+			double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
+			double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+	
+			double dist = QLineF(p1,p0).length();
+	
 			if(dist > r0 + r1)
 			{
-				// Distance still wrong, so force-set the proper distance
+				// If d > r0 + r1 then there are no solutions, the circles are separate.
+				
+				// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
+				// therefore the solution given by dBmToDistance() must be wrong.
+	
+				// Therefore, we will adjust the lossFactor for these APs inorder to provide
+				// an intersection by allocation part of the error to each AP
+	
 				double errorDist = dist - (r0 + r1);
-
-				r0 += errorDist * .6; // overlay a bit by using .6 instead of .5
-				r1 += errorDist * .6;
-
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
-			}
-			
-		}
-
-
-		QColor color0 = baseColorForAp(ap0);
-		QColor color1 = baseColorForAp(ap1);
-
-
-		// Render the estimated circles covered by these APs
-		if(!drawnFlag.contains(ap0))
-		{
-			drawnFlag.insert(ap0, true);
-
-			p.setPen(QPen(color0, penWidth));
-
-			if(isnan(r0))
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
-			else
-				p.drawEllipse(p0, r0, r0);
-		}
-
-		if(!drawnFlag.contains(ap1))
-		{
-			drawnFlag.insert(ap1, true);
-
-			p.setPen(QPen(color1, penWidth));
-
-			if(isnan(r1))
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
-			else
-				p.drawEllipse(p1, r1, r1);
-
-		}
-
-		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] i:"<<i<<", r0:"<<r0<<", r1:"<<r1;
-		
-		// The revised idea here is this:
-		// Need at least three APs to find AP with intersection of circles:
-		// Get the two lines the APs intersect
-		// Store the first two points at into firstSet
-		// Next set, the next two points compared to first two - the two closest go into the goodPoints set, the rejected ones go into badPoints
-		// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
-		// At end, good points forms the probability cluster of where the user probably is
-		
-		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
-		
-		QPointF goodPoint;
-		
-		//QLineF line  = calcIntersect(p0, r0, p1, r1);
-		//QLineF line = triangulate2(ap0, apMacToDbm[ap0],
-		//			   ap1, apMacToDbm[ap1]);
-		double xi, yi, xi_prime, yi_prime;
-		int ret = circle_circle_intersection(
-					p0.x(), p0.y(), r0,
-					p1.x(), p1.y(), r1,
-					&xi, &yi,
-					&xi_prime, &yi_prime);
-		if(!ret)
-		{
-			qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
-			continue;
-		}
-
-		QLineF line(xi, yi, xi_prime, yi_prime);
-
-		
-		if(line.isNull())
-		{
-			continue;
-		}
-		else
-		{
-			p.setPen(QPen(Qt::gray, penWidth));
-			p.drawLine(line);
-			
-			if(goodPoints.isEmpty())
-			{
-				if(firstSet.isNull())
+				
+				double correctR0 = (r0 + errorDist*.6) / m_pixelsPerMeter;
+				double correctR1 = (r1 + errorDist*.6) / m_pixelsPerMeter;
+				
+				double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
+				double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
+	
+				if(isnan(absLossFactor0))
 				{
-					firstSet = line;
-					// Cheat for the first intersection - just give the center of the line
-					goodPoint = (line.p1() + line.p2()) / 2;
-					
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint;
+					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
 				}
 				else
 				{
-					// This is the second AP intersection - here we compare both points in both lines
-					// The two points closest together are the 'good' points
-					double min = 0;
-					QLineF good;
-					QLineF bad;
-					
-					double len11 = QLineF(firstSet.p1(), line.p1()).length();
-					{
-						min = len11;
-						good = QLineF(firstSet.p1(), line.p1());
-						bad  = QLineF(firstSet.p2(), line.p2());
-					}
-					
-					double len12 = QLineF(firstSet.p1(), line.p2()).length();
-					if(len12 < min)
-					{
-						min = len12;
-						good = QLineF(firstSet.p1(), line.p2());
-						bad  = QLineF(firstSet.p2(), line.p1());
-					}
-					
-					double len21 = QLineF(firstSet.p2(), line.p1()).length();
-					if(len21 < min)
-					{
-						min = len21;
-						good = QLineF(firstSet.p2(), line.p1());
-						bad  = QLineF(firstSet.p1(), line.p2());
-					}
-					
-					double len22 = QLineF(firstSet.p2(), line.p2()).length();
-					if(len22 < min)
-					{
-						min = len22;
-						good = QLineF(firstSet.p2(), line.p2());
-						bad  = QLineF(firstSet.p1(), line.p1());
-					}
-					
-					goodPoints << good.p1() << good.p2();
-					badPoints  << bad.p1()  << bad.p2();
-					
-					goodPoint = good.p2();
-					
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
+					QPointF lossFactor = info0->lossFactor;
+					if(apMacToDbm[ap0] > info0->shortCutoff)
+						lossFactor.setY(absLossFactor0);
+					else
+						lossFactor.setX(absLossFactor0);
+	
+					info0->lossFactor = lossFactor;
+	
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Corrected loss factor for ap0:" <<lossFactor<<", correctR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
 				}
-			}
-			else
-			{
-				// Calculate avg distance for both intersection points,
-				// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected
-				double goodSum1=0, goodSum2=0;
-				foreach(QPointF good, goodPoints)
+	
+				if(isnan(absLossFactor1))
 				{
-					goodSum1 += QLineF(good, line.p1()).length();
-					goodSum2 += QLineF(good, line.p2()).length();
-				}
-				
-				double count = (double)goodPoints.size();
-				double goodAvg1 = goodSum1 / count,
-				goodAvg2 = goodSum2 / count;
-				
-				if(goodAvg1 < goodAvg2)
-				{
-					qDebug() <<
-					goodPoints << line.p1();
-					badPoints  << line.p2();
-					
-					goodPoint = line.p1();
-					
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
 				}
 				else
 				{
-					goodPoints << line.p2();
-					badPoints  << line.p1();
+					QPointF lossFactor = info1->lossFactor;
+					if(apMacToDbm[ap1] > info1->shortCutoff)
+						lossFactor.setY(absLossFactor1);
+					else
+						lossFactor.setX(absLossFactor1);
+	
+					info0->lossFactor = lossFactor;
+	
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Corrected loss factor for ap1:" <<lossFactor<<", correctR1:"<<correctR1<<", absLossFactor:"<<absLossFactor1;
+				}
+	
+				// Recalculate distances
+				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
+				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+	
+				if(dist > r0 + r1)
+				{
+					// Distance still wrong, so force-set the proper distance
+					double errorDist = dist - (r0 + r1);
+	
+					r0 += errorDist * .6; // overlay a bit by using .6 instead of .5
+					r1 += errorDist * .6;
+	
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+				}
+				
+			}
+	
+	
+			QColor color0 = baseColorForAp(ap0);
+			QColor color1 = baseColorForAp(ap1);
+	
+	
+			// Render the estimated circles covered by these APs
+			if(!drawnFlag.contains(ap0))
+			{
+				drawnFlag.insert(ap0, true);
+	
+				p.setPen(QPen(color0, penWidth));
+	
+				if(isnan(r0))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+				else
+					p.drawEllipse(p0, r0, r0);
+			}
+	
+			if(!drawnFlag.contains(ap1))
+			{
+				drawnFlag.insert(ap1, true);
+	
+				p.setPen(QPen(color1, penWidth));
+	
+				if(isnan(r1))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+				else
+					p.drawEllipse(p1, r1, r1);
+	
+			}
+	
+			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] i:"<<i<<", r0:"<<r0<<", r1:"<<r1;
+			
+			// The revised idea here is this:
+			// Need at least three APs to find AP with intersection of circles:
+			// Get the two lines the APs intersect
+			// Store the first two points at into firstSet
+			// Next set, the next two points compared to first two - the two closest go into the goodPoints set, the rejected ones go into badPoints
+			// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
+			// At end, good points forms the probability cluster of where the user probably is
+			
+			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
+			
+			QPointF goodPoint;
+			
+			//QLineF line  = calcIntersect(p0, r0, p1, r1);
+			//QLineF line = triangulate2(ap0, apMacToDbm[ap0],
+			//			   ap1, apMacToDbm[ap1]);
+			double xi, yi, xi_prime, yi_prime;
+			int ret = circle_circle_intersection(
+						p0.x(), p0.y(), r0,
+						p1.x(), p1.y(), r1,
+						&xi, &yi,
+						&xi_prime, &yi_prime);
+			if(!ret)
+			{
+				qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
+				continue;
+			}
+	
+			QLineF line(xi, yi, xi_prime, yi_prime);
+	
+			
+			if(line.isNull())
+			{
+				continue;
+			}
+			else
+			{
+				p.setPen(QPen(Qt::gray, penWidth));
+				p.drawLine(line);
+				
+				if(goodPoints.isEmpty())
+				{
+					if(firstSet.isNull())
+					{
+						firstSet = line;
+						// If only intersecting two APs, then just just give the center of the line.
+						// Otherwise, leave blank and let the code below handle it the first time
+						goodPoint = numAps > 2 ? QPointF() : (line.p1() + line.p2()) / 2;
+						
+						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint<<", numAps:"<<numAps;
+					}
+					else
+					{
+						// This is the second AP intersection - here we compare both points in both lines
+						// The two points closest together are the 'good' points
+						double min = 0;
+						QLineF good;
+						QLineF bad;
+						
+						double len11 = QLineF(firstSet.p1(), line.p1()).length();
+						{
+							min = len11;
+							good = QLineF(firstSet.p1(), line.p1());
+							bad  = QLineF(firstSet.p2(), line.p2());
+						}
+						
+						double len12 = QLineF(firstSet.p1(), line.p2()).length();
+						if(len12 < min)
+						{
+							min = len12;
+							good = QLineF(firstSet.p1(), line.p2());
+							bad  = QLineF(firstSet.p2(), line.p1());
+						}
+						
+						double len21 = QLineF(firstSet.p2(), line.p1()).length();
+						if(len21 < min)
+						{
+							min = len21;
+							good = QLineF(firstSet.p2(), line.p1());
+							bad  = QLineF(firstSet.p1(), line.p2());
+						}
+						
+						double len22 = QLineF(firstSet.p2(), line.p2()).length();
+						if(len22 < min)
+						{
+							min = len22;
+							good = QLineF(firstSet.p2(), line.p2());
+							bad  = QLineF(firstSet.p1(), line.p1());
+						}
+						
+						goodPoints << good.p1() << good.p2();
+						badPoints  << bad.p1()  << bad.p2();
+						
+						goodPoint = good.p2();
+						
+						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
+					}
+				}
+				else
+				{
+					// Calculate avg distance for both intersection points,
+					// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected
+					double goodSum1=0, goodSum2=0;
+					foreach(QPointF good, goodPoints)
+					{
+						goodSum1 += QLineF(good, line.p1()).length();
+						goodSum2 += QLineF(good, line.p2()).length();
+					}
 					
-					goodPoint = line.p2();
+					double count = (double)goodPoints.size();
+					double goodAvg1 = goodSum1 / count,
+					goodAvg2 = goodSum2 / count;
 					
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+					if(goodAvg1 < goodAvg2)
+					{
+						qDebug() <<
+						goodPoints << line.p1();
+						badPoints  << line.p2();
+						
+						goodPoint = line.p1();
+						
+						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+					}
+					else
+					{
+						goodPoints << line.p2();
+						badPoints  << line.p1();
+						
+						goodPoint = line.p2();
+						
+						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+					}
 				}
 			}
+			
+			if(goodPoint.isNull())
+			{
+				needFirstGoodPoint = true;
+			}
+			else
+			{
+				if(needFirstGoodPoint)
+				{
+					needFirstGoodPoint = false;
+					
+					QPointF tmpPoint = goodPoints.first();
+					
+					userPoly << tmpPoint;
+					
+					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<tmpPoint << " (from last intersection)";
+					
+					
+					p.save();
+					
+		// 			p.setPen(QPen(color0, penWidth));
+		// 			p.drawLine(p0, calcPoint);
+		// 			
+		// 			p.setPen(QPen(color1, penWidth));
+		// 			p.drawLine(p1, calcPoint);
+					
+					p.setPen(QPen(Qt::gray, 3.));
+					p.setBrush(QColor(0,0,0,127));
+					p.drawEllipse(tmpPoint, 10, 10);
+					
+					p.restore();
+					
+					avgPoint2 += tmpPoint;
+					count ++;
+				}
+					
+				calcPoint = goodPoint;
+				
+				if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+				{
+				//	qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+				}
+				else
+				{
+					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
+					//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+					
+					userPoly << goodPoint;
+					
+					p.save();
+					
+		// 			p.setPen(QPen(color0, penWidth));
+		// 			p.drawLine(p0, calcPoint);
+		// 			
+		// 			p.setPen(QPen(color1, penWidth));
+		// 			p.drawLine(p1, calcPoint);
+					
+					p.setPen(QPen(Qt::gray, 3.));
+					p.setBrush(QColor(0,0,0,127));
+					p.drawEllipse(calcPoint, 10, 10);
+					
+					p.restore();
+		
+					
+					avgPoint2 += calcPoint;
+					count ++;
+				}
+			}
+			
+			
+			//p.setPen(QPen(Qt::gray, penWidth));
+			//p.drawLine(p0, p1);
+			
+			//break;
+		
 		}
-		
-		calcPoint = goodPoint;
-		
-		if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-		{
-		//	qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
-		}
-		else
-		{
-			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
-		
-			if(!goodPoint.isNull())
-				userPoly << goodPoint;
-			
-			p.save();
-			
-			p.setPen(QPen(color0, penWidth));
-			p.drawLine(p0, calcPoint);
-			
-			p.setPen(QPen(color1, penWidth));
-			p.drawLine(p1, calcPoint);
-			
-			p.setPen(QPen(Qt::gray, 3.));
-			p.setBrush(QColor(0,0,0,127));
-			p.drawEllipse(calcPoint, 10, 10);
-			
-			p.restore();
-
-			
-			avgPoint2 += calcPoint;
-			count ++;
-		}
-		
-		//p.setPen(QPen(Qt::gray, penWidth));
-		//p.drawLine(p0, p1);
-		
-		//break;
 	}
 	
 // 	avgPoint2.setX( avgPoint.x() / count );
@@ -1715,10 +1796,10 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 	penWidth = 20;
 	
-	p.setPen(QPen(Qt::green, 10.));
-	p.setBrush(QColor(0,0,0,127));
-	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
-		p.drawEllipse(avgPoint, penWidth, penWidth);
+// 	p.setPen(QPen(Qt::green, 10.));
+// 	p.setBrush(QColor(0,0,0,127));
+// 	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+// 		p.drawEllipse(avgPoint, penWidth, penWidth);
 	
 	if(!isnan(avgPoint2.x()) && !isnan(avgPoint2.y()))
 	{
@@ -1820,7 +1901,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	
 	m_userItem->setVisible(true);
 
-	m_mapWindow->setStatusMessage("Location Updated!", 100);
+	//m_mapWindow->setStatusMessage("Location Updated!", 100);
 
 }
 
@@ -2244,6 +2325,8 @@ QLineF MapGraphicsScene::triangulate2(QString ap0, int dBm0, QString ap1, int dB
 	qDebug() << "triangulate2(): ca:"<<ca<<", ch2:"<<ch2<<", ch:"<<ch;
 	Debug() << "triangulate2(): p2:"<<p2<<", p3a:"<<p3a<<", p3b:"<<p3b;*/
 
+	Q_UNUSED(lc);
+	
 	double xi, yi, xi_prime, yi_prime;
 	int ret = circle_circle_intersection(
 				p0.x(), p0.y(), la,
