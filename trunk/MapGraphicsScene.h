@@ -13,8 +13,6 @@
 
 #include "WifiDataCollector.h"
 
-#include "SigMapValue.h"
-
 #ifdef Q_OS_ANDROID
 #define AndroidDialogHelper(widgetPtr, dialog) { \
 	if(widgetPtr) \
@@ -258,7 +256,9 @@ public:
 	QString currentDevice() { return m_device; }
 	
 	MapRenderOptions renderOpts() { return m_renderOpts; }
-	
+
+	QColor baseColorForAp(QString apMac);
+
 public slots:
 	void saveResults(QString filename);
 	void loadResults(QString filename);
@@ -317,7 +317,6 @@ protected:
 	QImage renderSignalMarker(QList<WifiDataResult> results);
 	SigMapValue *addSignalMarker(QPointF point, QList<WifiDataResult> results);
 	QColor colorForSignal(double sig, QString apMac);
-	QColor baseColorForAp(QString apMac);
 	void renderTriangle(QImage *img, SigMapValue *a, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	void renderTriangle(QImage *img, QPointF center, SigMapValue *b, SigMapValue *c, double dx, double dy, QString apMac);
 	

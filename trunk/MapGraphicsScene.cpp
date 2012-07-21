@@ -127,21 +127,22 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	// Set up background and other misc items
 	clear();
 	
+	// Load basic settings
 	QSettings settings("wifisigmap");
 	m_showMyLocation       = settings.value("showMyLocation", true).toBool();
 	m_autoGuessApLocations = settings.value("autoGuessApLocations", true).toBool();
 
-// 	m_pixelsPerMeter = 42.;
-// 	m_pixelsPerFoot  = 12.;
-
+	// Set defualt pixels per foot
 	setPixelsPerFoot(0.25/10);
-	
+
+	// Load last device/file used
 	setDevice(settings.value("device", "").toString());
-	
+
+	// Load last render mode
 	m_renderMode = (RenderMode)settings.value("rendermode", (int)DEFAULT_RENDER_MODE).toInt();
-	
+
+	// Ask MapRenderOpts to load itself from QSettings
 	m_renderOpts.loadFromQSettings();
-	
 	
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
@@ -150,14 +151,6 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	#ifdef OPENCV_ENABLED
 	m_kalman.predictionBegin(0,0);
 	#endif
-
-	/*
-	// Just test and exit
-	QStringList list = WifiDataCollector::findWlanInterfaces();
-	qDebug() << "Found IFs: "<<list;
-	exit(-1);
-	*/
-	
 }
 
 MapGraphicsScene::~MapGraphicsScene()
@@ -180,7 +173,15 @@ void MapGraphicsScene::setDevice(QString dev)
 	QSettings("wifisigmap").setValue("device", dev);
 	
 	if(dev.contains("/") || dev.contains("\\")) // HACK to see if it's a file
+	{
+		m_scanIf.setWlanDevice("");
 		m_scanIf.setDataTextfile(dev);
+	}
+	else
+	{
+		m_scanIf.setWlanDevice(dev);
+		m_scanIf.setDataTextfile("");
+	}
 }
 
 void MapGraphicsScene::debugTest()
@@ -855,7 +856,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	// Need at least two *known* APs registered on the map - with out that, we don't even need to check the results
 	if(m_apInfo.values().size() < 2)
 	{
-		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two APs marked, unable to guess user location";
+		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two APs observed, unable to guess user location";
 		return;
 	}
 	
@@ -899,6 +900,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	if(apsVisible.size() < 2)
 	{
 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two known APs marked AND visble, unable to guess user location";
+		m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
 		return;
 	}
 /*	
@@ -1308,9 +1310,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 		QString ap0 = apsVisible[0];
 		QString ap1 = apsVisible[i]; //(i < numAps - 1) ? apsVisible[i+1] : apsVisible[0];
+
+		MapApInfo *info0 = apInfo(ap0);
+		MapApInfo *info1 = apInfo(ap1);
 		
-		QPointF p0 = apInfo(ap0)->point;
-		QPointF p1 = apInfo(ap1)->point;
+		QPointF p0 = info0->point;
+		QPointF p1 = info1->point;
 		
 		QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
 						ap1, apMacToDbm[ap1]);
@@ -1318,6 +1323,78 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		// We assume triangulate() already stored drived loss factor into apInfo()
 		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+
+		double dist = QLineF(p1,p0).length();
+
+		if(dist > r0 + r1)
+		{
+			// If d > r0 + r1 then there are no solutions, the circles are separate.
+			
+			// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
+			// therefore the solution given by dBmToDistance() must be wrong.
+
+			// Therefore, we will adjust the lossFactor for these APs inorder to provide
+			// an intersection by allocation part of the error to each AP
+
+			double errorDist = fabs(r0 - r1);
+			
+			double correctR0 = (r0 + errorDist * .75) / m_pixelsPerMeter;
+			double correctR1 = (r1 + errorDist * .75) / m_pixelsPerMeter;
+			
+			double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
+			double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
+
+			if(isnan(absLossFactor0))
+			{
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+			}
+			else
+			{
+				QPointF lossFactor = info0->lossFactor;
+				if(apMacToDbm[ap0] > info0->shortCutoff)
+					lossFactor.setY(absLossFactor0);
+				else
+					lossFactor.setX(absLossFactor0);
+
+				info0->lossFactor = lossFactor;
+
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Corrected loss factor for ap0:" <<lossFactor<<", correctR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+			}
+
+			if(isnan(absLossFactor1))
+			{
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+			}
+			else
+			{
+				QPointF lossFactor = info1->lossFactor;
+				if(apMacToDbm[ap1] > info1->shortCutoff)
+					lossFactor.setY(absLossFactor1);
+				else
+					lossFactor.setX(absLossFactor1);
+
+				info0->lossFactor = lossFactor;
+
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Corrected loss factor for ap1:" <<lossFactor<<", correctR1:"<<correctR1<<", absLossFactor:"<<absLossFactor1;
+			}
+
+			// Recalculate distances
+			r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
+			r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+
+			if(dist > r0 + r1)
+			{
+				// Distance still wrong, so force-set the proper distance
+				double errorDist = fabs(r0 - r1);
+
+				r0 += errorDist / 2;
+				r1 += errorDist / 2;
+
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1;
+			}
+			
+		}
+
 
 		QColor color0 = baseColorForAp(ap0);
 		QColor color1 = baseColorForAp(ap1);

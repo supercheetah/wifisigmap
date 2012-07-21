@@ -106,6 +106,7 @@ MapWindow::MapWindow(QWidget *parent)
 	#endif
 	
 	setWindowTitle("WiFi Signal Mapper");
+	setWindowIcon(QPixmap(":/data/images/icon.png"));
 	setupUi();
 	
 	QString lastFile = QSettings("wifisigmap").value("last-map-file","").toString();

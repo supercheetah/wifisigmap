@@ -122,8 +122,7 @@ WifiDataCollector::WifiDataCollector()
 	m_scanTimer.setInterval(750);
 	
 	#else
-	QString interface = findWlanIf();
-	if(interface.isEmpty())
+	if(findWlanIf().isEmpty())
 		// We are running on a machine WITHOUT wireless, so we are going to use a dummy data source,
 		// therefore add artificial delay between scans
 		m_scanTimer.setInterval(500);
@@ -447,7 +446,11 @@ void WifiDataCollector::scanWifi()
 		debugTextFile = m_dataTextfile;
 	else
 	{
-		interface = findWlanIf();
+		interface = m_wlanDevice;
+
+		if(interface.isEmpty())
+			interface = findWlanIf();
+		
 		if(interface.isEmpty())
 			// scan3.txt is just some sample data I captured for use in development
 			//debugTextFile = QString("scan3-%1.txt").arg(m_scanNum+1);
