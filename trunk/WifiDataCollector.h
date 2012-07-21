@@ -45,10 +45,10 @@ public:
 	static QStringList findWlanInterfaces();
 
 	// If empty (default), uses first wlan device found
-	void setWlanDevice(QString dev="") {  m_wlanDevice = dev; }
+	void setWlanDevice(QString dev="");
 	
 	// Set data textfile to load data from a file instead of read it live (mainly for debugging/testing) 
-	void setDataTextfile(QString file) { m_dataTextfile = file; }
+	void setDataTextfile(QString file);
 	QString dataTextfile() { return m_dataTextfile; }
 
 	// Converts dBm in the range of [-100,-40] to a range of [0,1]
@@ -68,6 +68,8 @@ protected slots:
 	void scanWifi();
 
 protected:
+	void updateScanInterval();
+	
 	QThread m_scanThread;
 	
 	int m_numScans;
