@@ -52,6 +52,7 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 	ui->showReadingMarkers->setChecked(renderOpts.showReadingMarkers);
 	
 	QStringList renderOptions = QStringList()
+		<< "(None)"
 		<< "Radial Lines"
 		<< "Circles"
 		<< "Rectangle";

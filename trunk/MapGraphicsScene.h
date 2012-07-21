@@ -13,6 +13,8 @@
 
 #include "WifiDataCollector.h"
 
+#include "SigMapValue.h"
+
 #ifdef Q_OS_ANDROID
 #define AndroidDialogHelper(widgetPtr, dialog) { \
 	if(widgetPtr) \
@@ -24,31 +26,22 @@
 #define AndroidDialogHelper(widgetPtr, dialog) { Q_UNUSED(widgetPtr); Q_UNUSED(dialog); }
 #endif
 
-class MapGraphicsView : public QGraphicsView
-{
-	Q_OBJECT
-public:
-	MapGraphicsView();
-	void scaleView(qreal scaleFactor);
-	
-	double scaleFactor() { return m_scaleFactor; }
-	 
-	void reset();
+#define qDrawTextC(p,x,y,string,c1,c2) 	\
+	p.setPen(c1);			\
+	p.drawText(x-1, y-1, string);	\
+	p.drawText(x+1, y-1, string);	\
+	p.drawText(x+1, y+1, string);	\
+	p.drawText(x-1, y+1, string);	\
+	p.setPen(c2);			\
+	p.drawText(x, y, string);	\
 
-public slots:
-	void zoomIn();
-	void zoomOut();
-	
-protected:
-	void drawForeground(QPainter *p, const QRectF & rect);
-	
-	void keyPressEvent(QKeyEvent *event);
-	void mouseMoveEvent(QMouseEvent * mouseEvent);
-	void wheelEvent(QWheelEvent *event);
-	//void drawBackground(QPainter *painter, const QRectF &rect);
-	
-	double m_scaleFactor;
-};
+#define qDrawTextO(p,x,y,string) 	\
+	qDrawTextC(p,x,y,string,Qt::black,Qt::white);
+
+
+// Some math constants...
+static const double Pi  = 3.14159265358979323846264338327950288419717;
+static const double Pi2 = Pi * 2.;
 
 class SigMapValue;
 class SigMapValueMarker : public QObject, public QGraphicsPixmapItem
@@ -58,20 +51,20 @@ public:
 	SigMapValueMarker(SigMapValue *val, const QPixmap& pixmap = QPixmap(), QGraphicsItem *parent = 0)
 		: QGraphicsPixmapItem(pixmap, parent)
 		, m_value(val) {}
-	
+
 	SigMapValue *value() { return m_value; }
-	
+
 signals:
 	void clicked();
-	
+
 protected:
 	virtual void mouseReleaseEvent ( QGraphicsSceneMouseEvent * event )
 	{
 		QGraphicsItem::mouseReleaseEvent(event);
-		
+
 		emit clicked();
 	}
-	
+
 	SigMapValue *m_value;
 };
 
@@ -100,35 +93,35 @@ public:
 		, consumed(false)
 		, marker(0)
  		{}
-	
+
 	// Location on the map
 	QPointF point;
-	
+
 	double rxGain; // dBi, typically in the range of [-3,+3] - +3 for laptops, -3 for phones, 0 for unknown or possibly tablets
 	QString rxMac; // for estimating gain ...?
 	QDateTime timestamp;
-	
+
 	double lat; // future use
 	double lng;
-	
+
 	// Actual scan data for this point
 	QList<WifiDataResult> scanResults;
-	
+
 	// Utils for accessing data in scanResults
 	bool hasAp(QString mac);
 	double signalForAp(QString mac, bool returnDbmValue=false);
-	
+
 	// Cache fields for rendering
 	bool renderDataDirty;
 	double renderCircleRadius;
 	double renderLevel;
 	double renderAngle;
-	
+
 	bool consumed;
-	
+
 	// The actual marker on the map
 	SigMapValueMarker *marker;
-	
+
 };
 
 class MapGraphicsScene;
@@ -155,51 +148,6 @@ protected:
 	QPoint m_offset;
 };
 
-
-class LongPressSpinner : public QObject, public QGraphicsItem
-{
-	Q_OBJECT
-	Q_INTERFACES(QGraphicsItem)
-public:
-	LongPressSpinner();
-	
-	QRectF boundingRect() const;	
-	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
-
-public slots:
-	void setVisible(bool flag);
-	void setGoodPress(bool flag = true);
-	void setProgress(double); // [0,1]
-
-protected slots:
-	void goodPressExpire();
-	void fadeTick();
-
-protected:
-	bool m_goodPressFlag;
-	double m_progress;
-	QRectF m_boundingRect;
-	QTimer m_goodPressTimer;
-
-};
-
-class SigMapRenderer : public QObject
-{
-	Q_OBJECT
-public:
-	SigMapRenderer(MapGraphicsScene* gs);
-
-public slots:
-	void render();
-
-signals:
-	void renderProgress(double); // 0.0-1.0
-	void renderComplete(QPicture); //QImage);
-	//void renderComplete(QImage);
-
-protected:
-	MapGraphicsScene *m_gs;
-};
 
 class MapApInfo
 {
@@ -258,7 +206,7 @@ class MapRenderOptions
 public:
 	void loadFromQSettings();
 	void saveToQSettings();
-	
+
 	bool cacheMapRender;
 	bool showReadingMarkers;
 	bool multipleCircles;
@@ -271,6 +219,8 @@ public:
 };
 
 class MapWindow;
+class SigMapRenderer;
+class LongPressSpinner;
 
 class MapGraphicsScene : public QGraphicsScene
 {
@@ -285,6 +235,7 @@ public:
 	void clear();
 	
 	enum RenderMode {
+		RenderNone,
 		RenderRadial,
 		RenderCircles,
 		RenderRectangles,
