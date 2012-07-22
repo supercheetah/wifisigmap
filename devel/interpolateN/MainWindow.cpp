@@ -179,6 +179,40 @@ qPointValue getPoint(QList<qPointValue> list, QPointF point)
 	return qPointValue();
 }
 
+double weight(QPointF i, QPointF o, double p)
+{
+	return 1/pow(QLineF(i,o).length(), p);
+}
+
+double interpolateValue(QPointF point, QList<qPointValue> inputs)
+{
+	//value = interpolateValue(point2, inputs);
+	
+	/*
+	http://en.wikipedia.org/wiki/Inverse_distance_weighting:
+	u(x) = sum(i=0..N, (
+		W(i,x) * u(i)
+		----------
+		sum(j=0..N, W(j,x))
+		)
+	
+	Where:
+	W(i,X) = 1/(d(X,Xi)^p
+	*/
+	double p = 3;
+	int n = inputs.size();
+	double sum = 0;
+	for(int i=0; i<n; i++)
+	{
+		double a = weight(inputs[i].point, point, p) * inputs[i].value;
+		double b = 0;
+		for(int j=0; j<n; j++)
+			b += weight(inputs[j].point, point, p);
+		sum += a/b;
+	}
+	return sum;
+}
+
 QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existingPoints, QRectF bounds, QPointF p1, QPointF p2, int dir)
 {
 	QLineF boundLine(p1,p2);
@@ -188,7 +222,8 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 	if(!hasPoint(existingPoints, boundLine.p1()) &&
 	   !hasPoint(outputs,        boundLine.p1()))
 	{
-		c1 = qPointValue(boundLine.p1(), 0.); // NOTE assumingunknown corners have value of 0.
+		double value = interpolateValue(boundLine.p1(), inputs);
+		c1 = qPointValue(boundLine.p1(), value);
 		outputs << c1;
 	}
 	else
@@ -199,7 +234,8 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 	if(!hasPoint(existingPoints, boundLine.p2()) &&
 	   !hasPoint(outputs,        boundLine.p2()))
 	{
-		c2 = qPointValue(boundLine.p2(), 0.); // NOTE assuming unknown corners have value of 0.;
+		double value = interpolateValue(boundLine.p2(), inputs);
+		c2 = qPointValue(boundLine.p2(), value);
 		outputs << c2;
 	}
 	else
@@ -226,9 +262,9 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 		}
 	}
 	
-	double pval[4] = { c1.value, c1.value, c2.value, c2.value };
+	//double pval[4] = { c1.value, c1.value, c2.value, c2.value };
 	 
-	double lineLength = boundLine.length();
+	//double lineLength = boundLine.length();
 	
 	foreach(qPointValue v, inputs)
 	{
@@ -261,10 +297,42 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 			if(!hasPoint(existingPoints, point) &&
 			   !hasPoint(outputs, point))
 			{
-				double unitVal = (dir == 1 || dir == 3 ? v.point.x() : v.point.y()) / lineLength;
-				double value = cubicInterpolate(pval, unitVal);
+// 				double unitVal = (dir == 1 || dir == 3 ? v.point.x() : v.point.y()) / lineLength;
+// 				double value = cubicInterpolate(pval, unitVal);
+				double value = interpolateValue(point, inputs);
 				outputs << qPointValue(point, value);
 				//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/1] New point: "<<point<<", value:"<<value<<", corners: "<<c1.value<<","<<c2.value;
+			}
+		}
+		
+		foreach(qPointValue v2, inputs)
+		{
+			QLineF line2;
+			if(dir == 1 || dir == 3)
+				// 1=(boundLine runs right-left on TOP side of bounds)
+				// 3=(boundLine runs right-left on BOTTOM side of bounds)
+				// run line left right, see if intersects with 'line' above
+				line2 = QLineF(bounds.left(), v2.point.y(), bounds.right(), v2.point.y());
+			else
+			if(dir == 2 || dir == 4)
+				// 2=(boundLine runs top-bottom on RIGHT side of bounds)
+				// 4=(boundLine runs top-bottom on LEFT side of bounds)
+				// run line left right, see if intersects with 'line' above
+				line2 = QLineF(v2.point.x(), bounds.top(), v2.point.x(), bounds.bottom());
+			
+			//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] Testing: "<<line2;
+			
+			// test to see boundLine intersects line, if so, create point if none exists
+			QPointF point2;
+			/*QLineF::IntersectType type = */line.intersect(line2, &point2);
+			if(!point2.isNull())
+			{
+				if(!hasPoint(existingPoints, point2) &&
+				   !hasPoint(outputs, point2))
+				{
+					double value = interpolateValue(point2, inputs);
+					outputs << qPointValue(point2, isnan(value) ? 0 :value);
+				}
 			}
 		}
 		
@@ -302,267 +370,6 @@ qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool r
 	
 	return minPnt;
 }
-
-QList<qPointValue> testInnerLines(QList<qPointValue> inputs, QList<qPointValue> existingPoints, QRectF bounds, QPointF p1, QPointF p2, int dir)
-{
-	QLineF boundLine(p1,p2);
-	QList<qPointValue> outputs;
-	
-// 	qPointValue c1, c2;
-// 	if(!hasPoint(existingPoints, boundLine.p1()) &&
-// 	   !hasPoint(outputs,        boundLine.p1()))
-// 	{
-// 		c1 = qPointValue(boundLine.p1(), 0.); // NOTE assumingunknown corners have value of 0.
-// 		outputs << c1;
-// 	}
-// 	else
-// 	{
-// 		c1 = getPoint(inputs, boundLine.p1());
-// 	}
-// 	
-// 	if(!hasPoint(existingPoints, boundLine.p2()) &&
-// 	   !hasPoint(outputs,        boundLine.p2()))
-// 	{
-// 		c2 = qPointValue(boundLine.p2(), 0.); // NOTE assuming unknown corners have value of 0.;
-// 		outputs << c2;
-// 	}
-// 	else
-// 	{
-// 		c2 = getPoint(inputs, boundLine.p2());
-// 	}
-// 		
-// 	double pval[4] = { c1.value, c1.value/2, c2.value/2, c2.value };
-// 	 
-// 	double lineLength = boundLine.length();
-	
-	foreach(qPointValue v, inputs)
-	{
-		QLineF line;
-		if(dir == 1)
-			// line from point to TOP
-			// (boundLine runs right-left on TOP side of bounds)
-			line = QLineF(v.point, QPointF(v.point.x(), bounds.top()));
-		else
-		if(dir == 2)
-			// line from point to RIGHT
-			// (boundLine runs top-bottom on RIGHT side of bounds)
-			line = QLineF(v.point, QPointF(bounds.right(), v.point.y()));
-		else
-		if(dir == 3)
-			// line from point to BOTTOM
-			// (boundLine runs right-left on BOTTOM side of bounds)
-			line = QLineF(v.point, QPointF(v.point.x(), bounds.bottom()));
-		else
-		if(dir == 4)
-			// line from point to LEFT
-			// (boundLine runs top-bottom on LEFT side of bounds)
-			line = QLineF(v.point, QPointF(bounds.left(),  v.point.y()));
-		
-// 		// test to see boundLine intersects line, if so, create point if none exists
-// 		QPointF point;
-// 		/*QLineF::IntersectType type = */boundLine.intersect(line, &point);
-// 		if(!point.isNull())
-// 		{
-// 			if(!hasPoint(existingPoints, point) &&
-// 			   !hasPoint(outputs, point))
-// 			{
-// 				double unitVal = (dir == 1 || dir == 3 ? v.point.x() : v.point.y()) / lineLength;
-// 				double value = cubicInterpolate(pval, unitVal);
-// 				outputs << qPointValue(point, value);
-// 				qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/1] New point: "<<point<<", value:"<<value<<", corners: "<<c1.value<<","<<c2.value;
-// 			}
-// 		}
-		
-
-		foreach(qPointValue v2, inputs)
-		{
-			QLineF line2;
-			if(dir == 1 || dir == 3)
-				// 1=(boundLine runs right-left on TOP side of bounds)
-				// 3=(boundLine runs right-left on BOTTOM side of bounds)
-				// run line left right, see if intersects with 'line' above
-				line2 = QLineF(bounds.left(), v2.point.y(), bounds.right(), v2.point.y());
-			else
-			if(dir == 2 || dir == 4)
-				// 2=(boundLine runs top-bottom on RIGHT side of bounds)
-				// 4=(boundLine runs top-bottom on LEFT side of bounds)
-				// run line left right, see if intersects with 'line' above
-				line2 = QLineF(v2.point.x(), bounds.top(), v2.point.x(), bounds.bottom());
-			
-			//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/2] Testing: "<<line2;
-			
-			// test to see boundLine intersects line, if so, create point if none exists
-			QPointF point2;
-			/*QLineF::IntersectType type = */line.intersect(line2, &point2);
-			if(!point2.isNull())
-			{
-				if(!hasPoint(existingPoints, point2) &&
-				   !hasPoint(outputs, point2))
-				{
-					// Intersected point, find nerest point +/-
-					
-// 					// Get values for the ends of the line (assuming interpolated above)
-// 					qPointValue ic1 = getPoint(existingPoints, line2.p1());
-// 					if(ic1.isNull())
-// 						ic1 = getPoint(outputs, line2.p1());
-// 					
-// 					qPointValue ic2 = getPoint(existingPoints, line2.p2());
-// 					if(ic2.isNull())
-// 						ic2 = getPoint(outputs, line2.p2());
-// 						
-// 					if(ic1.isNull())
-// 					{
-// 						qDebug() << "ic1 logic error, quiting";
-// 						exit(-1);
-// 					}
-// 					
-// 					if(ic2.isNull())
-// 					{
-// 						qDebug() << "ic2 logic error, quiting";
-// 						exit(-1);
-// 					}
-
-					QList<qPointValue> combined;
-					combined << existingPoints << outputs;
-					
-					/// Third arg to nearestPoint() is a direction to search, 0-based: 0=X+, 1=Y+, 2=X-, 3=Y-
-					
-					qPointValue pntAfter  = nearestPoint(combined, point2, dir+1); // same dir
-					qPointValue pntBefore = nearestPoint(combined, point2, dir-1); // oposite dir (dir is 1 based, nearestPoint expects 0 based)
-
-					qPointValue pntPre = nearestPoint(combined, point2, //dir); // perpendicular positive (dir is 1 based, nearestPoint expects 0 based)
-										dir == 1 ? 3 : // dir=1 is TL, arg=2 is X-
-										dir == 2 ? 4 :
-										dir == 3 ? 1 :
-										dir == 4 ? 2 : 2);
-
-					qPointValue pntPost = nearestPoint(combined, point2,
-										dir == 1 ? 1 : // dir=1 is TL, arg=2 is X-
-										dir == 2 ? 2 :
-										dir == 3 ? 3 :
-										dir == 4 ? 4 : 4);
-										
-					//double innerLineLength = QLineF(pntAfter.point, pntBefore.point).length();
-					
-					//double innerPval[4] = { pntBefore.value, pntBefore.value/2+pntBefore.value, pntAfter.value-pntAfter.value/2, pntAfter.value };
-					//double innerPval[4] = { pntPre.value, pntBefore.value, pntAfter.value, pntAfter.value };
-			
-					// Note we are using perpendicular point components to the cubicInterpolate() call above
-					//double unitVal = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
-					//double value = cubicInterpolate(innerPval, unitVal);
-
-					QLineF line1 = QLineF(pntAfter.point, pntBefore.point);
-					QLineF line2 = QLineF(pntPre.point,   pntPost.point);
-// 					double lenLine1 = line1.length();
-// 					double lenLine2 = line2.length();
-
-					//double unit1 = (dir == 1 || dir == 3 ? v.point.y() : v.point.x()) / innerLineLength;
-
-					double value;
-					if(dir == 1 || dir == 3)
-					{
-						double unit11 = line2.y1() > line2.y2() ? line2.y2() : line2.y1(); // near
-						double unit12 = line2.y1() > line2.y2() ? line2.y1() : line2.y2(); // far
-
-						double val11  = line2.y1() > line2.y2() ? pntBefore.value : pntAfter.value;
-						double val12  = line2.y1() > line2.y2() ? pntAfter.value : pntBefore.value;
-						
-						double unit21 = line1.x1() > line1.x2() ? line1.x2() : line1.x1(); // near
-						double unit22 = line1.x1() > line1.x2() ? line1.x1() : line1.x2(); // far
-
-						double val21  = line1.x1() > line1.x2() ? pntPre.value  : pntPost.value;
-						double val22  = line1.x1() > line1.x2() ? pntPost.value : pntPre.value;
-
-
-						double unitLen1 = unit12 - unit11;
-						double unitLen2 = unit22 - unit21;
-
-// 						double unit1 = (unit12 - point2.y()) / unitLen1;
-// 						double unit2 = (unit22 - point2.x()) / unitLen1;
-						
-						double fr1 = (unit22 - point2.x()) / unitLen2 * val21
-						           + (point2.x() - unit21) / unitLen2 * val22;
-						
-						//double fr2 = (corners[2].point.x() - x) / w * corners[3].value
-						 //          + (x - corners[0].point.x()) / w * corners[2].value;
-						
-						double p1  = (unit12 - point2.y()) / unitLen1 * val11
-						           + (point2.y() - unit11) / unitLen1 * val12;
-
-						//double val1 = fr1 * (unit1 / 2.);
-						//double val2 =  p1 * (unit2 / 2.);
-
-						//value = val1 + val2;
-						value = (fr1 + p1) / 2.;
-						if(value < 0 || value > 1)
-						{
-							qDebug() << "** Value out of range: "<<value<<", calcs:";
-							qDebug() << "\t dir[1||3]: point2:"<<point2<<", p1a:"<<((unit12 - point2.y()) / unitLen1) <<", p1b:" << ((point2.y() - unit11) / unitLen2);
-							qDebug() << "\t dir[1||3]: unit1[1,2]:["<<unit11<<","<<unit12<<"], val1[1,2]:["<<val11<<","<<val12<<"]";
-							qDebug() << "\t dir[1||3]: unit2[1,2]:["<<unit21<<","<<unit22<<"], val2[1,2]:["<<val21<<","<<val22<<"]";
-							qDebug() << "\t dir[1||3]: unitLen[1,2]:["<<unitLen1<<","<<unitLen2/*<<"],unit[1,2]:["<<unit1<<","<<unit2*/<<"]";
-							qDebug() << "\t dir[1||3]: fr1:"<<fr1<<", p1:"<<p1<</*", val1:"<<val1<<", val2:"<<val2<<*/", value:"<<value;
-						}
-					}
-					else
-					//if(dir == 1 || dir == 3)
-					{
-						double unit11 = line2.x1() > line2.x2() ? line2.x2() : line2.x1(); // near
-						double unit12 = line2.x1() > line2.x2() ? line2.x1() : line2.x2(); // far
-						
-						double val11  = line2.x1() > line2.x2() ? pntBefore.value : pntAfter.value;
-						double val12  = line2.x1() > line2.x2() ? pntAfter.value : pntBefore.value;
-						
-						double unit21 = line1.y1() > line1.y2() ? line1.y2() : line1.y1(); // near
-						double unit22 = line1.y1() > line1.y2() ? line1.y1() : line1.y2(); // far
-						
-						double val21  = line1.y1() > line1.y2() ? pntPre.value  : pntPost.value;
-						double val22  = line1.y1() > line1.y2() ? pntPost.value : pntPre.value;
-						
-						
-						double unitLen1 = unit12 - unit11;
-						double unitLen2 = unit22 - unit21;
-						
-// 						double unit1 = (unit12 - point2.y()) / unitLen1;
-// 						double unit2 = (unit22 - point2.x()) / unitLen1;
-						
-						double fr1 = (unit22 - point2.y()) / unitLen2 * val21
-						           + (point2.y() - unit21) / unitLen2 * val22;
-						
-						//double fr2 = (corners[2].point.x() - x) / w * corners[3].value
-						//          + (x - corners[0].point.x()) / w * corners[2].value;
-						
-						double p1  = (unit12 - point2.x()) / unitLen1 * val11
-						           + (point2.x() - unit11) / unitLen1 * val12;
-						
-						//double val1 = fr1 * (unit1 / 2.);
-						//double val2 =  p1 * (unit2 / 2.);
-
-						//value = val1 + val2;
-						value = (fr1 + p1) / 2.;
-					}
-
-					if(value < 0 || value > 1)
-					{
-						qDebug() << "testLine: bound:"<<boundLine<<" -> line:"<<line<<" ["<<dir<<"/2]";
-						qDebug() << "[inner] " << dir << ": New point: "<<point2<<" \t value:"<<QString().sprintf("%.02f",value).toDouble()<< "\n"
-								<< " \t before/after: "<<pntBefore.value<<" @ " << pntBefore.point << " -> " << pntAfter.value << " @ " << pntAfter.point << "\n"
-								<< " \t pre/post:     "<<pntPre.value   <<" @ " << pntPre.point    << " -> " << pntPost.value << " @ " << pntPost.point;
-					}
-					
-					outputs << qPointValue(point2, isnan(value) ? 0 :value);
-				}
-			}
-				
-		}		
-		
-	}
-	
-	
-	return outputs;
-}
-
-
 
 MainWindow::MainWindow()
 {
@@ -784,32 +591,19 @@ MainWindow::MainWindow()
 	*-------X-----X---------X
 	|       |     |         |
 	|       |     |         |
-	X-------*-----?---------X
+	X-------*-----X---------X
 	|       |     |         |
 	|       |     |         |
 	|       |     |         |
 	|       |     |         |
-	X-------?-----*---------X
+	X-------X-----*---------X
 	|       |     |         |
 	|       |     |         |
 	X-------X-----*---------*
 	
 	New points added by the four testLine() calls ar marked with an X.
 	
-	Note the two question marks above where the inner lines intersect - those points were NOT added because
-	their values could not be interpolated until the values for the outer points were calculated.
-	 
-	Now that every outer point along the outside edges of the outer rectangle have been calculated, we
-	now can go thru and calculate the intersection of every line inside the rectangle.
-	
 	*/
-		
-	// 
-	outputList << testInnerLines(points, outputList, bounds, bounds.topLeft(),	bounds.topRight(),     1);
-	outputList << testInnerLines(points, outputList, bounds, bounds.topRight(),	bounds.bottomRight(),  2);
-	outputList << testInnerLines(points, outputList, bounds, bounds.bottomRight(),	bounds.bottomLeft(),   3);
-	outputList << testInnerLines(points, outputList, bounds, bounds.bottomLeft(),	bounds.topLeft(),      4);
-	
 	
 	// Sort the list of ppoints so we procede thru the list top->bottom and left->right
 	qSort(outputList.begin(), outputList.end(), qPointValue_sort_point);

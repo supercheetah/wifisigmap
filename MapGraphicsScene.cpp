@@ -141,6 +141,8 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	, m_userItem(0)
 	, m_apLocationOverlay(0)
 {
+	m_renderUpdatesPaused = false;
+	
 	// Setup default render options
 	m_renderOpts.cacheMapRender     = true;
 	m_renderOpts.showReadingMarkers = true;
