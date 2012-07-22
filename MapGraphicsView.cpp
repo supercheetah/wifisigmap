@@ -1,6 +1,53 @@
 #include "MapGraphicsView.h"
 #include "MapGraphicsScene.h"
 
+
+MapSignalHistory::MapSignalHistory(QColor c, int maxHistory)
+	: color(c)
+{
+	for(int i=0; i<maxHistory; i++)
+		history << -1;
+}
+
+void MapSignalHistory::addValue(double v)
+{
+	history << v;
+}
+
+QImage MapSignalHistory::renderGraph(QSize size)
+{
+	QImage img(size, QImage::Format_ARGB32_Premultiplied);
+	memset(img.bits(), 0, img.byteCount());
+	QPainter p(&img);
+	p.setRenderHints(QPainter::Antialiasing | QPainter::HighQualityAntialiasing);
+	
+	double height = (double)size.height();
+	double width  = (double)size.width();
+	double step   = width / (double)history.size();
+	
+	QPointF pntOne(1.25,1.25);
+	QPointF lastPoint(0., height);
+	for(int i=0; i<history.size(); i++)
+	{
+		double x = (double)i * step;
+		double y = height - history[i] * height;
+		
+		QPointF pnt(x,y);
+		p.setPen(QPen(color.lighter(500), 1.25));
+		p.drawLine(lastPoint-pntOne/2, pnt-pntOne/2);
+		
+		p.setPen(QPen(color.darker(500), 1.25));
+		p.drawLine(lastPoint+pntOne, pnt+pntOne);
+		
+		p.setPen(QPen(color, 1.25));
+		p.drawLine(lastPoint, pnt);
+		
+		lastPoint = pnt;
+	}
+	p.end();
+	return img;
+}
+
 /// MapGraphicsView class implementation
 
 MapGraphicsView::MapGraphicsView()
@@ -144,6 +191,12 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 
 	foreach(WifiDataResult result, results)
 	{
+		if(!m_apSigHist.contains(result.mac))
+			m_apSigHist.insert(result.mac, new MapSignalHistory(gs->baseColorForAp(result.mac)));
+		
+		MapSignalHistory *hist = m_apSigHist.value(result.mac);
+		hist->addValue(result.value);
+		
 		QColor color = gs->colorForSignal(1.0, result.mac).lighter(100);
 #ifdef Q_OS_ANDROID
 		color = color.darker(300);
@@ -156,6 +209,10 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 				.arg(result.essid),
 			outline,
 			color);
+			
+		p->setOpacity(0.80);
+		p->drawImage(rect.topLeft() + QPoint(margin, y - lineJump*.75), hist->renderGraph(QSize((int)(w - pad*2), (int)(lineJump - 4.))).mirrored(true,false));
+		p->setOpacity(1.0);
 	}
 
 	p->restore();
