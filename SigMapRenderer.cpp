@@ -1022,7 +1022,7 @@ void SigMapRenderer::render()
 					{
 						double value = quadInterpolate(quad, (double)x, (double)y);
 						//QColor color = colorForValue(value);
-						QColor color = m_gs->colorForSignal(value, "default");
+						QColor color = m_gs->colorForSignal(value, "(default)");
 						if(x < tmpImg.width())
 							scanline[x] = color.rgba();
 					}
