@@ -561,7 +561,7 @@ void MapGraphicsScene::sensorReadingChanged()
 	if(sensorName == "QGyroscope")
 	{
 		static const float NS2S = 1.0f / 1000000000.0f;
-		static float deltaRotationVector[4] = {0,0,0,0};
+		static QVector<float> deltaRotationVector(4,0);
 		static float timestamp = 0;
 
 		double values[3] = {
@@ -605,9 +605,9 @@ void MapGraphicsScene::sensorReadingChanged()
 		}
 		timestamp = reading->timestamp();
 		//float deltaRotationMatrix[] = { 0,0,0, 0,0,0, 0,0,0 };
-		QList<float> deltaRotationMatrix = getRotationMatrixFromVector(deltaRotationVector, 16);
+		QVector<float> deltaRotationMatrix = getRotationMatrixFromVector(deltaRotationVector, 16);
 		static QMatrix4x4 rotationCurrent;
-		roationCurrent *= QMatrix4x4((qreal*)deltaRotationMatrix.data());
+		rotationCurrent *= QMatrix4x4((qreal*)deltaRotationMatrix.data());
 		// User code should concatenate the delta rotation we computed with the current rotation
 		// in order to get the updated rotation.
 		//float rotationCurrent[] = { 1,1,1, 1,1,1, 1,1,1 };
