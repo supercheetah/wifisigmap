@@ -1,6 +1,19 @@
 #include "SigMapRenderer.h"
 #include "MapGraphicsScene.h"
 
+
+#define qDrawTextCp(p,pnt,string,c1,c2) 	\
+	p.setPen(c1);			\
+	p.drawText(pnt + QPoint(-1, -1), string);	\
+	p.drawText(pnt + QPoint(+1, -1), string);	\
+	p.drawText(pnt + QPoint(+1, +1), string);	\
+	p.drawText(pnt + QPoint(-1, +1), string);	\
+	p.setPen(c2);			\
+	p.drawText(pnt, string);	\
+
+#define qDrawTextOp(p,pnt,string) 	\
+	qDrawTextCp(p,pnt,string,Qt::black,Qt::white);
+
 static QString SigMapRenderer_sort_apMac;
 static QPointF SigMapRenderer_sort_center;
 
@@ -532,7 +545,7 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 2.5;
+	double p = 3;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
@@ -845,18 +858,32 @@ void SigMapRenderer::render()
 		//QPointF center = info->point;
 
 		foreach(SigMapValue *val, m_gs->m_sigValues)
-			//val->consumed = false;
-			if(val->hasAp(apMac))
-			{
-				qPointValue p = qPointValue( val->point, val->signalForAp(apMac) );
+		{
+			//if(val->hasAp(apMac))
+			//{
+				qPointValue p = qPointValue( val->point, val->signalForAp(apMac) ); // signalForAp() returns 0 if not in this reading
 				points << p;
-				//qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
-			}
+				qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
+			//}
+		}
+
+		QList<qPointValue> originalInputs = points;
 
 		// Set bounds to be at minimum the bounds of the background
-		points << qPointValue( QPointF(0,0), 0 );
+		points << qPointValue( QPointF(0,0), interpolateValue(QPointF(0,0), originalInputs ) );
 		if(!origSize.isEmpty())
-			points << qPointValue( QPointF((double)origSize.width(), (double)origSize.height()), 0 );
+		{
+			QPointF br = QPointF((double)origSize.width(), (double)origSize.height());
+			points << qPointValue( br, interpolateValue(br, originalInputs) );
+		}
+
+// 		srand(time(NULL));
+// 		for(int i=0; i<50; i++)
+// 		{
+// 			QPointF randomPoint(QPointF((double)rand()/(double)RAND_MAX*origSize.width(), (double)rand()/(double)RAND_MAX* origSize.height()));
+// 			points << qPointValue(randomPoint, interpolateValue(randomPoint, originalInputs) * 0.9);
+// 		}
+
 
 
 	//  	#define val(x) ( ((double)x) / 6. )
@@ -994,24 +1021,23 @@ void SigMapRenderer::render()
 					for(int x=(int)tl.point.x(); x<br.point.x(); x++)
 					{
 						double value = quadInterpolate(quad, (double)x, (double)y);
-						QColor color = colorForValue(value);
+						//QColor color = colorForValue(value);
+						QColor color = m_gs->colorForSignal(value, "default");
 						if(x < tmpImg.width())
 							scanline[x] = color.rgba();
 					}
 				}
 
-/*				QVector<QPointF> vec;
-				vec <<tl.point<<tr.point<<br.point<<bl.point;
-				//p2.setPen(QColor(0,0,0,127));
-				p2.setPen(Qt::white);
-				p2.drawPolygon(vec);*/
+// 				QVector<QPointF> vec;
+// 				vec <<tl.point<<tr.point<<br.point<<bl.point;
+// 				//p2.setPen(QColor(0,0,0,127));
+// 				p2.setPen(Qt::black);
+// 				p2.drawPolygon(vec);
 
-//
-// 				p2.setPen(Qt::gray);
-// 				p2.drawText(tl.point, QString().sprintf("%.02f",tl.value));
-// 				p2.drawText(tr.point, QString().sprintf("%.02f",tr.value));
-// 				p2.drawText(bl.point, QString().sprintf("%.02f",bl.value));
-// 				p2.drawText(br.point, QString().sprintf("%.02f",br.value));
+// 				qDrawTextOp(p2,tl.point, QString().sprintf("%.02f",tl.value));
+// 				qDrawTextOp(p2,tr.point, QString().sprintf("%.02f",tr.value));
+// 				qDrawTextOp(p2,bl.point, QString().sprintf("%.02f",bl.value));
+// 				qDrawTextOp(p2,br.point, QString().sprintf("%.02f",br.value));
 			}
 		}
 
