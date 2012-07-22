@@ -360,7 +360,13 @@ SigMapRenderer::SigMapRenderer(MapGraphicsScene* gs)
 QColor colorForValue(double v)
 {
 	int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
-	return QColor::fromHsv(hue, 255, 255);
+	double alphaV = (v+.33) * 255.;
+	int alpha = qMin(255, (int)alphaV);
+	if(v < .1)
+		alpha = 255 * (v*10);
+	else
+		alpha = 255;
+	return QColor::fromHsv(hue, 255, 255, alpha); //, ((int)255*(1-v))); //v < 0.01 ? 0 : (v<0.5 ? 255*v*2 : 255));
 }
 
 class qPointValue {
@@ -526,7 +532,7 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 3;
+	double p = 2.5;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
@@ -994,11 +1000,12 @@ void SigMapRenderer::render()
 					}
 				}
 
-// 				QVector<QPointF> vec;
-// 				vec <<tl.point<<tr.point<<br.point<<bl.point;
-// 				//p2.setPen(QColor(0,0,0,127));
-// 				p2.setPen(Qt::white);
-// 				p2.drawPolygon(vec);
+/*				QVector<QPointF> vec;
+				vec <<tl.point<<tr.point<<br.point<<bl.point;
+				//p2.setPen(QColor(0,0,0,127));
+				p2.setPen(Qt::white);
+				p2.drawPolygon(vec);*/
+
 //
 // 				p2.setPen(Qt::gray);
 // 				p2.drawText(tl.point, QString().sprintf("%.02f",tl.value));
