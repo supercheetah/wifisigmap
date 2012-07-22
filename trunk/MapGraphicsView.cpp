@@ -25,21 +25,24 @@ QImage MapSignalHistory::renderGraph(QSize size)
 	double width  = (double)size.width();
 	double step   = width / (double)history.size();
 	
-	QPointF pntOne(1.25,1.25);
-	QPointF lastPoint(0., height);
+	QPointF pntOne(1.,1.);
+	QPointF lastPoint;
 	for(int i=0; i<history.size(); i++)
 	{
 		double x = (double)i * step;
 		double y = height - history[i] * height;
 		
 		QPointF pnt(x,y);
-		p.setPen(QPen(color.lighter(500), 1.25));
+		if(lastPoint.isNull())
+			lastPoint = pnt;
+			
+		p.setPen(QPen(color.lighter(500), 1.));
 		p.drawLine(lastPoint-pntOne/2, pnt-pntOne/2);
 		
-		p.setPen(QPen(color.darker(500), 1.25));
+		p.setPen(QPen(color.darker(500), 1.));
 		p.drawLine(lastPoint+pntOne, pnt+pntOne);
 		
-		p.setPen(QPen(color, 1.25));
+		p.setPen(QPen(color, 1.));
 		p.drawLine(lastPoint, pnt);
 		
 		lastPoint = pnt;

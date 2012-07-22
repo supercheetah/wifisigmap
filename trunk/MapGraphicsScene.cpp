@@ -778,7 +778,7 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 		
 	//markerGroup.save("apMarkerDebug.png");
 	
-	markerGroup = tinted(markerGroup, colorForSignal(1.0, mac));
+	markerGroup = tinted(markerGroup, baseColorForAp(mac));
 
 	QGraphicsPixmapItem *item = addPixmap(QPixmap::fromImage(markerGroup));
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
@@ -3513,8 +3513,9 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 	if(!m_colorListForMac.contains(apMac))
 	{
 		//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": m_colorListforMac cache miss, getting base...";
-		QColor baseColor = baseColorForAp(apMac);
+		QColor baseColor = apMac.isEmpty() || apMac == "(default)" ? Qt::white : baseColorForAp(apMac);
 		
+		qDebug() << "MapGraphicsScene::colorForSignal(): Gradient cache miss for: "<<apMac;
 		// paint the gradient
 		#ifdef Q_OS_ANDROID
 		int imgHeight = 1;
@@ -3522,13 +3523,13 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		int imgHeight = 10; // for debugging output
 		#endif
 		
-		QImage signalLevelImage(100,imgHeight,QImage::Format_ARGB32_Premultiplied);
+		QImage signalLevelImage(2500,imgHeight,QImage::Format_ARGB32_Premultiplied);
 		QPainter sigPainter(&signalLevelImage);
 		
 		if(1/*m_renderMode == RenderCircles ||
 		   m_renderMode == RenderTriangles*/)
 		{
-			QLinearGradient fade(QPoint(0,0),QPoint(100,0));
+			QLinearGradient fade(QPoint(0,0),QPoint(signalLevelImage.width(),0));
 	// 		fade.setColorAt( 0.3, Qt::black  );
 	// 		fade.setColorAt( 1.0, Qt::white  );
 			fade.setColorAt( 0.0, Qt::black );
@@ -3551,7 +3552,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		{
 			//sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
 		
-			QLinearGradient fade(QPoint(0,0),QPoint(100,0));
+			QLinearGradient fade(QPoint(0,0),QPoint(signalLevelImage.width(),0));
 			fade.setColorAt( 1.0, baseColor.lighter(100)  );
 	 		fade.setColorAt( 0.5, baseColor               );
 	 		//fade.setColorAt( 0.0, Qt::transparent  );
@@ -3569,7 +3570,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		#endif
 		
 		QRgb* scanline = (QRgb*)signalLevelImage.scanLine(0);
-		for(int i=0; i<100; i++)
+		for(int i=0; i<2500; i++)
 		{
 			QColor color;
 			color.setRgba(scanline[i]);
@@ -3583,9 +3584,10 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		colorList = m_colorListForMac.value(apMac); 
 	}
 	
-	int colorIdx = (int)(sig * 100);
-	if(colorIdx > 99)
-		colorIdx = 99;
+	int listSize = colorList.size();
+	int colorIdx = (int)(sig * (double)listSize);
+	if(colorIdx > listSize-1)
+		colorIdx = listSize-1;
 	if(colorIdx < 0)
 		colorIdx = 0;
 	
