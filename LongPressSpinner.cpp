@@ -18,7 +18,7 @@ LongPressSpinner::LongPressSpinner()
 	double fingerTipAdjust = 0;
  	#ifdef Q_OS_ANDROID
 // 	// TODO Is there some OS preference that indicates right or left handed usage?
- 	fingertipAdjust = (iconSize/2)/3;
+	fingerTipAdjust = (iconSize/2)/3;
 	#endif
 
 	m_boundingRect = QRectF(QPointF(-iconSize/2 - fingerTipAdjust,-iconSize/2),size);
