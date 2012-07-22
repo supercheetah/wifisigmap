@@ -3131,6 +3131,8 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	item->setZValue(99);
 	
 	//item->setOpacity(0);
+	if(!m_renderOpts.showReadingMarkers)
+		item->setVisible(false);
 	
 	// Add pointer to the item in the scene to the signal value for turning on/off per user
 	val->marker = item;
@@ -3523,18 +3525,26 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 		QImage signalLevelImage(100,imgHeight,QImage::Format_ARGB32_Premultiplied);
 		QPainter sigPainter(&signalLevelImage);
 		
-		if(m_renderMode == RenderCircles ||
-		   m_renderMode == RenderTriangles)
+		if(1/*m_renderMode == RenderCircles ||
+		   m_renderMode == RenderTriangles*/)
 		{
 			QLinearGradient fade(QPoint(0,0),QPoint(100,0));
 	// 		fade.setColorAt( 0.3, Qt::black  );
 	// 		fade.setColorAt( 1.0, Qt::white  );
-			fade.setColorAt( 0.3, Qt::red    );
-			fade.setColorAt( 0.7, Qt::yellow );
-			fade.setColorAt( 1.0, Qt::green  );
+			fade.setColorAt( 0.0, Qt::black );
+			fade.setColorAt( 0.1, Qt::red    );
+			fade.setColorAt( 0.15, QColor(255,2,195)); //dark pink
+			fade.setColorAt( 0.2, QColor(191,0,254)); //purple
+			fade.setColorAt( 0.25, QColor(98,2,254)); //deep blue/purple
+			fade.setColorAt( 0.3, QColor(0,12,254)); //bright blue
+			fade.setColorAt( 0.35, QColor(0,237,254)); //cyan
+			fade.setColorAt( 0.6, Qt::yellow);
+			fade.setColorAt( 0.8, QColor(0,254,89)); //light green
+			fade.setColorAt( 0.9, QColor(0,254,0)); //solid green
+			fade.setColorAt( 1.0, QColor(12,255,0)); //bright green
 			sigPainter.fillRect( signalLevelImage.rect(), fade );
-			sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
-			sigPainter.fillRect( signalLevelImage.rect(), baseColor ); 
+			//sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+			//sigPainter.fillRect( signalLevelImage.rect(), baseColor );
 		
 		}
 		else
