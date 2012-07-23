@@ -550,7 +550,7 @@ const qPointValue operator*(const qPointValue& a, const QPointF& b)
 	return qPointValue(a.point * b, a.value);
 }
 
-QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize())
+QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false)
 {
 	QRectF bounds = getBounds(points);
 	
@@ -607,17 +607,23 @@ QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize())
 				scanline[x] = color.rgba();
 			}
 		}
-			
-		QVector<QPointF> vec;
-		vec << tl.point << tr.point << br.point << bl.point;
-		p.setPen(QColor(0,0,0,127));
-		p.drawPolygon(vec);
+		
+		if(renderLines)
+		{
+			QVector<QPointF> vec;
+			vec << tl.point << tr.point << br.point << bl.point;
+			p.setPen(QColor(0,0,0,127));
+			p.drawPolygon(vec);
+		}
 // 
-		p.setPen(Qt::gray);
-		qDrawTextOp(p,tl.point, QString().sprintf("%.02f",tl.value));
-		qDrawTextOp(p,tr.point, QString().sprintf("%.02f",tr.value));
-		qDrawTextOp(p,bl.point, QString().sprintf("%.02f",bl.value));
-		qDrawTextOp(p,br.point, QString().sprintf("%.02f",br.value));
+		if(renderPointValues)
+		{
+			p.setPen(Qt::gray);
+			qDrawTextOp(p,tl.point, QString().sprintf("%.02f",tl.value));
+			qDrawTextOp(p,tr.point, QString().sprintf("%.02f",tr.value));
+			qDrawTextOp(p,bl.point, QString().sprintf("%.02f",bl.value));
+			qDrawTextOp(p,br.point, QString().sprintf("%.02f",br.value));
+		}
 	}
 
 // 	p.setPen(QPen());

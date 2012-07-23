@@ -3513,7 +3513,7 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 	if(!m_colorListForMac.contains(apMac))
 	{
 		//qDebug() << "MapGraphicsScene::colorForSignal: "<<apMac<<": m_colorListforMac cache miss, getting base...";
-		QColor baseColor = baseColorForAp(apMac);
+		QColor baseColor = apMac.isEmpty() ? Qt::transparent : baseColorForAp(apMac);
 		
 		// paint the gradient
 		#ifdef Q_OS_ANDROID
@@ -3543,8 +3543,12 @@ QColor MapGraphicsScene::colorForSignal(double sig, QString apMac)
 			fade.setColorAt( 0.9, QColor(0,254,0)); //solid green
 			fade.setColorAt( 1.0, QColor(12,255,0)); //bright green
 			sigPainter.fillRect( signalLevelImage.rect(), fade );
-			//sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
-			//sigPainter.fillRect( signalLevelImage.rect(), baseColor );
+			
+			if(baseColor != Qt::transparent)
+			{
+				sigPainter.setCompositionMode(QPainter::CompositionMode_HardLight);
+				sigPainter.fillRect( signalLevelImage.rect(), baseColor );
+			}
 		
 		}
 		else

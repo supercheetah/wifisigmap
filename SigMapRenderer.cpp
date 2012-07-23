@@ -366,21 +366,9 @@ SigMapRenderer::SigMapRenderer(MapGraphicsScene* gs)
 	qRegisterMetaType<QPicture>("QPicture");
 }
 
+
 #define fuzzyIsEqual(a,b) ( fabs(a - b) < 0.00001 )
 //#define fuzzyIsEqual(a,b) ( ((int) a) == ((int) b) )
-
-
-QColor colorForValue(double v)
-{
-	int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
-	double alphaV = (v+.33) * 255.;
-	int alpha = qMin(255, (int)alphaV);
-	if(v < .1)
-		alpha = 255 * (v*10);
-	else
-		alpha = 255;
-	return QColor::fromHsv(hue, 255, 255, alpha); //, ((int)255*(1-v))); //v < 0.01 ? 0 : (v<0.5 ? 255*v*2 : 255));
-}
 
 class qPointValue {
 public:
@@ -401,7 +389,73 @@ public:
 	bool isValid() { return !point.isNull() && !valueIsNull; }
 };
 
-// The following cubic interpolation functions are from http://www.paulinternet.nl/?page=bicubic
+class qQuadValue : public QRectF {
+public:
+	qQuadValue(
+		qPointValue _tl,
+		qPointValue _tr,
+		qPointValue _br,
+		qPointValue _bl)
+		
+		: QRectF(_tl.point.x(),  _tl.point.y(),
+		         _tr.point.x() - _tl.point.x(),
+		         _br.point.y() - _tr.point.y())
+		
+		, tl(_tl)
+		, tr(_tr)
+		, br(_br)
+		, bl(_bl)
+	{}
+	
+	qQuadValue(QList<qPointValue> corners)
+	
+		: QRectF(corners[0].point.x(),  corners[0].point.y(),
+		         corners[1].point.x() - corners[0].point.x(),
+		         corners[2].point.y() - corners[1].point.y())
+		
+		, tl(corners[0])
+		, tr(corners[1])
+		, br(corners[2])
+		, bl(corners[3])
+	{}
+		
+	QList<qPointValue> corners()
+	{
+		return QList<qPointValue>()
+			<< tl << tr << br << bl;
+	};
+	
+	qPointValue tl, tr, br, bl;
+};
+
+namespace SurfaceInterpolate {
+
+/// \brief Simple value->color function
+QColor colorForValue(double v)
+{
+	int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
+	//return QColor::fromHsv(hue, 255, 255);
+	
+	//int hue = (int)((1-v) * (359-120) + 120);
+ 	//hue = qMax(0, qMin(359, hue));
+
+	//int hue = (int)(v * 120);
+	//hue = qMax(0, qMin(120, hue));
+ 	 
+	int sat = 255;
+	int val = 255;
+	double valTop = 0.9;
+	if(v < valTop)
+	{
+		val = (int)(v/valTop * 255.);
+		val = qMax(0, qMin(255, val));
+	}
+	
+	return QColor::fromHsv(hue, sat, val);
+}
+
+
+// The following four cubic interpolation functions are from http://www.paulinternet.nl/?page=bicubic
 double cubicInterpolate (double p[4], double x) {
 	return p[1] + 0.5 * x*(p[2] - p[0] + x*(2.0*p[0] - 5.0*p[1] + 4.0*p[2] - p[3] + x*(3.0*(p[1] - p[2]) + p[3] - p[0])));
 }
@@ -415,7 +469,9 @@ double bicubicInterpolate (double p[4][4], double x, double y) {
 	return cubicInterpolate(arr, x);
 }
 
-double tricubicInterpolate (double p[4][4][4], double x, double y, double z) {
+/*
+/// Not used:
+double tricubicInterpolate(double p[4][4][4], double x, double y, double z) {
 	double arr[4];
 	arr[0] = bicubicInterpolate(p[0], y, z);
 	arr[1] = bicubicInterpolate(p[1], y, z);
@@ -424,6 +480,7 @@ double tricubicInterpolate (double p[4][4][4], double x, double y, double z) {
 	return cubicInterpolate(arr, x);
 }
 
+/// Not used:
 double nCubicInterpolate (int n, double* p, double coordinates[]) {
 	//assert(n > 0);
 	if(n <= 0)
@@ -441,24 +498,26 @@ double nCubicInterpolate (int n, double* p, double coordinates[]) {
 		return cubicInterpolate(arr, *coordinates);
 	}
 }
+*/
 
 //bool newQuad = false;
-double quadInterpolate(QList<qPointValue> corners, double x, double y)
+/// \brief Interpolate the value for point \a x, \a y from the values at the four corners of \a quad
+double quadInterpolate(qQuadValue quad, double x, double y)
 {
-	double w = corners[2].point.x() - corners[0].point.x();
-	double h = corners[2].point.y() - corners[0].point.y();
+	double w = quad.width();
+	double h = quad.height();
 	
 	bool useBicubic = true;
 	if(useBicubic)
 	{
 		// Use bicubic impl from http://www.paulinternet.nl/?page=bicubic
-		double unitX = (x - corners[0].point.x()) / w;
-		double unitY = (y - corners[0].point.y()) / h;
+		double unitX = (x - quad.left() ) / w;
+		double unitY = (y - quad.top()  ) / h;
 		
-		double	c1 = corners[0].value,
-			c2 = corners[1].value,
-			c3 = corners[2].value,
-			c4 = corners[3].value;
+		double	c1 = quad.tl.value,
+			c2 = quad.tr.value,
+			c3 = quad.br.value,
+			c4 = quad.bl.value;
 
 		double p[4][4] = 
 		{
@@ -488,27 +547,29 @@ double quadInterpolate(QList<qPointValue> corners, double x, double y)
 	else
 	{
 		// Very simple implementation of http://en.wikipedia.org/wiki/Bilinear_interpolation
-		double fr1 = (corners[2].point.x() - x) / w * corners[0].value
-			   + (x - corners[0].point.x()) / w * corners[1].value;
+		double fr1 = (quad.br.point.x() - x) / w * quad.tl.value
+			   + (x - quad.tl.point.x()) / w * quad.tr.value;
 	
-		double fr2 = (corners[2].point.x() - x) / w * corners[3].value
-			   + (x - corners[0].point.x()) / w * corners[2].value;
+		double fr2 = (quad.br.point.x() - x) / w * quad.bl.value
+			   + (x - quad.tl.point.x()) / w * quad.br.value;
 	
-		double p1  = (corners[2].point.y() - y) / h * fr1
-			   + (y - corners[0].point.y()) / h * fr2;
+		double p1  = (quad.br.point.y() - y) / h * fr1
+			   + (y - quad.tl.point.y()) / h * fr2;
 	
 		//qDebug() << "quadInterpolate: "<<x<<" x "<<y<<": "<<p<<" (fr1:"<<fr1<<",fr2:"<<fr2<<",w:"<<w<<",h:"<<h<<")";
 		return p1;
 	}
 }
 
-bool qPointValue_sort_point(qPointValue a, qPointValue b)
+/// \brief Internal comparitor for sorting qPointValues
+bool _qPointValue_sort_point(qPointValue a, qPointValue b)
 {
 	return  fuzzyIsEqual(a.point.y(), (int)b.point.y()) ?
 		(int)a.point.x()  < (int)b.point.x() :
 		(int)a.point.y()  < (int)b.point.y();
 }
 
+/// \brief Checks \a list to see if it contains \a point, \returns true if \a point is in \a list, false otherwise 
 bool hasPoint(QList<qPointValue> list, QPointF point)
 {
 	foreach(qPointValue v, list)
@@ -517,23 +578,15 @@ bool hasPoint(QList<qPointValue> list, QPointF point)
 	return false;
 }
 
-qPointValue getPoint(QList<qPointValue> list, QPointF point)
-{
-	foreach(qPointValue v, list)
-		if(v.point == point)
-			return v;
-	return qPointValue();
-}
-
+/// \brief Calculates the weightof point \a o at point \a i given power \a p, used internally by interpolateValue()
 double weight(QPointF i, QPointF o, double p)
 {
 	return 1/pow(QLineF(i,o).length(), p);
 }
 
+/// \brief A very simple IDW implementation to interpolate the value at \a point from the inverse weighted distance of all the other points given in \a inputs, using a default power factor 
 double interpolateValue(QPointF point, QList<qPointValue> inputs)
 {
-	//value = interpolateValue(point2, inputs);
-	
 	/*
 	http://en.wikipedia.org/wiki/Inverse_distance_weighting:
 	u(x) = sum(i=0..N, (
@@ -545,7 +598,7 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 2.0;
+	double p = 3;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
@@ -564,53 +617,19 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 	QLineF boundLine(p1,p2);
 	QList<qPointValue> outputs;
 	
-	qPointValue c1, c2;
 	if(!hasPoint(existingPoints, boundLine.p1()) &&
 	   !hasPoint(outputs,        boundLine.p1()))
 	{
 		double value = interpolateValue(boundLine.p1(), inputs);
-		c1 = qPointValue(boundLine.p1(), value);
-		outputs << c1;
-	}
-	else
-	{
-		c1 = getPoint(inputs, boundLine.p1());
+		outputs << qPointValue(boundLine.p1(), value);
 	}
 	
 	if(!hasPoint(existingPoints, boundLine.p2()) &&
 	   !hasPoint(outputs,        boundLine.p2()))
 	{
 		double value = interpolateValue(boundLine.p2(), inputs);
-		c2 = qPointValue(boundLine.p2(), value);
-		outputs << c2;
+		outputs << qPointValue(boundLine.p2(), value);;
 	}
-	else
-	{
-		c2 = getPoint(inputs, boundLine.p2());
-	}
-	
-	if(dir == 1 || dir == 3)
-	{
-		if(c1.point.x() > c2.point.x())
-		{
-			qPointValue tmp = c1;
-			c1 = c2;
-			c2 = tmp;
-		}
-	}
-	else
-	{
-		if(c1.point.y() > c2.point.y())
-		{
-			qPointValue tmp = c1;
-			c1 = c2;
-			c2 = tmp;
-		}
-	}
-	
-	//double pval[4] = { c1.value, c1.value, c2.value, c2.value };
-	 
-	//double lineLength = boundLine.length();
 	
 	foreach(qPointValue v, inputs)
 	{
@@ -717,6 +736,280 @@ qPointValue nearestPoint(QList<qPointValue> list, QPointF point, int dir, bool r
 	return minPnt;
 }
 
+/// \brief Returns the bounds (max/min X/Y) of \a points
+QRectF getBounds(QList<qPointValue> points)
+{
+	QRectF bounds;
+	foreach(qPointValue v, points)
+	{
+		//qDebug() << "corner: "<<v.point<<", value:"<<v.value;
+		bounds |= QRectF(v.point, QSizeF(1.,1.0));
+	}
+	bounds.adjust(0,0,-1,-1);
+	
+	return bounds;
+}
+	
+
+
+/**
+\brief Generates a list of quads covering the every point given by \a points using rectangle bicubic interpolation.
+
+	Rectangle Bicubic Interpolation
+	
+	The goal:
+	Given an arbitrary list of points (and values assoicated with each point),
+	interpolate the value for every point contained within the bounding rectangle.
+	Goal something like: http://en.wikipedia.org/wiki/File:BicubicInterpolationExample.png
+	
+	To illustrate what this means and how we do it, assume you give it four points (marked by asterisks, below),
+	along with an arbitrary value for each point:
+	
+	*-----------------------
+	|                       |
+	|                       |
+	|       *               |
+	|                       |
+	|                       |
+	|                       |
+	|                       |
+	|             *         |
+	|                       |
+	|                       |
+	 -----------------------*
+	
+	The goal of the algorithm is to subdivide the bounding rectangle (described as the union of the location of all the points)
+	into a series of sub-rectangles, and interpolate the values of the known points to the new points found by the intersections
+	of the lines:
+	
+	X-------*-----*---------*
+	|       |     |         |
+	|       |     |         |
+	*-------X-----*---------*
+	|       |     |         |
+	|       |     |         |
+	|       |     |         |
+	|       |     |         |
+	*-------*-----X---------*
+	|       |     |         |
+	|       |     |         |
+	*-------*-----*---------X
+	
+	Above, X marks the original points, and the asterisks marks the points the algorithm inserted to create the sub-rectangles.
+	For each asterisk above, the algorithm also interpolated the values from each of the given points (X's) to find the value
+	at the new point (using bicubic interpolation.)
+	
+	Now that the algorithm has a list of rectangles, it can procede to render each of them using bicubic interpolation of the value
+	across the surface.
+	
+	Note that for any CORNER points which are NOT given, they are assumed to have a value of "0". This can be changed in "testLine()", above.
+*/
+
+QList<qQuadValue> generateQuads(QList<qPointValue> points)
+{
+	// Sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
+	//qSort(points.begin(), points.end(), qPointValue_sort_point);
+	
+	// Find the bounds of the point cloud given so we can then subdivide it into smaller rectangles as needed:
+	QRectF bounds = getBounds(points);
+	
+	// Iterate over every point
+	// draw line from point to each bound (X1,Y),(X2,Y),(X,Y1),(X,Y2)
+	// see if line intersects with perpendicular line from any other point
+	// add point at intersection if none exists
+	// add point at end point of line if none exists
+	QList<qPointValue> outputList = points;
+	
+	qDebug() << "generateQuads(): "<<points.size()<<" points: processing line top:    left->right";
+	outputList << testLine(points, outputList, bounds, bounds.topLeft(),		bounds.topRight(),     1);
+	qDebug() << "generateQuads(): "<<points.size()<<" points: processing line right:  top->bottom";
+	outputList << testLine(points, outputList, bounds, bounds.topRight(),		bounds.bottomRight(),  2);
+	qDebug() << "generateQuads(): "<<points.size()<<" points: processing line bottom: right->left";
+	outputList << testLine(points, outputList, bounds, bounds.bottomRight(),	bounds.bottomLeft(),   3);
+	qDebug() << "generateQuads(): "<<points.size()<<" points: processing line left:   bottom->top";
+	outputList << testLine(points, outputList, bounds, bounds.bottomLeft(),		bounds.topLeft(),      4);
+	
+	/* After these four testLine() calls, the outputList now has these points (assuming the first example above):
+	
+	*-------X-----X---------X
+	|       |     |         |
+	|       |     |         |
+	X-------*-----X---------X
+	|       |     |         |
+	|       |     |         |
+	|       |     |         |
+	|       |     |         |
+	X-------X-----*---------X
+	|       |     |         |
+	|       |     |         |
+	X-------X-----*---------*
+	
+	New points added by the four testLine() calls ar marked with an X.
+	
+	*/
+	
+	qDebug() << "generateQuads(): Final point cloud size: "<<outputList.size()<<" points, sorting..."; 
+	
+	// Sort the list of ppoints so we procede thru the list top->bottom and left->right
+	qSort(outputList.begin(), outputList.end(), _qPointValue_sort_point);
+	
+	// Points are now sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
+	
+	//qDebug() << "bounds:"<<bounds;
+
+	//QList<QList<qPointValue> > quads;
+	QList<qQuadValue> quads;
+	
+	qDebug() << "generateQuads(): Generating quads from "<<outputList.size()<<" points in cloud.";
+	
+	int counter = 0, max = outputList.size();
+	// This is the last stage of the algorithm - go thru the new point cloud and construct the actual sub-rectangles
+	// by starting with each point and proceding clockwise around the rectangle, getting the nearest point in each direction (X+,Y), (X,Y+) and (X-,Y)
+	foreach(qPointValue tl, outputList)
+	{
+		QList<qPointValue> quad;
+		
+		qPointValue tr = nearestPoint(outputList, tl.point, 0);
+		qPointValue br = nearestPoint(outputList, tr.point, 1);
+		qPointValue bl = nearestPoint(outputList, br.point, 2);
+		
+		// These 'isNull()' tests catch points on the edges of the bounding rectangle
+		if(!tr.point.isNull() &&
+		   !br.point.isNull() &&
+		   !bl.point.isNull())
+		{
+// 			quad  << tl << tr << br << bl;
+// 			quads << (quad);
+			quads << qQuadValue(tl, tr, br, bl);
+			
+			qDebug() << "generateQuads(): Point "<<(counter++)<<"/"<<max<<": New quad generated, num quads now: "<<quads.size();
+			
+			//qDebug() << "Quad[p]: "<<tl.point<<", "<<tr.point<<", "<<br.point<<", "<<bl.point;
+// 			qDebug() << "Quad[v]: "<<tl.value<<tr.value<<br.value<<bl.value;
+		}
+	}
+	
+	return quads;
+}
+
+const QPointF operator*(const QPointF& a, const QPointF& b)
+{
+	return QPointF(a.x() * b.x(), a.y() * b.y());
+}
+
+const qPointValue operator*(const qPointValue& a, const QPointF& b)
+{
+	return qPointValue(a.point * b, a.value);
+}
+
+QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false)
+{
+	QRectF bounds = getBounds(points);
+	
+	QSizeF outputSize = bounds.size();
+	double dx = 1, dy = 1;
+	if(!renderSize.isNull())
+	{
+		outputSize.scale(renderSize, Qt::KeepAspectRatio);
+		dx = outputSize.width()  / bounds.width();
+		dy = outputSize.height() / bounds.height();
+	}
+	
+	QPointF renderScale(dx,dy);
+	
+	qDebug() << "renderPoints(): Generating quads for "<<points.size()<<" points, bounds: "<<bounds<<", output size:"<<outputSize;
+	QList<qQuadValue> quads = generateQuads(points);
+	qDebug() << "renderPoints(): Generated "<<quads.size()<<" from "<<points.size()<<" points";
+	
+	// Arbitrary rendering choices
+//	QImage img(w,h, QImage::Format_ARGB32_Premultiplied);
+	QImage img(outputSize.toSize(), QImage::Format_ARGB32_Premultiplied);
+	
+	QPainter p(&img);
+	p.fillRect(img.rect(), Qt::white);
+	
+	int counter = 0, maxCounter = quads.size();
+	
+	//foreach(QList<qPointValue> quad, quads)
+	foreach(qQuadValue quad, quads)
+	{
+ 		qPointValue tl = quad.tl * renderScale; //quad[0];
+ 		qPointValue tr = quad.tr * renderScale; //quad[1];
+		qPointValue br = quad.br * renderScale; //quad[2];
+		qPointValue bl = quad.bl * renderScale; //quad[3];
+		
+		//qDebug() << "[quads]: pnt "<<(counter++)<<": "<<tl.point;
+		int progress = (int)(((double)(counter++)/(double)maxCounter) * 100);
+		qDebug() << "renderPoints(): Rendering rectangle, progress:"<<progress<<"%";
+		
+		int xmin = qMax((int)(tl.point.x()), 0);
+		int xmax = qMin((int)(br.point.x()), (int)(img.width()));
+
+		int ymin = qMax((int)(tl.point.y()), 0);
+		int ymax = qMin((int)(br.point.y()), (int)(img.height()));
+
+
+		// Here's the actual rendering of the interpolated quad
+		for(int y=ymin; y<ymax; y++)
+		{
+			QRgb* scanline = (QRgb*)img.scanLine(y);
+			for(int x=xmin; x<xmax; x++)
+			{
+				double value = quadInterpolate(quad, ((double)x) / dx, ((double)y) / dy);
+				//QColor color = colorForValue(value);
+				QColor color = colorForValue(value);
+				scanline[x] = color.rgba();
+			}
+		}
+		
+		if(renderLines)
+		{
+			QVector<QPointF> vec;
+			vec << tl.point << tr.point << br.point << bl.point;
+			p.setPen(QColor(0,0,0,127));
+			p.drawPolygon(vec);
+		}
+// 
+		if(renderPointValues)
+		{
+			p.setPen(Qt::gray);
+			qDrawTextOp(p,tl.point, QString().sprintf("%.02f",tl.value));
+			qDrawTextOp(p,tr.point, QString().sprintf("%.02f",tr.value));
+			qDrawTextOp(p,bl.point, QString().sprintf("%.02f",bl.value));
+			qDrawTextOp(p,br.point, QString().sprintf("%.02f",br.value));
+		}
+	}
+
+// 	p.setPen(QPen());
+// 	p.setBrush(QColor(0,0,0,127));
+// 	foreach(qPointValue v, points)
+// 	{
+// 		p.drawEllipse(v.point, 5, 5);
+// 	}
+
+// 	
+// 	p.setPen(QPen());
+// 	p.setBrush(QColor(255,255,255,200));
+// 	counter = 0;
+// 	foreach(qPointValue v, outputList)
+// 	{
+// 		p.setPen(QPen());
+// 		if(!hasPoint(points, v.point))
+// 			p.drawEllipse(v.point, 5, 5);
+// 			
+// // 		p.setPen(Qt::gray);
+// // 		qDrawTextOp(p,v.point + QPointF(0, p.font().pointSizeF()*1.75), QString::number(counter++));
+// 		
+// 	}
+	
+	p.end();
+	
+	return img;
+}
+
+};
+
+using namespace SurfaceInterpolate;
 
 void SigMapRenderer::render()
 {
@@ -762,9 +1055,6 @@ void SigMapRenderer::render()
 
 	if(m_gs->m_renderMode == MapGraphicsScene::RenderRectangles)
 	{
-		QRectF rect(0,0,300,300);
-		//double w = rect.width(), h = rect.height();
-
 		// Rectangle Bicubic Interpolation
 
 		// The goal:
@@ -818,29 +1108,6 @@ void SigMapRenderer::render()
 		*/
 
 
-		// Setup our list of points - these can be in any order, any arrangement.
-
-	// 	QList<qPointValue> points = QList<qPointValue>()
-	// 		<< qPointValue(QPointF(0,0), 		0.0)
-	// // 		<< qPointValue(QPointF(10,80), 		0.5)
-	// // 		<< qPointValue(QPointF(80,10), 		0.75)
-	// // 		<< qPointValue(QPointF(122,254), 	0.33)
-	// 		<< qPointValue(QPointF(w,0), 		0.0)
-	// 		<< qPointValue(QPointF(w/3*1,h/3*2),	1.0)
-	// 		<< qPointValue(QPointF(w/2,h/2),	1.0)
-	// 		<< qPointValue(QPointF(w/3*2,h/3*1),	1.0)
-	// 		<< qPointValue(QPointF(w,h), 		0.0)
-	// 		<< qPointValue(QPointF(0,h), 		0.0);
-
-// 		QList<qPointValue> points = QList<qPointValue>()
-// 			<< qPointValue(QPointF(0,0), 		0.5)
-// 			//<< qPointValue(QPointF(w/3*2,h/3),	1.0)
-// 			<< qPointValue(QPointF(w/2,h/2),	1.0)
-// 			<< qPointValue(QPointF(w,w),		0.5);
-
-// 		foreach(QString apMac, apMacToEssid.keys())
-// 		{
-		//QString apMac = apMacToEssid.keys().at(0);
 
 		QStringList macList;
 		foreach(MapApInfo *info, m_gs->m_apInfo)
@@ -854,11 +1121,11 @@ void SigMapRenderer::render()
 
 		//QPointF center = info->point;
 
-		int macListSize = macList.size();
+// 		int macListSize = macList.size();
 		foreach(SigMapValue *val, m_gs->m_sigValues)
 		{
 			double sum = 0;
-			int count = 0;
+			int count  = 0;
 			foreach(QString apMac, macList)
 			{
 				if(val->hasAp(apMac))
@@ -868,9 +1135,9 @@ void SigMapRenderer::render()
 				}
 			}
 
-			qPointValue p = qPointValue( val->point,  count == 0 ? 0 : sum/(double)count); // signalForAp() returns 0 if not in this reading
+			qPointValue p = qPointValue(val->point,  count == 0 ? 0 : sum/(double)count); // signalForAp() returns 0 if not in this reading
 			points << p;
-			qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
+			qDebug() << "\tpoints << qPointValue(" << p.point << ", " << p.value << ");";
 		}
 
 		QList<qPointValue> originalInputs = points;
@@ -890,220 +1157,10 @@ void SigMapRenderer::render()
 // 			points << qPointValue(randomPoint, interpolateValue(randomPoint, originalInputs) * 0.9);
 // 		}
 
-
-
-	//  	#define val(x) ( ((double)x) / 6. )
-	//  	QList<qPointValue> points = QList<qPointValue>()
-	//  		<< qPointValue(QPointF(0,0),	val(0))
-	//
-	// 		<< qPointValue(QPointF(w/4*1,h/4*1),	val(1))
-	// 		<< qPointValue(QPointF(w/4*2,h/4*1),	val(2))
-	// 		<< qPointValue(QPointF(w/4*3,h/4*1),	val(4))
-	// 		<< qPointValue(QPointF(w/4*4,h/4*1),	val(1))
-	//
-	// 		<< qPointValue(QPointF(w/4*1,h/4*2),	val(6))
-	// 		<< qPointValue(QPointF(w/4*2,h/4*2),	val(3))
-	// 		<< qPointValue(QPointF(w/4*3,h/4*2),	val(5))
-	// 		<< qPointValue(QPointF(w/4*4,h/4*2),	val(2))
-	//
-	// 		<< qPointValue(QPointF(w/4*1,h/4*3),	val(4))
-	// 		<< qPointValue(QPointF(w/4*2,h/4*3),	val(2))
-	// 		<< qPointValue(QPointF(w/4*3,h/4*3),	val(1))
-	// 		<< qPointValue(QPointF(w/4*4,h/4*3),	val(5))
-	//
-	// 		<< qPointValue(QPointF(w/4*1,h/4*4),	val(5))
-	// 		<< qPointValue(QPointF(w/4*2,h/4*4),	val(4))
-	// 		<< qPointValue(QPointF(w/4*3,h/4*4),	val(2))
-	// 		<< qPointValue(QPointF(w/4*4,h/4*4),	val(3))
-	//
-	// 		;
-	//
-	// 	#undef val
-
-
-
-
-
-		// Sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
-		qSort(points.begin(), points.end(), qPointValue_sort_point);
-
-		// Find the bounds of the point cloud given so we can then subdivide it into smaller rectangles as needed:
-		QRectF bounds;
-		foreach(qPointValue v, points)
-		{
-			//qDebug() << "corner: "<<v.point<<", value:"<<v.value;
-			bounds |= QRectF(v.point, QSizeF(1.,1.0));
-		}
-		bounds.adjust(0,0,-1,-1);
-
-		// Iterate over every point
-		// draw line from point to each bound (X1,Y),(X2,Y),(X,Y1),(X,Y2)
-		// see if line intersects with perpendicular line from any other point
-		// add point at intersection if none exists
-		// add point at end point of line if none exists
-		QList<qPointValue> outputList = points;
+		QImage tmpImg = renderPoints(points, QSize(1000,1000));
 		
-		outputList << testLine(points, outputList, bounds, bounds.topLeft(),		bounds.topRight(),     1);
-		outputList << testLine(points, outputList, bounds, bounds.topRight(),		bounds.bottomRight(),  2);
-		outputList << testLine(points, outputList, bounds, bounds.bottomRight(),	bounds.bottomLeft(),   3);
-		outputList << testLine(points, outputList, bounds, bounds.bottomLeft(),		bounds.topLeft(),      4);
+		tmpImg = tmpImg.scaled(origSize);//, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
-		/* After these four testLine() calls, the outputList now has these points (assuming the first example above):
-		
-		*-------X-----X---------X
-		|       |     |         |
-		|       |     |         |
-		X-------*-----X---------X
-		|       |     |         |
-		|       |     |         |
-		|       |     |         |
-		|       |     |         |
-		X-------X-----*---------X
-		|       |     |         |
-		|       |     |         |
-		X-------X-----*---------*
-		
-		New points added by the four testLine() calls ar marked with an X.
-		
-		*/
-		
-		// Sort the list of ppoints so we procede thru the list top->bottom and left->right
-		qSort(outputList.begin(), outputList.end(), qPointValue_sort_point);
-
-		// Points are now sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
-
-
-		qDebug() << "bounds:"<<bounds;
-
-		QList<QList<qPointValue> > quads;
-
-		QSize imgSize(qMax(origSize.width(), (int)bounds.width()), qMax(origSize.height(), (int)bounds.height()));
-		
-		QImage tmpImg(imgSize, QImage::Format_ARGB32_Premultiplied);
-		QPainter p2(&tmpImg);
-		p2.fillRect(tmpImg.rect(), Qt::transparent);
-		//p2.end();
-
-// 		// Arbitrary rendering choices
-// 	//	QImage img(w,h, QImage::Format_ARGB32_Premultiplied);
-// 		QImage img(400,400, QImage::Format_ARGB32_Premultiplied);
-//
-// 		QPainter p(&img);
-// 		// Move painter 50,50 so we have room for text (when debugging I rendered values over every point)
-// 		p.fillRect(img.rect(), Qt::white);
-// 	//	int topX=0, topY=0;
-// 		int topX=50, topY=50;
-// 		p.translate(topX,topY);
-//
-// 	//
-		// This is the last stage of the algorithm - go thru the new point cloud and construct the actual sub-rectangles
-		// by starting with each point and proceding clockwise around the rectangle, getting the nearest point in each direction (X+,Y), (X,Y+) and (X-,Y)
-		foreach(qPointValue tl, outputList)
-		{
-			QList<qPointValue> quad;
-
-			qPointValue tr = nearestPoint(outputList, tl.point, 0);
-			qPointValue br = nearestPoint(outputList, tr.point, 1);
-			qPointValue bl = nearestPoint(outputList, br.point, 2);
-
-			// These 'isNull()' tests catch points on the edges of the bounding rectangle
-			if(!tr.point.isNull() &&
-			!br.point.isNull() &&
-			!bl.point.isNull())
-			{
-				quad  << tl << tr << br << bl;
-				quads << (quad);
-
-	// 			qDebug() << "Quad[p]: "<<tl.point<<", "<<tr.point<<", "<<br.point<<", "<<bl.point;
-	// 			qDebug() << "Quad[v]: "<<tl.value<<tr.value<<br.value<<bl.value;
-
-				int xmin = qMax((int)(tl.point.x()), 0);
-				int xmax = qMin((int)(br.point.x()), (int)(tmpImg.width()));
-
-				int ymin = qMax((int)(tl.point.y()), 0);
-				int ymax = qMin((int)(br.point.y()), (int)(tmpImg.height()));
-
-
-				// Here's the actual rendering of the interpolated quad
-				for(int y=ymin; y<ymax; y++)
-				{
-					QRgb* scanline = (QRgb*)tmpImg.scanLine(y);
-					for(int x=xmin; x<xmax; x++)
-					{
-						double value = quadInterpolate(quad, (double)x, (double)y);
-						//QColor color = colorForValue(value);
-						QColor color = m_gs->colorForSignal(value, "default");
-						if(x < tmpImg.width())
-							scanline[x] = color.rgba();
-					}
-				}
-
-// 				QVector<QPointF> vec;
-// 				vec <<tl.point<<tr.point<<br.point<<bl.point;
-// 				//p2.setPen(QColor(0,0,0,127));
-// 				p2.setPen(Qt::black);
-// 				p2.drawPolygon(vec);
-
-// 				qDrawTextOp(p2,tl.point, QString().sprintf("%.02f",tl.value));
-// 				qDrawTextOp(p2,tr.point, QString().sprintf("%.02f",tr.value));
-// 				qDrawTextOp(p2,bl.point, QString().sprintf("%.02f",bl.value));
-// 				qDrawTextOp(p2,br.point, QString().sprintf("%.02f",br.value));
-			}
-		}
-
-		//p.end();
-
-		//exit(-1);
-		/*
-
-		// Just some debugging:
-
-		QImage img(4,4, QImage::Format_ARGB32_Premultiplied);
-
-		QList<QList<qPointValue> > quads;
-
-		QList<qPointValue> points;
-
-	// 	points = QList<qPointValue>()
-	// 		<< qPointValue(QPointF(0,0), 					0.0)
-	// 		<< qPointValue(QPointF(img.width()/2,0),			0.5)
-	// 		<< qPointValue(QPointF(img.width()/2,img.height()), 		0.0)
-	// 		<< qPointValue(QPointF(0,img.height()), 			0.5);
-	// 	quads << points;
-	//
-	// 	points = QList<qPointValue>()
-	// 		<< qPointValue(QPointF(img.width()/2,0), 		0.5)
-	// 		<< qPointValue(QPointF(img.width(),0),			0.0)
-	// 		<< qPointValue(QPointF(img.width(),img.height()), 	0.5)
-	// 		<< qPointValue(QPointF(img.width()/2,img.height()), 	0.0);
-	// 	quads << points;
-
-
-		points = QList<qPointValue>()
-			<< qPointValue(QPointF(0,0), 				0.0)
-			<< qPointValue(QPointF(img.width()-1,0),		0.0)
-			<< qPointValue(QPointF(img.width()-1,img.height()-1), 	1.0)
-			<< qPointValue(QPointF(0,img.height()-1), 		0.0);
-		quads << points;
-
-
-		//quads << (points);
-		foreach(QList<qPointValue> corners, quads)
-		{
-			//for(int y=0; y<img.height(); y++)
-			for(int y=corners[0].point.y(); y<=corners[2].point.y(); y++)
-			{
-				QRgb* scanline = (QRgb*)img.scanLine(y);
-				for(int x=corners[0].point.x(); x<=corners[2].point.x(); x++)
-				{
-					double value = quadInterpolate(corners, (double)x, (double)y);
-					qDebug() << "pnt:"<<x<<","<<y<<", val:"<<value;
-					QColor color = colorForValue(value);
-					scanline[x] = color.rgba();
-				}
-			}
-		}
-		*/
 		tmpImg.save("interpolate.jpg");
 
 		//setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
@@ -1181,7 +1238,8 @@ void SigMapRenderer::render()
 
 	}
 	else
-	if(m_gs->m_renderMode == MapGraphicsScene::RenderRadial)
+	if(m_gs->m_renderMode == MapGraphicsScene::RenderRadial ||
+	   m_gs->m_renderMode == MapGraphicsScene::RenderCircles)
 	{
 		/*
 		#ifdef Q_OS_ANDROID
@@ -1221,13 +1279,13 @@ void SigMapRenderer::render()
 
 			if(!info->marked)
 			{
-				//qDebug() << "SigMapRenderer::render(): Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
+				//qDebug() << "SigMapRenderer::render(): [radidal] Unable to render signals for apMac:"<<apMac<<", AP not marked on MAP yet.";
 				continue;
 			}
 
 			if(!info->renderOnMap)
 			{
-				qDebug() << "SigMapRenderer::render(): User disabled render for "<<apMac;
+				qDebug() << "SigMapRenderer::render(): [radidal] User disabled render for "<<apMac;
 				continue;
 			}
 
