@@ -8,4 +8,4 @@ DEPENDPATH += .
 INCLUDEPATH += .
 
 # Input
-SOURCES += MainWindow.cpp
+SOURCES += MainWindow.cpp SurfaceInterpolate.cpp

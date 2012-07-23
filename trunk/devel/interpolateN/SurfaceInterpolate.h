@@ -1,5 +1,6 @@
 #ifndef SurfaceInterpolate_H
 #define SurfaceInterpolate_H
+#include <QtGui>
 
 class qPointValue {
 public:
