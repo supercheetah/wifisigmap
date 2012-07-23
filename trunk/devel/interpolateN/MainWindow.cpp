@@ -1,5 +1,7 @@
 #include <QtGui>
 
+#include "SurfaceInterpolate.h"
+
 #define qDrawTextCp(p,pnt,string,c1,c2) 	\
 	p.setPen(c1);			\
 	p.drawText(pnt + QPoint(-1, -1), string);	\
@@ -28,64 +30,6 @@ int main(int argc, char **argv)
 
 #define fuzzyIsEqual(a,b) ( fabs(a - b) < 0.00001 )
 //#define fuzzyIsEqual(a,b) ( ((int) a) == ((int) b) )
-
-class qPointValue {
-public:
-	qPointValue(QPointF p = QPointF()) : point(p), value(0.0), valueIsNull(true) {}
-	qPointValue(QPointF p, double v)   : point(p), value(v),   valueIsNull(false) {}
-	
-	QPointF point;
-	double  value;
-	bool    valueIsNull;
-	
-	void setValue(double v)
-	{
-		value       = v;
-		valueIsNull = false;
-	}
-	
-	bool isNull()  { return  point.isNull() ||  valueIsNull; }
-	bool isValid() { return !point.isNull() && !valueIsNull; }
-};
-
-class qQuadValue : public QRectF {
-public:
-	qQuadValue(
-		qPointValue _tl,
-		qPointValue _tr,
-		qPointValue _br,
-		qPointValue _bl)
-		
-		: QRectF(_tl.point.x(),  _tl.point.y(),
-		         _tr.point.x() - _tl.point.x(),
-		         _br.point.y() - _tr.point.y())
-		
-		, tl(_tl)
-		, tr(_tr)
-		, br(_br)
-		, bl(_bl)
-	{}
-	
-	qQuadValue(QList<qPointValue> corners)
-	
-		: QRectF(corners[0].point.x(),  corners[0].point.y(),
-		         corners[1].point.x() - corners[0].point.x(),
-		         corners[2].point.y() - corners[1].point.y())
-		
-		, tl(corners[0])
-		, tr(corners[1])
-		, br(corners[2])
-		, bl(corners[3])
-	{}
-		
-	QList<qPointValue> corners()
-	{
-		return QList<qPointValue>()
-			<< tl << tr << br << bl;
-	};
-	
-	qPointValue tl, tr, br, bl;
-};
 
 namespace SurfaceInterpolate {
 
@@ -262,41 +206,20 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 }
 */
 
-/// \brief Calculates the weightof point \a o at point \a i given power \a p, used internally by interpolateValue()
+/// \brief Calculates the weight of point \a o at point \a i given power \a p, used internally by interpolateValue()
 #define _dist2(a, b) ( ( ( a.x() - b.x() ) * ( a.x() - b.x() ) ) + ( ( a.y() - b.y() ) * ( a.y() - b.y() ) ) )
-#define NEARBY2 (2000 * 2000)
+//#define NEARBY2 (2000 * 2000)
+//#define NEARBY2 (4000 * 4000)
+//#define NEARBY2 (1000 * 1000)
 
 inline double weight(QPointF i, QPointF o, double p)
 {
-// 	int key = (o.y() * 5000 + o.x() * 5000*5000 + i.y() * 5000 + i.x());
-// 	if(weightCache.contains(key))
-// 	{
-// 		//qDebug() << "weight(): Cache hit for key:"<<key;
-// 		return weightCache.value(key);
-// 	}
-	//return 0;
-	//return 1;
-	//return 1/pow(QLineF(i,o).length(), p);
-// 	const qreal dx = i.x() - o.x(),
-// 		    dy = i.y() - o.y();
-	//qreal var = dx*dx + dy*dy;
-	//qreal var = _dist2(i,o);
-	qreal var = sqrt(_dist2(i,o));
-	//qreal var = sqrt(dx*dx + dy*dy);
-// 	if(var > NEARBY2)
-// 		return 0.000001;
-// 	int count = 0, max = (int)round(p);
-// 	while(count ++ < max)
-// 		var *= var;
-// 	return 1/var;
-	double b=pow(var,p);
-	qreal val = b==0?0:1/b;
-	//weightCache.insert(key, val);
-	return val;
+	double b = pow(sqrt(_dist2(i,o)),p);
+	return b == 0 ? 0 : 1 / b;
 }
 
 /// \brief A very simple IDW implementation to interpolate the value at \a point from the inverse weighted distance of all the other points given in \a inputs, using a default power factor 
-double interpolateValue(QPointF point, QList<qPointValue> inputs)
+double Interpolator::interpolateValue(QPointF point, QList<qPointValue> inputs)
 {
 	//return 1;
 	/*
@@ -316,43 +239,57 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 	for(int i=0; i<n; i++)
 	{
 		qPointValue x = inputs[i];
-		if(_dist2(x.point, point) < NEARBY2)
+		if(_dist2(x.point, point) < m_nearbyDistance)
 		{
 			double a = weight(x.point, point, p) * x.value;
 			double b = 0;
 			for(int j=0; j<n; j++)
-				b += weight(inputs[j].point, point, p);
-			sum += b==0?0:a/b;
+			{
+				QPointF y = inputs[j].point;
+				if(_dist2(y, point) < m_nearbyDistance)
+					b += weight(y, point, p);
+			}
+			sum += b == 0 ? 0 : a / b;
 		}
 	}
 	return sum;
 }
 
 
-QList<int> pointsUsed;
-#define PointKey(p) (p.y() * bounds.width() + p.x())
-#define IsPointUsed(p) pointsUsed.contains(PointKey(p))
-#define MarkPointUsed(p) {int k=PointKey(p);if(!pointsUsed.contains(k)){pointsUsed.append(k);}}
-
-QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existingPoints, QRectF bounds, QPointF p1, QPointF p2, int dir)
+inline int Interpolator::pointKey(QPointF p)
 {
+	return (int)(p.y() * m_currentBounds.width() + p.x());
+}
+
+inline bool Interpolator::isPointUsed(QPointF p)
+{
+	return m_pointsUsed.contains(pointKey(p));
+}
+
+inline void Interpolator::markPointUsed(QPointF p)
+{
+	int k = pointKey(p);
+	if(!m_pointsUsed.contains(k))
+		m_pointsUsed.append(k);
+}
+
+QList<qPointValue> Interpolator::testLine(QList<qPointValue> inputs, QPointF p1, QPointF p2, int dir)
+{
+	QRectF bounds = m_currentBounds;
+	
 	QLineF boundLine(p1,p2);
 	QList<qPointValue> outputs;
 	
-// 	if(!hasPoint(existingPoints, boundLine.p1()) &&
-// 	   !hasPoint(outputs,        boundLine.p1()))
-	if(!IsPointUsed(boundLine.p1()))
+	if(!isPointUsed(boundLine.p1()))
 	{
-		MarkPointUsed(boundLine.p1());
+		markPointUsed(boundLine.p1());
 		double value = interpolateValue(boundLine.p1(), inputs);
 		outputs << qPointValue(boundLine.p1(), value);
 	}
 	
-// 	if(!hasPoint(existingPoints, boundLine.p2()) &&
-// 	   !hasPoint(outputs,        boundLine.p2()))
-	if(!IsPointUsed(boundLine.p2()))
+	if(!isPointUsed(boundLine.p2()))
 	{
-		MarkPointUsed(boundLine.p2());
+		markPointUsed(boundLine.p2());
 		double value = interpolateValue(boundLine.p2(), inputs);
 		outputs << qPointValue(boundLine.p2(), value);;
 	}
@@ -387,15 +324,10 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 		/*QLineF::IntersectType type = */boundLine.intersect(line, &point);
 		if(!point.isNull())
 		{
-// 			if(!hasPoint(existingPoints, point) &&
-// 			   !hasPoint(outputs, point))
-// 			{
-			if(!IsPointUsed(point))
+			if(!isPointUsed(point))
 			{
-				MarkPointUsed(point);
+				markPointUsed(point);
 			
-// 				double unitVal = (dir == 1 || dir == 3 ? v.point.x() : v.point.y()) / lineLength;
-// 				double value = cubicInterpolate(pval, unitVal);
 				double value = interpolateValue(point, inputs);
 				outputs << qPointValue(point, value);
 				//qDebug() << "testLine: "<<boundLine<<" -> "<<line<<" ["<<dir<<"/1] New point: "<<point<<", value:"<<value<<", corners: "<<c1.value<<","<<c2.value;
@@ -424,11 +356,9 @@ QList<qPointValue> testLine(QList<qPointValue> inputs, QList<qPointValue> existi
 			/*QLineF::IntersectType type = */line.intersect(line2, &point2);
 			if(!point2.isNull())
 			{
-// 				if(!hasPoint(existingPoints, point2) &&
-// 				   !hasPoint(outputs, point2))
-				if(!IsPointUsed(point2))
+				if(!isPointUsed(point2))
 				{
-					MarkPointUsed(point2);
+					markPointUsed(point2);
 					double value = interpolateValue(point2, inputs);
 					outputs << qPointValue(point2, isnan(value) ? 0 :value);
 				}
@@ -539,13 +469,20 @@ QRectF getBounds(QList<qPointValue> points)
 	Note that for any CORNER points which are NOT given, they are assumed to have a value of "0". This can be changed in "testLine()", above.
 */
 
-QList<qQuadValue> generateQuads(QList<qPointValue> points)
+QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
 {
+	m_pointsUsed.clear();
+	
 	// Sorted Y1->Y2 then X1->X2 (so for every Y, points go X1->X2, then next Y, etc, for example: (0,0), (1,0), (0,1), (1,1))
 	//qSort(points.begin(), points.end(), qPointValue_sort_point);
 	
 	// Find the bounds of the point cloud given so we can then subdivide it into smaller rectangles as needed:
 	QRectF bounds = getBounds(points);
+	
+	m_currentBounds = bounds; // used by pointKey(), isPointUsed(), markPointUsed()
+	
+	if(m_autoNearby)
+		m_nearbyDistance = (bounds.width() * .25) * (bounds.height() * .25);
 	
 	// Iterate over every point
 	// draw line from point to each bound (X1,Y),(X2,Y),(X,Y1),(X,Y2)
@@ -554,20 +491,20 @@ QList<qQuadValue> generateQuads(QList<qPointValue> points)
 	// add point at end point of line if none exists
 	QList<qPointValue> outputList = points;
 	
-	if(points.size() < 50)
+	if(points.size() < m_pointSizeCutoff)
 	{
 		qDebug() << "generateQuads(): Point method 1: Quad search";
-		outputList << testLine(points, outputList, bounds, bounds.topLeft(),		bounds.topRight(),     1);
-		outputList << testLine(points, outputList, bounds, bounds.topRight(),		bounds.bottomRight(),  2);
-		outputList << testLine(points, outputList, bounds, bounds.bottomRight(),	bounds.bottomLeft(),   3);
-		outputList << testLine(points, outputList, bounds, bounds.bottomLeft(),		bounds.topLeft(),      4);
+		outputList << testLine(points, bounds.topLeft(),	bounds.topRight(),     1);
+		outputList << testLine(points, bounds.topRight(),	bounds.bottomRight(),  2);
+		outputList << testLine(points, bounds.bottomRight(),	bounds.bottomLeft(),   3);
+		outputList << testLine(points, bounds.bottomLeft(),	bounds.topLeft(),      4);
 	}
 	else
 	{
 		qDebug() << "generateQuads(): Point method 2: Grid";
-		float stepX = qMax(10., bounds.width()  / 30);
-		float stepY = qMax(10., bounds.height() / 30);
-		int  max = (int)(bounds.width() / stepX), count=0;
+		float stepX = m_gridStepSizeX > 0 ? m_gridStepSizeX : bounds.width()  / m_gridNumStepsX;
+		float stepY = m_gridStepSizeY > 0 ? m_gridStepSizeY : bounds.height() / m_gridNumStepsY;
+// 		int  max = (int)(bounds.width() / stepX), count=0;
 		for(float x=bounds.left(); x<=bounds.right()+stepX; x+=stepX)
 		{
 			//qDebug() << "generateQuads(): Processing column: "<<(count++)<<"/"<<max;
@@ -583,16 +520,19 @@ QList<qQuadValue> generateQuads(QList<qPointValue> points)
 	
 	qDebug() << "generateQuads(): Final # points: "<<outputList.size();
 	
-	double maxValue = 0;
-	foreach(qPointValue p, outputList)
-		if(p.value > maxValue)
-			maxValue = p.value;
-	
-	QList<qPointValue> tmp;
-	foreach(qPointValue p, outputList)
-		tmp << qPointValue(p.point, p.value/maxValue);
-	
-	outputList = tmp;
+	if(m_scaleValues)
+	{
+		double maxValue = 0;
+		foreach(qPointValue p, outputList)
+			if(p.value > maxValue)
+				maxValue = p.value;
+		
+		QList<qPointValue> tmp;
+		foreach(qPointValue p, outputList)
+			tmp << qPointValue(p.point, p.value/maxValue);
+		
+		outputList = tmp;
+	}
 	
 	//qDebug() << "generateQuads(): stepX:"<<stepX<<", stepY:"<<stepY<<", right:"<<bounds.right();
 	
@@ -662,7 +602,7 @@ const qPointValue operator*(const qPointValue& a, const QPointF& b)
 	return qPointValue(a.point * b, a.value);
 }
 
-QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false)
+QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, bool renderLines, bool renderPointValues)
 {
 	//renderLines = true;
 	//renderPointValues = true;
@@ -1249,12 +1189,14 @@ MainWindow::MainWindow()
         
 
 
+	Interpolator ip;
+	
 	QList<qPointValue> originalInputs = points;
 
 	// Set bounds to be at minimum the bounds of the background
-	points << qPointValue( QPointF(0,0), interpolateValue(QPointF(0,0), originalInputs ) );
+	points << qPointValue( QPointF(0,0), ip.interpolateValue(QPointF(0,0), originalInputs ) );
 	QPointF br = QPointF((double)w, (double)h);
-	points << qPointValue( br, interpolateValue(br, originalInputs) );
+	points << qPointValue( br, ip.interpolateValue(br, originalInputs) );
 	
 // 	srand(time(NULL));
 
@@ -1334,8 +1276,7 @@ MainWindow::MainWindow()
 // 	#undef val
 	
 	
-		
-	QImage img = renderPoints(points, QSize(500,500));
+	QImage img = ip.renderPoints(points, QSize(500,500));
 	
 	//exit(-1);
 	/*
@@ -1388,9 +1329,12 @@ MainWindow::MainWindow()
 		}
 	}
 	*/
+	//img = img.scaled(rect.size().toSize());
 	img.save("interpolate.jpg");
 
 	setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
+	
+	exit(-1);
 }
 
 
