@@ -545,7 +545,7 @@ double interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 3;
+	double p = 2.0;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
@@ -842,13 +842,10 @@ void SigMapRenderer::render()
 // 		{
 		//QString apMac = apMacToEssid.keys().at(0);
 
-		QString apMac;
+		QStringList macList;
 		foreach(MapApInfo *info, m_gs->m_apInfo)
 			if(info->renderOnMap)
-			{
-				apMac = info->mac;
-				break;
-			}
+				macList << info->mac;
 
 
 		//qDebug() << "MAC: "<<apMac;
@@ -857,14 +854,23 @@ void SigMapRenderer::render()
 
 		//QPointF center = info->point;
 
+		int macListSize = macList.size();
 		foreach(SigMapValue *val, m_gs->m_sigValues)
 		{
-			//if(val->hasAp(apMac))
-			//{
-				qPointValue p = qPointValue( val->point, val->signalForAp(apMac, "(default)") ); // signalForAp() returns 0 if not in this reading
-				points << p;
-				qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
-			//}
+			double sum = 0;
+			int count = 0;
+			foreach(QString apMac, macList)
+			{
+				if(val->hasAp(apMac))
+				{
+					sum   += val->signalForAp(apMac);
+					count ++;
+				}
+			}
+
+			qPointValue p = qPointValue( val->point,  count == 0 ? 0 : sum/(double)count); // signalForAp() returns 0 if not in this reading
+			points << p;
+			qDebug() << "points << qPointValue(" << p.point << ", " << p.value << ");";
 		}
 
 		QList<qPointValue> originalInputs = points;
@@ -971,13 +977,9 @@ void SigMapRenderer::render()
 
 		QList<QList<qPointValue> > quads;
 
-		QSize imgSize(qMax(origSize.width(),  (int)bounds.width()),
-			      qMax(origSize.height(), (int)bounds.height()));
-
-
-		double divisor = 1;
+		QSize imgSize(qMax(origSize.width(), (int)bounds.width()), qMax(origSize.height(), (int)bounds.height()));
 		
-		QImage tmpImg(imgSize.width()/divisor, imgSize.height()/divisor, QImage::Format_ARGB32_Premultiplied);
+		QImage tmpImg(imgSize, QImage::Format_ARGB32_Premultiplied);
 		QPainter p2(&tmpImg);
 		p2.fillRect(tmpImg.rect(), Qt::transparent);
 		//p2.end();
@@ -996,9 +998,6 @@ void SigMapRenderer::render()
 // 	//
 		// This is the last stage of the algorithm - go thru the new point cloud and construct the actual sub-rectangles
 		// by starting with each point and proceding clockwise around the rectangle, getting the nearest point in each direction (X+,Y), (X,Y+) and (X-,Y)
-		int count=0;
-		int areaSum = 0;
-		int areaMax = (bounds.width()/divisor) * (bounds.height()/divisor);
 		foreach(qPointValue tl, outputList)
 		{
 			QList<qPointValue> quad;
@@ -1009,8 +1008,8 @@ void SigMapRenderer::render()
 
 			// These 'isNull()' tests catch points on the edges of the bounding rectangle
 			if(!tr.point.isNull() &&
-			   !br.point.isNull() &&
-			   !bl.point.isNull())
+			!br.point.isNull() &&
+			!bl.point.isNull())
 			{
 				quad  << tl << tr << br << bl;
 				quads << (quad);
@@ -1018,16 +1017,12 @@ void SigMapRenderer::render()
 	// 			qDebug() << "Quad[p]: "<<tl.point<<", "<<tr.point<<", "<<br.point<<", "<<bl.point;
 	// 			qDebug() << "Quad[v]: "<<tl.value<<tr.value<<br.value<<bl.value;
 
-				int xmin = qMax((int)(tl.point.x()/divisor), 0);
-				int xmax = qMin((int)(br.point.x()/divisor), (int)(tmpImg.width()/divisor));
+				int xmin = qMax((int)(tl.point.x()), 0);
+				int xmax = qMin((int)(br.point.x()), (int)(tmpImg.width()));
 
-				int ymin = qMax((int)(tl.point.y()/divisor), 0);
-				int ymax = qMin((int)(br.point.y()/divisor), (int)(tmpImg.height()/divisor));
+				int ymin = qMax((int)(tl.point.y()), 0);
+				int ymax = qMin((int)(br.point.y()), (int)(tmpImg.height()));
 
-				int area = (ymax - ymin) * (xmax - xmin);
-				areaSum += area;
-
-				qDebug() << "Rendering point: "<<(count++)<<"/"<<outputList.size()<<", area:"<<area<<", sum:"<<areaSum<<"/"<<areaMax;
 
 				// Here's the actual rendering of the interpolated quad
 				for(int y=ymin; y<ymax; y++)
@@ -1037,8 +1032,9 @@ void SigMapRenderer::render()
 					{
 						double value = quadInterpolate(quad, (double)x, (double)y);
 						//QColor color = colorForValue(value);
-						QColor color = m_gs->colorForSignal(value, "(default)");
-						scanline[x] = color.rgba();
+						QColor color = m_gs->colorForSignal(value, "default");
+						if(x < tmpImg.width())
+							scanline[x] = color.rgba();
 					}
 				}
 
@@ -1112,7 +1108,7 @@ void SigMapRenderer::render()
 
 		//setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
 
-		p.drawImage(0,0,tmpImg.scaled(imgSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+		p.drawImage(0,0,tmpImg);
 	}
 	else
 	if(m_gs->m_renderMode == MapGraphicsScene::RenderTriangles)
