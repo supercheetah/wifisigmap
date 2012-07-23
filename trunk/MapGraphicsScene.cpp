@@ -950,6 +950,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	if(origSize.width() * 2 * origSize.height() * 2 * 3 > 128*1024*1024)
 	{
 		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Size too large, not updating: "<<origSize;
+		m_userItem->setVisible(false);
 		return;
 	}
 
@@ -972,6 +973,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	if(m_apInfo.values().size() < 2)
 	{
 		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two APs observed, unable to guess user location";
+		m_userItem->setVisible(false);
 		return;
 	}
 	
@@ -1020,6 +1022,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	{
 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two known APs marked AND visble, unable to guess user location";
 		m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
+		m_userItem->setVisible(false);
 		return;
 	}
 
@@ -3690,6 +3693,8 @@ void MapGraphicsScene::loadResults(QString filename)
 {
 	//m_mapWindow->gv()->resetMatrix();
 	m_mapWindow->gv()->resetTransform();
+	qDeleteAll(m_apInfo.values());
+	m_apInfo.clear();
 	
 	m_colorCounter = 0; // reset AP color counter
 	

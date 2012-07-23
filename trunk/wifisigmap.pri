@@ -37,4 +37,5 @@ SOURCES += \
 	OptionsDialog.cpp \
 	SigMapRenderer.cpp \
 	LongPressSpinner.cpp \
-	MapGraphicsView.cpp
+	MapGraphicsView.cpp \
+	SurfaceInterpolate.cpp
