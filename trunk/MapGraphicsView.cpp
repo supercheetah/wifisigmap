@@ -36,11 +36,11 @@ QImage MapSignalHistory::renderGraph(QSize size)
 		if(lastPoint.isNull())
 			lastPoint = pnt;
 			
-		p.setPen(QPen(color.lighter(500), 1.));
-		p.drawLine(lastPoint-pntOne/2, pnt-pntOne/2);
+// 		p.setPen(QPen(color.lighter(500), 1.));
+// 		p.drawLine(lastPoint-pntOne/2, pnt-pntOne/2);
 		
 		p.setPen(QPen(color.darker(500), 1.));
-		p.drawLine(lastPoint+pntOne, pnt+pntOne);
+		p.drawLine(lastPoint/*+pntOne*/, pnt+pntOne);
 		
 		p.setPen(QPen(color, 1.));
 		p.drawLine(lastPoint, pnt);
