@@ -728,11 +728,8 @@ QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, b
 	return img;
 }
 
-QString Interpolator::generate3dSurface(QList<qPointValue> points, QSize renderSize/*, bool renderLines, bool renderPointValues*/)
+QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF renderSize, double valueScale)
 {
-// 	renderLines = true;
-// 	renderPointValues = true;
-
 	QRectF bounds = getBounds(points);
 
 	QSizeF outputSize = bounds.size();
@@ -746,7 +743,21 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSize renderS
 
 	QPointF renderScale(dx,dy);
 
+	// TODO - Provide separate step X/Y for 3D grid?
+	int oldStepX = m_gridNumStepsX;
+	int oldStepY = m_gridNumStepsY;
+
+	m_gridNumStepsX = 100;
+	m_gridNumStepsY = 100;
+
+	// TBD - Is this a good formula?
+	if(valueScale < 0)
+		valueScale = sqrt(outputSize.width() * outputSize.height()) * 0.25;
+	
 	QList<qQuadValue> quads = generateQuads(points, true); // force grid mode
+
+	m_gridNumStepsX = oldStepX;
+	m_gridNumStepsY = oldStepY;
 
 	QStringList bufferVerts;
 	QStringList bufferFaces;
@@ -757,8 +768,6 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSize renderS
  		qPointValue tr = quad.tr * renderScale;
 		qPointValue br = quad.br * renderScale;
 		qPointValue bl = quad.bl * renderScale;
-
-		const double valueScale = 100;
 
 		int startIdx = bufferVerts.size();
 		bufferVerts << QString("v %1 %2 %3").arg(tl.point.x()).arg(tl.value * valueScale).arg(tl.point.y());
@@ -771,6 +780,8 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSize renderS
 		int idx2 = idx1 + 1;
 		int idx3 = idx2 + 1;
 		bufferFaces << QString("f %1 %2 %3 %4").arg(idx0).arg(idx1).arg(idx2).arg(idx3);
+
+		// TODO - Render faces using bicubic interpolation instead of using smaller grid size above
 		
 		/*
 		double xmin = tl.point.x();
