@@ -2997,12 +2997,12 @@ QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 		}
 	}
 	
-// 	if(resultCounter == 1)
-// 		boundingRect = iconRects[0] = QRectF(-iconSizeHalf, -iconSizeHalf, (double)iconSize, (double)iconSize);
+ 	if(resultCounter == 1)
+ 		boundingRect = iconRects[0] = QRectF(-iconSizeHalf, -iconSizeHalf, (double)iconSize, (double)iconSize);
 	
 	boundingRect.adjust(-10,-10,+10,+10);
 	
-	//qDebug() << "MapGraphicsScene::addSignalMarker(): boundingRect:"<<boundingRect;
+//	qDebug() << "MapGraphicsScene::addSignalMarker(): boundingRect:"<<boundingRect;
 	
 	QImage markerGroup(boundingRect.size().toSize(), QImage::Format_ARGB32_Premultiplied);
 	memset(markerGroup.bits(), 0, markerGroup.byteCount());//markerGroup.fill(Qt::green);
