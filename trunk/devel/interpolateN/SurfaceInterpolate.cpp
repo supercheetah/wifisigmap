@@ -464,7 +464,7 @@ QRectF getBounds(QList<qPointValue> points)
 	Note that for any CORNER points which are NOT given, they are assumed to have a value of "0". This can be changed in "testLine()", above.
 */
 
-QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
+QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points, bool forceGrid)
 {
 	m_pointsUsed.clear();
 	
@@ -489,9 +489,10 @@ QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
 	// add point at end point of line if none exists
 	QList<qPointValue> outputList = points;
 	
-	if(points.size() < m_pointSizeCutoff)
+	if(!forceGrid &&
+	    points.size() < m_pointSizeCutoff)
 	{
-		qDebug() << "generateQuads(): Point method 1: Quad search";
+		qDebug() << "# generateQuads(): Point method 1: Quad search";
 		outputList << testLine(points, bounds.topLeft(),	bounds.topRight(),     1);
 		outputList << testLine(points, bounds.topRight(),	bounds.bottomRight(),  2);
 		outputList << testLine(points, bounds.bottomRight(),	bounds.bottomLeft(),   3);
@@ -499,7 +500,7 @@ QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
 	}
 	else
 	{
-		qDebug() << "generateQuads(): Point method 2: Grid";
+		qDebug() << "# generateQuads(): Point method 2: Grid";
 		float stepX = m_gridStepSizeX > 0 ? m_gridStepSizeX : bounds.width()  / m_gridNumStepsX;
 		float stepY = m_gridStepSizeY > 0 ? m_gridStepSizeY : bounds.height() / m_gridNumStepsY;
 // 		int  max = (int)(bounds.width() / stepX), count=0;
@@ -516,7 +517,7 @@ QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
 		}
 	}
 	
-	qDebug() << "generateQuads(): Final # points: "<<outputList.size();
+	qDebug() << "# generateQuads(): Final # points: "<<outputList.size();
 	
 	#if 1
 	if(m_scaleValues)
@@ -725,6 +726,89 @@ QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, b
 	p.end();
 	
 	return img;
+}
+
+QString Interpolator::generate3dSurface(QList<qPointValue> points, QSize renderSize/*, bool renderLines, bool renderPointValues*/)
+{
+// 	renderLines = true;
+// 	renderPointValues = true;
+
+	QRectF bounds = getBounds(points);
+
+	QSizeF outputSize = bounds.size();
+	double dx = 1, dy = 1;
+	if(!renderSize.isNull())
+	{
+		outputSize.scale(renderSize, Qt::KeepAspectRatio);
+		dx = outputSize.width()  / bounds.width();
+		dy = outputSize.height() / bounds.height();
+	}
+
+	QPointF renderScale(dx,dy);
+
+	QList<qQuadValue> quads = generateQuads(points, true); // force grid mode
+
+	QStringList bufferVerts;
+	QStringList bufferFaces;
+
+	foreach(qQuadValue quad, quads)
+	{
+ 		qPointValue tl = quad.tl * renderScale;
+ 		qPointValue tr = quad.tr * renderScale;
+		qPointValue br = quad.br * renderScale;
+		qPointValue bl = quad.bl * renderScale;
+
+		const double valueScale = 100;
+
+		int startIdx = bufferVerts.size();
+		bufferVerts << QString("v %1 %2 %3").arg(tl.point.x()).arg(tl.value * valueScale).arg(tl.point.y());
+		bufferVerts << QString("v %1 %2 %3").arg(tr.point.x()).arg(tr.value * valueScale).arg(tr.point.y());
+		bufferVerts << QString("v %1 %2 %3").arg(br.point.x()).arg(br.value * valueScale).arg(br.point.y());
+		bufferVerts << QString("v %1 %2 %3").arg(bl.point.x()).arg(bl.value * valueScale).arg(bl.point.y());
+
+		int idx0 = startIdx + 1; // vert indexes are 1 based
+		int idx1 = idx0 + 1;
+		int idx2 = idx1 + 1;
+		int idx3 = idx2 + 1;
+		bufferFaces << QString("f %1 %2 %3 %4").arg(idx0).arg(idx1).arg(idx2).arg(idx3);
+		
+		/*
+		double xmin = tl.point.x();
+		double xmax = br.point.x() + 1.;
+
+		double ymin = tl.point.y();
+		double ymax = br.point.y() + 1.;
+
+		double yStep = (ymax - ymin) / 10.;
+		double xStep = (xmax - xmin) / 10.;
+
+		// Here's the actual rendering of the interpolated quad
+		for(double y=ymin; y<ymax; y+=yStep)
+		{
+			const double sy = ((double)y) / dy;
+			for(double x=xmin; x<xmax; x+=xStep)
+			{
+				double sx = ((double)x) / dx;
+				double value = quadInterpolate(quad, sx, sy);
+				//qDebug() << "Rendering quad "<<(counter++)<<"/"<<maxCounter<<": img point:"<<x<<","<<y<<", scaled:"<<sx<<","<<sy<<", value:"<<value;
+				//QColor color = colorForValue(value);
+				//QColor color = isnan(value) ? Qt::gray : colorForValue(value);
+
+				//scanline[x] = color.rgba();
+
+				/// # (sx,sy,value)
+
+				// 3D - z is into the screen, so we substitue *our* Y for 3D z, and our Z (vertical) - value for the up/down
+				bufferVerts << QString("v %1 %2 %3").arg(sx).arg(value * valueScale).arg(sy);
+			}
+		}
+		*/
+	}
+
+	qDebug() << "generate3dSurface(): Num verts: "<<bufferVerts.size()<<", Num faces: "<<bufferFaces.size();
+
+	return  bufferVerts.join("\n") + "\n" +
+		bufferFaces.join("\n") + "\n" ;
 }
 
 };
