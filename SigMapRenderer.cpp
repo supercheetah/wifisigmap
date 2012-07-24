@@ -528,6 +528,23 @@ void SigMapRenderer::render()
 		//setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
 
 		p.drawImage(0,0,tmpImg);
+
+		QString objCode = ip.generate3dSurface(points, QSize(3,3), 0.33);
+
+		//printf("# SurfaceInterpolate::generate3dSurface():\n%s\n", qPrintable(objCode));
+
+		QFile file("test.obj");
+		if(!file.open(QIODevice::WriteOnly))
+		{
+			QMessageBox::critical(0,tr("Can't Write test.obj"),QString(tr("Unable to write test.obj")));
+			//return;
+		}
+		else
+		{
+			QTextStream stream(&file);
+			stream << objCode;
+			file.close();
+		}
 	}
 	else
 	if(m_gs->m_renderMode == MapGraphicsScene::RenderTriangles)
