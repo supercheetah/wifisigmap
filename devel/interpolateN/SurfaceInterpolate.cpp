@@ -90,12 +90,11 @@ double nCubicInterpolate (int n, double* p, double coordinates[]) {
 
 //bool newQuad = false;
 /// \brief Interpolate the value for point \a x, \a y from the values at the four corners of \a quad
-double quadInterpolate(qQuadValue quad, double x, double y)
+double quadInterpolate(qQuadValue quad, double x, double y, bool useBicubic = true)
 {
 	double w = quad.width();
 	double h = quad.height();
 	
-	bool useBicubic = true;
 	if(useBicubic)
 	{
 		// Use bicubic impl from http://www.paulinternet.nl/?page=bicubic
@@ -140,11 +139,15 @@ double quadInterpolate(qQuadValue quad, double x, double y)
 	
 		double fr2 = (quad.br.point.x() - x) / w * quad.bl.value
 			   + (x - quad.tl.point.x()) / w * quad.br.value;
+
+		double h1  = (quad.br.point.y() - y),
+		       h2  = (y - quad.tl.point.y());
+		
+		double p1  = h1 / h * fr1
+			   + h2 / h * fr2;
 	
-		double p1  = (quad.br.point.y() - y) / h * fr1
-			   + (y - quad.tl.point.y()) / h * fr2;
-	
-		//qDebug() << "quadInterpolate: "<<x<<" x "<<y<<": "<<p<<" (fr1:"<<fr1<<",fr2:"<<fr2<<",w:"<<w<<",h:"<<h<<")";
+		//qDebug() << "quadInterpolate: "<<x<<" x "<<y<<": "<<p1<<" (h1:"<<h1<<", h2:"<<h2<<", fr1:"<<fr1<<",fr2:"<<fr2<<",w:"<<w<<",h:"<<h<<"), bry:"<<quad.br.point.y()<<", tly:"<<quad.tl.point.y();
+		
 		return p1;
 	}
 }
@@ -728,7 +731,7 @@ QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, b
 	return img;
 }
 
-QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF renderSize, double valueScale)
+bool Interpolator::write3dSurfaceFile(QString objFile, QList<qPointValue> points, QSizeF renderSize, double valueScale, QString mtlFile, double xres, double yres)
 {
 	QRectF bounds = getBounds(points);
 
@@ -743,12 +746,12 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF render
 
 	QPointF renderScale(dx,dy);
 
-	// TODO - Provide separate step X/Y for 3D grid?
-	int oldStepX = m_gridNumStepsX;
-	int oldStepY = m_gridNumStepsY;
-
-	m_gridNumStepsX = 100;
-	m_gridNumStepsY = 100;
+// 	// TODO - Provide separate step X/Y for 3D grid?
+// 	int oldStepX = m_gridNumStepsX;
+// 	int oldStepY = m_gridNumStepsY;
+// 
+// 	m_gridNumStepsX = 100;
+// 	m_gridNumStepsY = 100;
 
 	// TBD - Is this a good formula?
 	if(valueScale < 0)
@@ -756,12 +759,17 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF render
 	
 	QList<qQuadValue> quads = generateQuads(points, true); // force grid mode
 
-	m_gridNumStepsX = oldStepX;
-	m_gridNumStepsY = oldStepY;
+// 	m_gridNumStepsX = oldStepX;
+// 	m_gridNumStepsY = oldStepY;
 
 	QStringList bufferVerts;
 	QStringList bufferFaces;
+	QStringList bufferMaterial;
+	
+	QStringList materialsUsed;
 
+	qDebug() << "# Using valueScale: "<<valueScale;
+	
 	foreach(qQuadValue quad, quads)
 	{
  		qPointValue tl = quad.tl * renderScale;
@@ -769,6 +777,7 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF render
 		qPointValue br = quad.br * renderScale;
 		qPointValue bl = quad.bl * renderScale;
 
+		/*
 		int startIdx = bufferVerts.size();
 		bufferVerts << QString("v %1 %2 %3").arg(tl.point.x()).arg(tl.value * valueScale).arg(tl.point.y());
 		bufferVerts << QString("v %1 %2 %3").arg(tr.point.x()).arg(tr.value * valueScale).arg(tr.point.y());
@@ -780,46 +789,102 @@ QString Interpolator::generate3dSurface(QList<qPointValue> points, QSizeF render
 		int idx2 = idx1 + 1;
 		int idx3 = idx2 + 1;
 		bufferFaces << QString("f %1 %2 %3 %4").arg(idx0).arg(idx1).arg(idx2).arg(idx3);
-
-		// TODO - Render faces using bicubic interpolation instead of using smaller grid size above
+		*/
 		
-		/*
 		double xmin = tl.point.x();
-		double xmax = br.point.x() + 1.;
+		double xmax = br.point.x();
 
 		double ymin = tl.point.y();
-		double ymax = br.point.y() + 1.;
+		double ymax = br.point.y();
 
-		double yStep = (ymax - ymin) / 10.;
-		double xStep = (xmax - xmin) / 10.;
+		double yStep = (ymax - ymin) / yres;
+		double xStep = (xmax - xmin) / xres;
 
-		// Here's the actual rendering of the interpolated quad
+		qQuadValue quad2(tl, tr, br, bl);
+				
+		#define WriteVert(x,y) \
+			bufferVerts << QString("v %1 %2 %3") \
+				.arg(x) \
+				.arg(quadInterpolate(quad2, x, y)) \
+				.arg(y);
+
 		for(double y=ymin; y<ymax; y+=yStep)
 		{
-			const double sy = ((double)y) / dy;
 			for(double x=xmin; x<xmax; x+=xStep)
 			{
-				double sx = ((double)x) / dx;
-				double value = quadInterpolate(quad, sx, sy);
-				//qDebug() << "Rendering quad "<<(counter++)<<"/"<<maxCounter<<": img point:"<<x<<","<<y<<", scaled:"<<sx<<","<<sy<<", value:"<<value;
-				//QColor color = colorForValue(value);
-				//QColor color = isnan(value) ? Qt::gray : colorForValue(value);
+				int startIdx = bufferVerts.size();
 
-				//scanline[x] = color.rgba();
+				WriteVert(x,         y);
+				WriteVert(x + xStep, y);
+				WriteVert(x + xStep, y + yStep);
+				WriteVert(x,         y + yStep);
 
-				/// # (sx,sy,value)
+				// get color at center
+				double value = quadInterpolate(quad2, x+xStep/2, y+yStep/2);
+				QColor color = isnan(value) ? Qt::gray : colorForValue(value);
 
-				// 3D - z is into the screen, so we substitue *our* Y for 3D z, and our Z (vertical) - value for the up/down
-				bufferVerts << QString("v %1 %2 %3").arg(sx).arg(value * valueScale).arg(sy);
+				QString mtlName = color.name();
+				mtlName = mtlName.replace("#", "mtl");
+
+				if(!materialsUsed.contains(mtlName))
+				{
+					materialsUsed << mtlName;
+					bufferMaterial << QString("newmtl %1\nKa %2 %3 %4\nKd %2 %3 %4\n")
+						.arg(mtlName)
+						.arg(color.redF())
+						.arg(color.greenF())
+						.arg(color.blueF());
+				}
+
+				bufferFaces << QString("usemtl %1").arg(mtlName);
+
+				int idx0 = startIdx + 1; // vert indexes are 1 based
+				int idx1 = idx0 + 1;
+				int idx2 = idx1 + 1;
+				int idx3 = idx2 + 1;
+				bufferFaces << QString("f %1 %2 %3 %4").arg(idx0).arg(idx1).arg(idx2).arg(idx3);
 			}
 		}
-		*/
 	}
 
 	qDebug() << "generate3dSurface(): Num verts: "<<bufferVerts.size()<<", Num faces: "<<bufferFaces.size();
 
-	return  bufferVerts.join("\n") + "\n" +
-		bufferFaces.join("\n") + "\n" ;
+	if(mtlFile.isEmpty())
+		mtlFile = QFileInfo(objFile).baseName() + ".mtl";
+
+	QString objCode = QString("mtllib %1\n%2\n%3\n")
+		.arg(mtlFile)
+		.arg(bufferVerts.join("\n"))
+		.arg(bufferFaces.join("\n"));
+
+	QString mtlCode = bufferMaterial.join("\n") + "\n";
+
+	QFile file(objFile);
+	if(!file.open(QIODevice::WriteOnly))
+	{
+		return false;
+	}
+	else
+	{
+		QTextStream stream(&file);
+		stream << objCode;
+		file.close();
+	}
+
+	QFile file2(mtlFile);
+	if(!file2.open(QIODevice::WriteOnly))
+	{
+		return false;
+	}
+	else
+	{
+		QTextStream stream(&file2);
+		stream << mtlCode;
+		file2.close();
+	}
+
+	return true;
+		
 }
 
 };

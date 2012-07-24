@@ -100,7 +100,7 @@ namespace SurfaceInterpolate
 		double interpolateValue(QPointF point, QList<qPointValue> inputs);
 		QList<qQuadValue> generateQuads(QList<qPointValue> points, bool forceGrid=false);
 		QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false);
-		QString generate3dSurface(QList<qPointValue> points, QSizeF renderSize, double valueScale = -1);
+		bool write3dSurfaceFile(QString objFile, QList<qPointValue> points, QSizeF renderSize, double valueScale = -1, QString mtlFile="", double xres=10, double yres=10);
 		
 	protected:
 		QList<qPointValue> testLine(QList<qPointValue> inputs, QPointF p1, QPointF p2, int dir);
