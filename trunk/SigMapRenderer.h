@@ -21,6 +21,7 @@ signals:
 
 protected:
 	MapGraphicsScene *m_gs;
+	QMutex m_renderLock;
 };
 
 #endif

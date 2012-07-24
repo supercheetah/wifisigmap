@@ -218,20 +218,20 @@ double Interpolator::interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 4;
+	double p = 2.5;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
 	{
 		qPointValue x = inputs[i];
-		//if(_dist2(x.point, point) < m_nearbyDistance)
+		if(_dist2(x.point, point) < m_nearbyDistance)
 		{
 			double a = weight(x.point, point, p) * x.value;
 			double b = 0;
 			for(int j=0; j<n; j++)
 			{
 				QPointF y = inputs[j].point;
-				//if(_dist2(y, point) < m_nearbyDistance)
+				if(_dist2(y, point) < m_nearbyDistance)
 					b += weight(y, point, p);
 			}
 			sum += b == 0 ? 0 : a / b;
@@ -480,7 +480,7 @@ QList<qQuadValue> Interpolator::generateQuads(QList<qPointValue> points)
 		markPointUsed(p.point);
 	
 	if(m_autoNearby)
-		m_nearbyDistance = (bounds.width() * .25) * (bounds.height() * .25);
+		m_nearbyDistance = (bounds.width() * .35) * (bounds.height() * .35);
 	
 	// Iterate over every point
 	// draw line from point to each bound (X1,Y),(X2,Y),(X,Y1),(X,Y2)
@@ -651,10 +651,10 @@ QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, b
 //		int progress = (int)(((double)(counter++)/(double)maxCounter) * 100);
 
 		int xmin = qMax((int)(tl.point.x()), 0);
-		int xmax = qMin((int)(br.point.x()), (int)(img.width()));
+		int xmax = qMin((int)(br.point.x()+1), (int)(img.width()));
 
 		int ymin = qMax((int)(tl.point.y()), 0);
-		int ymax = qMin((int)(br.point.y()), (int)(img.height()));
+		int ymax = qMin((int)(br.point.y()+1), (int)(img.height()));
 
 // 		if(counter == 7)
 // 		{
@@ -665,11 +665,11 @@ QImage Interpolator::renderPoints(QList<qPointValue> points, QSize renderSize, b
 		
 
 		// Here's the actual rendering of the interpolated quad
-		for(int y=ymin; y<=ymax; y++)
+		for(int y=ymin; y<ymax; y++)
 		{
 			QRgb* scanline = (QRgb*)img.scanLine(y);
 			const double sy = ((double)y) / dy;
-			for(int x=xmin; x<=xmax; x++)
+			for(int x=xmin; x<xmax; x++)
 			{
 				double sx = ((double)x) / dx;
 				double value = quadInterpolate(quad, sx, sy);

@@ -21,7 +21,7 @@ MainWindow::MainWindow()
 {
 	//QRectF rect(0,0,4001,3420);
 	//QRectF rect(0,0,854, 374);
-	QRectF rect(0,0,100,100);
+	QRectF rect(0,0,1353,765);
 	//QRectF(89.856,539.641 1044.24x661.359)
 	double w = rect.width(), h = rect.height();
 
@@ -490,14 +490,45 @@ MainWindow::MainWindow()
         points << qPointValue( QPointF(413.194, 2096.64), 0.37);
         points << qPointValue( QPointF(419.56, 2382.52), 0.426667);
 */
-        points << qPointValue( QPointF(75,75), 1.0);
-//         points << qPointValue( QPointF(648.362, 283.993), 0.410667);
-//         points << qPointValue( QPointF(129.726, 243.538), 0.264);
-//         points << qPointValue( QPointF(294.657, 197.242), 0.26);
-//         points << qPointValue( QPointF(498.73, 283.324), 0.326667);
-        points << qPointValue( QPointF(25,25), 0.5);
+//         points << qPointValue( QPointF(75,75), 1.0);
+// //         points << qPointValue( QPointF(648.362, 283.993), 0.410667);
+// //         points << qPointValue( QPointF(129.726, 243.538), 0.264);
+// //         points << qPointValue( QPointF(294.657, 197.242), 0.26);
+// //         points << qPointValue( QPointF(498.73, 283.324), 0.326667);
+//         points << qPointValue( QPointF(25,25), 0.5);
 
-
+       points << qPointValue( QPointF(618.207, 191.9), 0.146667);
+        points << qPointValue( QPointF(606.206, 147.299), 0);
+        points << qPointValue( QPointF(620.319, 140.289), 0);
+        points << qPointValue( QPointF(662.378, 132.064), 0);
+        points << qPointValue( QPointF(727.286, 120.842), 0);
+        points << qPointValue( QPointF(781.013, 111.439), 0);
+        points << qPointValue( QPointF(814.605, 173.209), 0.0266667);
+        points << qPointValue( QPointF(816.081, 191.636), 0);
+        points << qPointValue( QPointF(817.941, 230.94), 0);
+        points << qPointValue( QPointF(812.592, 260.709), 0);
+        points << qPointValue( QPointF(748.776, 277.965), 0.12);
+        points << qPointValue( QPointF(838.64, 286.338), 0.08);
+        points << qPointValue( QPointF(838.902, 362.479), 0);
+        points << qPointValue( QPointF(740.147, 397.303), 0.0933333);
+        points << qPointValue( QPointF(687.206, 401.018), 0.24);
+        points << qPointValue( QPointF(634.232, 416.038), 0.266667);
+        points << qPointValue( QPointF(598.355, 419.091), 0.346667);
+        points << qPointValue( QPointF(581.419, 373.271), 0.253333);
+        points << qPointValue( QPointF(625.026, 337.805), 0.28);
+        points << qPointValue( QPointF(678.837, 318.822), 0.2);
+        points << qPointValue( QPointF(666.995, 276.466), 0.226667);
+        points << qPointValue( QPointF(633.941, 290.71), 0.2);
+        points << qPointValue( QPointF(627.545, 242.452), 0.146667);
+        points << qPointValue( QPointF(664.449, 231.712), 0.28);
+        points << qPointValue( QPointF(578.706, 262.608), 0.146667);
+        points << qPointValue( QPointF(567.557, 285.191), 0.133333);
+        points << qPointValue( QPointF(547.931, 229.505), 0.0933333);
+        points << qPointValue( QPointF(539.234, 196.858), 0);
+        points << qPointValue( QPointF(534.874, 171.712), 0);
+        points << qPointValue( QPointF(563.212, 152.439), 0);
+        points << qPointValue( QPointF(588.915, 150.383), 0);
+	
 	Interpolator ip;
 	
 	QList<qPointValue> originalInputs = points;
@@ -585,7 +616,7 @@ MainWindow::MainWindow()
 // 	#undef val
 	
 	
-	QImage img = ip.renderPoints(points, QSize(500,500));
+	QImage img = ip.renderPoints(points, QSize(750,750));
 	
 	//exit(-1);
 	/*
@@ -638,7 +669,7 @@ MainWindow::MainWindow()
 		}
 	}
 	*/
-	//img = img.scaled(rect.size().toSize());
+//	img = img.scaled(rect.size().toSize());
 	img.save("interpolate.jpg");
 
 	setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));

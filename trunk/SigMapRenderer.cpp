@@ -371,6 +371,8 @@ using namespace SurfaceInterpolate;
 
 void SigMapRenderer::render()
 {
+	QMutexLocker lock(&m_renderLock);
+	
 	//qDebug() << "SigMapRenderer::render(): currentThreadId:"<<QThread::currentThreadId()<<", rendering...";
 	QSize origSize = m_gs->m_bgPixmap.size();
 
