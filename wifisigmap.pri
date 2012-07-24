@@ -38,4 +38,5 @@ SOURCES += \
 	SigMapRenderer.cpp \
 	LongPressSpinner.cpp \
 	MapGraphicsView.cpp \
-	SurfaceInterpolate.cpp
+	SurfaceInterpolate.cpp \
+	MapLocatingRoutines.cpp
