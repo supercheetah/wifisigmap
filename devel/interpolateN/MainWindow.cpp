@@ -19,8 +19,9 @@ using namespace SurfaceInterpolate;
 
 MainWindow::MainWindow()
 {
-	QRectF rect(0,0,4001,3420);
-	//QRectF rect(0,0,300,300);
+	//QRectF rect(0,0,4001,3420);
+	//QRectF rect(0,0,854, 374);
+	QRectF rect(0,0,100,100);
 	//QRectF(89.856,539.641 1044.24x661.359)
 	double w = rect.width(), h = rect.height();
 
@@ -91,7 +92,7 @@ MainWindow::MainWindow()
 // 		<< qPointValue(QPointF(0,0), 		0.0)
 // 		<< qPointValue(QPointF(w,h),		0.0);
 
-	
+/*	
 	points << qPointValue( QPointF(409.028, 2934.03), 0.286667);
         points << qPointValue( QPointF(263.632, 2944.56), 0.284444);
         points << qPointValue( QPointF(63.2585, 2967.1), 0.32);
@@ -488,7 +489,13 @@ MainWindow::MainWindow()
         points << qPointValue( QPointF(150.034, 2559.29), 0.364444);
         points << qPointValue( QPointF(413.194, 2096.64), 0.37);
         points << qPointValue( QPointF(419.56, 2382.52), 0.426667);
-        
+*/
+        points << qPointValue( QPointF(75,75), 1.0);
+//         points << qPointValue( QPointF(648.362, 283.993), 0.410667);
+//         points << qPointValue( QPointF(129.726, 243.538), 0.264);
+//         points << qPointValue( QPointF(294.657, 197.242), 0.26);
+//         points << qPointValue( QPointF(498.73, 283.324), 0.326667);
+        points << qPointValue( QPointF(25,25), 0.5);
 
 
 	Interpolator ip;
