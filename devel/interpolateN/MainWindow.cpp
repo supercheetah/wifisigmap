@@ -617,6 +617,10 @@ MainWindow::MainWindow()
 	
 	
 	QImage img = ip.renderPoints(points, QSize(750,750));
+
+	QString objCode = ip.generate3dSurface(points, QSize(750,750));
+
+	printf("# SurfaceInterpolate::generate3dSurface():\n%s\n", qPrintable(objCode));
 	
 	//exit(-1);
 	/*

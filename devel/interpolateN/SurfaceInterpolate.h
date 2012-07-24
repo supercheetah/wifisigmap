@@ -98,8 +98,9 @@ namespace SurfaceInterpolate
 		void setScaleValues(bool flag)		{ m_scaleValues = flag; }
 		
 		double interpolateValue(QPointF point, QList<qPointValue> inputs);
-		QList<qQuadValue> generateQuads(QList<qPointValue> points);
+		QList<qQuadValue> generateQuads(QList<qPointValue> points, bool forceGrid=false);
 		QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false);
+		QString generate3dSurface(QList<qPointValue> points, QSize renderSize/*, bool renderLines, bool renderPointValues*/);
 		
 	protected:
 		QList<qPointValue> testLine(QList<qPointValue> inputs, QPointF p1, QPointF p2, int dir);
