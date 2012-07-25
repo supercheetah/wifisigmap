@@ -21,18 +21,18 @@ namespace SurfaceInterpolate {
 /// \brief Simple value->color function
 QColor colorForValue(double v)
 {
-	int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
+	//int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
 	//return QColor::fromHsv(hue, 255, 255);
 	
-	//int hue = (int)((1-v) * (359-120) + 120);
- 	//hue = qMax(0, qMin(359, hue));
+	int hue = (int)((1-v) * (359-120) + 120);
+ 	hue = qMax(0, qMin(359, hue));
 
-	//int hue = (int)(v * 120);
-	//hue = qMax(0, qMin(120, hue));
+// 	int hue = (int)(v * 120);
+// 	hue = qMax(0, qMin(120, hue));
  	 
 	int sat = 255;
 	int val = 255;
-	double valTop = 0.9;
+	double valTop = 1.0;//0.9;
 	if(v < valTop)
 	{
 		val = (int)(v/valTop * 255.);

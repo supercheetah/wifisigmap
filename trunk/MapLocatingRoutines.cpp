@@ -652,6 +652,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QPointF p0 = info0->point;
 			QPointF p1 = info1->point;
 
+			// Not really used - unneeded really since we're using the circle_circle_intersection
+			// routine below
 			QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
 							ap1, apMacToDbm[ap1]);
 
@@ -723,10 +725,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				   dist < fabs(r0 - r1))
 				{
 					// Distance still wrong, so force-set the proper distance
-					double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
+					double errorDist = dist >  r0 + r1 ?
+							   dist - (r0 + r1):
+							      fabs(r0 - r1);
 
-					r0 += errorDist * .6; // overlay a bit by using .6 instead of .5
-					r1 += errorDist * .6;
+					r0 += errorDist * .51; // overlay a bit
+					r1 += errorDist * .51;
 
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
@@ -1147,6 +1151,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 	QHash<QString, QList<SigMapValue*> > valuesByAp;
 	foreach(QString apMac, m_apInfo.keys())
 	{
+		MapApInfo *info = apInfo(apMac);
+		if(!info->renderOnMap)
+			continue;
+			
 		// Build a list of values for this AP
 		valuesByAp.insert(apMac, QList<SigMapValue *>());
 		foreach(SigMapValue *val, m_sigValues)
@@ -1162,8 +1170,6 @@ void MapGraphicsScene::updateApLocationOverlay()
 		valuesByAp[apMac] = list;
 
 
-		MapApInfo *info = apInfo(apMac);
-
 		qDebug() << "[apLocationGuess] Found "<<list.size()<<" readings for apMac:"<<apMac<<", ESSID:" << info->essid;
 
 		if(list.isEmpty())
@@ -1174,68 +1180,328 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 		QPointF avgPoint(0.,0.);
 		count = 0;
+		
+		
+		// The "best guess" at the "correct" intersection of the circles
+		QList<QPointF> goodPoints;
+		QLineF firstSet;
+	
+		QStringList pairsTested;
+	
 		int numVals = list.size();
+		bool needFirstGoodPoint = false;
 
 		//SigMapValue *val0 = list.first();
 
 		for(int i=0; i<numVals; i++)
 		{
-			//SigMapValue *val1 = list[i];
-			SigMapValue *val0 = list[i];
-			SigMapValue *val1 = (i < numVals - 1) ? list[i+1] : list[0];
-
-
-			QPointF calcPoint = triangulateAp(apMac, val0, val1);
-
-			// We assume triangulate() already stored drived loss factor into apInfo()
-			//double r0 = dBmToDistance(val0->signalForAp(apMac, true), apMac) * m_pixelsPerMeter;
-			//double r1 = dBmToDistance(val1->signalForAp(apMac, true), apMac) * m_pixelsPerMeter;
-
-			qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", reading"<<i<<": calcPoint:"<<calcPoint;
-
-			if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
-				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] Can't render ellipse - calcPoint is NaN";
-			else
+			for(int j=0; j<numVals; j++)
 			{
-				//userPoly << calcPoint;
-
-				p.setPen(QPen(color0, penWidth));//, Qt::DashLine));
-				p.drawLine(val0->point, calcPoint);
-
+				QString key = QString("%1%2").arg(i<j?i:j).arg(i<j?j:i);
+				qDebug() << "AP Intersect: Processing: "<<i<<", "<<j<<" ....";
+				if(i == j || pairsTested.contains(key))
+				{
+					//qDebug() << "\t not testing ("<<i<<"/"<<j<<"): key:"<<key;
+					continue;
+				}
+				
+				pairsTested << key;
+				
+				//SigMapValue *val1 = list[i];
+				SigMapValue *val0 = list[i];
+				SigMapValue *val1 = list[j];
+				
+				QPointF p0 = val0->point;
+				QPointF p1 = val1->point;
+				
+				QPointF calcPoint;
+				
+				int dbm0 = (int)val0->signalForAp(apMac, true);
+				int dbm1 = (int)val1->signalForAp(apMac, true);
+				
+				// We're assuming default loss factors for this AP
+				double r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
+				double r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
+				
+				double dist = QLineF(p1,p0).length();
+				
+				if(dist > r0 + r1 ||
+				   dist < fabs(r0 - r1))
+				{
+					// If d > r0 + r1 then there are no solutions, the circles are separate.
+					// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
+			
+					// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
+					// therefore the solution given by dBmToDistance() must be wrong.
+	
+					// Therefore, we will adjust the lossFactor for these APs inorder to provide
+					// an intersection by allocation part of the error to each AP
+	
+					double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
+	
+					double corrected = (r0 + errorDist * .6) / m_pixelsPerMeter;
+					
+					double absLossFactor = deriveLossFactor(apMac, dbm0, corrected/*, gRx*/);
+					
+					if(isnan(absLossFactor))
+					{
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+					}
+					else
+					{
+						QPointF lossFactor = info->lossFactor;
+						if(dbm0 > info->shortCutoff)
+							lossFactor.setY(absLossFactor);
+						else
+							lossFactor.setX(absLossFactor);
+	
+						info->lossFactor = lossFactor;
+	
+						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Corrected loss factor for apMac:" <<lossFactor<<", corrected:"<<corrected<<", absLossFactor:"<<absLossFactor;
+					}
+	
+					// Recalculate distances
+					r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
+					r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
+	
+					if(dist > r0 + r1 ||
+					   dist < fabs(r0 - r1))
+					{
+						// Distance still wrong, so force-set the proper distance
+						double errorDist = dist >  r0 + r1 ?
+								   dist - (r0 + r1):
+								      fabs(r0 - r1);
+	
+						r0 += errorDist * .51; // overlay a bit 
+						r1 += errorDist * .51;
+	
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+					}
+	
+				}
+				
+				// Draw ellipses 
 				p.setPen(QPen(color0, penWidth));
-				p.drawLine(val1->point, calcPoint);
-
-				avgPoint += calcPoint;
-				count ++;
-
-				p.setPen(QPen(Qt::color0, 3.));
-				p.setBrush(QColor(0,0,0,127));
-				p.drawEllipse(val0->point, 10, 10);
-
-				p.setPen(QPen(Qt::color0, 3.));
-				p.setBrush(QColor(0,0,0,127));
-				p.drawEllipse(val1->point, 10, 10);
-
-				p.setPen(QPen(Qt::green, 3.));
-				p.setBrush(QColor(0,0,0,127));
-				p.drawEllipse(calcPoint, 10, 10);
-
+//  				if(p0.x() > 0 && p0.y() > 0 && r0 > 1)
+//  					p.drawEllipse(p0, r0, r0);
+//  				if(p1.x() > 0 && p1.y() > 0 && r1 > 1)
+//  					p.drawEllipse(p1, r1, r1);
+				
+				
+				// The revised idea here is this:
+				// Need at least three APs to find AP with intersection of circles:
+				// Get the two lines the APs intersect
+				// Store the first two points at into firstSet
+				// Next set, the next two points compared to first two - the two closest go into the goodPoints set, the rejected ones go are 'bad points'
+				// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
+				// At end, good points forms the probability cluster of where the user probably is
+	
+				//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
+	
+				QPointF goodPoint;
+	
+				//QLineF line  = calcIntersect(p0, r0, p1, r1);
+				//QLineF line = triangulate2(ap0, apMacToDbm[ap0],
+				//			   ap1, apMacToDbm[ap1]);
+				double xi, yi, xi_prime, yi_prime;
+				int ret = circle_circle_intersection(
+							p0.x(), p0.y(), r0,
+							p1.x(), p1.y(), r1,
+							&xi, &yi,
+							&xi_prime, &yi_prime);
+				if(!ret)
+				{
+					qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
+					continue;
+				}
+	
+				QLineF line(xi, yi, xi_prime, yi_prime);
+	
+	
+				if(line.isNull())
+				{
+					continue;
+				}
+				else
+				{
+					p.setPen(QPen(Qt::gray, penWidth));
+					p.drawLine(line);
+	
+					if(goodPoints.isEmpty())
+					{
+						if(firstSet.isNull())
+						{
+							firstSet = line;
+							// If only intersecting two APs, then just just give the center of the line.
+							// Otherwise, leave blank and let the code below handle it the first time
+							goodPoint = numVals > 2 ? QPointF() : (line.p1() + line.p2()) / 2;
+	
+							//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint<<", numVals:"<<numVals;
+						}
+						else
+						{
+							// This is the second AP intersection - here we compare both points in both lines
+							// The two points closest together are the 'good' points
+							double min = 0;
+							QLineF good;
+							QLineF bad;
+	
+							double len11 = QLineF(firstSet.p1(), line.p1()).length();
+							{
+								min = len11;
+								good = QLineF(firstSet.p1(), line.p1());
+								bad  = QLineF(firstSet.p2(), line.p2());
+							}
+	
+							double len12 = QLineF(firstSet.p1(), line.p2()).length();
+							if(len12 < min)
+							{
+								min = len12;
+								good = QLineF(firstSet.p1(), line.p2());
+								bad  = QLineF(firstSet.p2(), line.p1());
+							}
+	
+							double len21 = QLineF(firstSet.p2(), line.p1()).length();
+							if(len21 < min)
+							{
+								min = len21;
+								good = QLineF(firstSet.p2(), line.p1());
+								bad  = QLineF(firstSet.p1(), line.p2());
+							}
+	
+							double len22 = QLineF(firstSet.p2(), line.p2()).length();
+							if(len22 < min)
+							{
+								min = len22;
+								good = QLineF(firstSet.p2(), line.p2());
+								bad  = QLineF(firstSet.p1(), line.p1());
+							}
+	
+							goodPoints << good.p1() << good.p2();
+	
+							goodPoint = good.p2();
+	
+							//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
+						}
+					}
+					else
+					{
+						// Calculate avg distance for both intersection points,
+						// then the point with the smallest avg 'good' distance is chosen as a good point, the other one is rejected
+						double goodSum1=0, goodSum2=0;
+						foreach(QPointF good, goodPoints)
+						{
+							goodSum1 += QLineF(good, line.p1()).length();
+							goodSum2 += QLineF(good, line.p2()).length();
+						}
+	
+						double count = (double)goodPoints.size();
+						double goodAvg1 = goodSum1 / count,
+						goodAvg2 = goodSum2 / count;
+	
+						if(goodAvg1 < goodAvg2)
+						{
+							goodPoints << line.p1();
+							goodPoint   = line.p1();
+	
+							//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+						}
+						else
+						{
+							goodPoints << line.p2();
+							goodPoint   = line.p2();
+	
+							//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+						}
+					}
+				}
+				
+				if(goodPoint.isNull())
+				{
+					needFirstGoodPoint = true;
+				}
+				else
+				{
+					if(needFirstGoodPoint)
+					{
+						needFirstGoodPoint = false;
+	
+						QPointF tmpPoint = goodPoints.first();
+	
+						userPoly << tmpPoint;
+	
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<tmpPoint << " (from last intersection)";
+	
+	
+						p.save();
+	
+			// 			p.setPen(QPen(color0, penWidth));
+			// 			p.drawLine(p0, calcPoint);
+			//
+			// 			p.setPen(QPen(color1, penWidth));
+			// 			p.drawLine(p1, calcPoint);
+	
+						p.setPen(QPen(Qt::gray, 3.));
+						p.setBrush(QColor(0,0,0,127));
+						if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
+							p.drawEllipse(tmpPoint, 10, 10);
+	
+						p.restore();
+	
+						avgPoint += tmpPoint;
+						count ++;
+					}
+	
+					calcPoint = goodPoint;
+	
+					if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+					{
+					//	qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+					}
+					else
+					{
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
+						//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+	
+						userPoly << goodPoint;
+	
+						p.save();
+	
+						p.setPen(QPen(Qt::gray, 3.));
+						p.setBrush(QColor(0,0,0,127));
+						if(calcPoint.x() > 0 && calcPoint.y() > 0)
+							p.drawEllipse(calcPoint, 10, 10);
+	
+						p.restore();
+	
+	
+						avgPoint += calcPoint;
+						count ++;
+					}
+				}
 			}
 
-			//break;
 		}
 
 		avgPoint /= count;
 
-		p.setPen(QPen(Qt::red, 30.));
+		//p.setPen(QPen(Qt::red, 30.));
 		//p.drawPolygon(userPoly);
+		
+		{
+			p.save();
+			p.setPen(QPen(Qt::black, 5));
+			p.setBrush(QColor(0,0,255,127));
+			p.drawPolygon(userPoly);
+			p.restore();
+		}
 
 		penWidth = 5;
 
-		p.setPen(QPen(Qt::green, 10.));
-		p.setBrush(QColor(0,0,0,127));
-		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
-			p.drawEllipse(avgPoint, penWidth, penWidth);
+// 		p.setPen(QPen(Qt::green, 10.));
+// 		p.setBrush(QColor(0,0,0,127));
+// 		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+// 			p.drawEllipse(avgPoint, penWidth, penWidth);
 
 		qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", avgPoint:"<<avgPoint<<", count:"<<count;
 
@@ -1247,7 +1513,8 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 			QImage markerGroup(":/data/images/ap-marker.png");
 			p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
-			//p.drawEllipse(avgPoint, penWidth, penWidth);
+			if(avgPoint.x() > 0 && avgPoint.y() > 0)
+				p.drawEllipse(avgPoint, penWidth, penWidth);
 
 // 				if(avgPoint == avgPoint)
 // 					p.setPen(QPen(Qt::yellow, 10.));
