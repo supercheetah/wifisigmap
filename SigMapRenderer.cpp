@@ -521,15 +521,15 @@ void SigMapRenderer::render()
 
 		QImage tmpImg = ip.renderPoints(points, QSize(750,750));
 		
+		//tmpImg.save("interpolate.jpg");
+		
 		tmpImg = tmpImg.scaled(origSize);//, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
-		tmpImg.save("interpolate.jpg");
-
 		//setPixmap(QPixmap::fromImage(img));//.scaled(200,200)));
 
 		p.drawImage(0,0,tmpImg);
 
-		ip.write3dSurfaceFile("test.obj", points, QSize(3,3), 0.33);
+		//ip.write3dSurfaceFile("test.obj", points, QSize(3,3), 0.33);
 	}
 	else
 	if(m_gs->m_renderMode == MapGraphicsScene::RenderTriangles)
