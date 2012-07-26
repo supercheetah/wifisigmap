@@ -695,7 +695,7 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 // 	item->setFlag(QGraphicsItem::ItemIsMovable);
 // 	item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
 // 	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-	item->setZValue(99);
+	item->setZValue(200);
 }
 
 
@@ -1188,7 +1188,7 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	item->setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
  	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
-	item->setZValue(99);
+	item->setZValue(199);
 	
 	//item->setOpacity(0);
 	if(!m_renderOpts.showReadingMarkers)

@@ -102,6 +102,8 @@ namespace SurfaceInterpolate
 		QImage renderPoints(QList<qPointValue> points, QSize renderSize = QSize(), bool renderLines=false, bool renderPointValues=false);
 		bool write3dSurfaceFile(QString objFile, QList<qPointValue> points, QSizeF renderSize, double valueScale = -1, QString mtlFile="", double xres=10, double yres=10);
 		
+		static QColor colorForValue(double v);
+		
 	protected:
 		QList<qPointValue> testLine(QList<qPointValue> inputs, QPointF p1, QPointF p2, int dir);
 		
