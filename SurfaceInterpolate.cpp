@@ -19,7 +19,7 @@
 namespace SurfaceInterpolate {
 
 /// \brief Simple value->color function
-QColor colorForValue(double v)
+QColor Interpolator::colorForValue(double v)
 {
 	//int hue = qMax(0, qMin(359, (int)((1-v) * 359)));
 	//return QColor::fromHsv(hue, 255, 255);

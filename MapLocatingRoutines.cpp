@@ -1,6 +1,23 @@
 #include "MapGraphicsScene.h"
 #include "MapWindow.h"
 
+QColor darkenColor(QColor color, double value)
+{
+	int h = color.hue();
+	int s = color.saturation();
+	int v = color.value();
+	return QColor::fromHsv(h, s, (int)(v * value));
+}
+
+/// \brief Calculates the weight of point \a o at point \a i given power \a p
+#define _dist2(a, b) ( ( ( a.x() - b.x() ) * ( a.x() - b.x() ) ) + ( ( a.y() - b.y() ) * ( a.y() - b.y() ) ) )
+
+inline double inverseDistanceWeight(QPointF i, QPointF o, double p)
+{
+	double b = pow(sqrt(_dist2(i,o)),p);
+	return b == 0 ? 0 : 1 / b;
+}
+
 /// These location routines are put here separate from MapGraphicsScene.cpp for easier editing and shorter compilation routines.
 /// In the future, I probably should look at separating these into their own separate class.
 
@@ -13,7 +30,7 @@ bool MapGraphicsScene_sort_SigMapValue_bySignal(SigMapValue *a, SigMapValue *b)
 
 	double va = a && a->hasAp(apMac) ? a->signalForAp(apMac) : 0.;
 	double vb = b && b->hasAp(apMac) ? b->signalForAp(apMac) : 0.;
-	return va < vb;
+	return vb < va;
 
 }
 
@@ -1194,8 +1211,11 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 		//SigMapValue *val0 = list.first();
 
+// 		QPointF strongestReading = numVals > 0 ? list[0]->point : QPointF();
+		
 		for(int i=0; i<numVals; i++)
 		{
+			QPointF strongestReading;
 			for(int j=0; j<numVals; j++)
 			{
 				QString key = QString("%1%2").arg(i<j?i:j).arg(i<j?j:i);
@@ -1205,12 +1225,25 @@ void MapGraphicsScene::updateApLocationOverlay()
 					continue;
 				}
 				
-				qDebug() << "AP Intersect: Processing: "<<i<<", "<<j<<" ....";
 				pairsTested << key;
 				
 				//SigMapValue *val1 = list[i];
 				SigMapValue *val0 = list[i];
 				SigMapValue *val1 = list[j];
+				
+				if(strongestReading.isNull())
+					strongestReading = val0->point;
+				
+				double value0 = val0->signalForAp(apMac);
+				double value1 = val1->signalForAp(apMac);
+				
+				qDebug() << "AP Intersect: Processing: "<<i<<", "<<j<<", sig[i]:"<<value0<<", sig[j]:"<<value1;
+				
+				// For sake of speed on large data sets, 
+				// don't use points that had less than 40% signal reading
+				if(value0 < 0.4 ||
+				   value1 < 0.4)
+				   continue;
 				
 				QPointF p0 = val0->point;
 				QPointF p1 = val1->point;
@@ -1234,7 +1267,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 					info->lossFactor = lossFactor;
 					
-					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r0, corrected:" <<lossFactor;
+					//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r0, corrected:" <<lossFactor;
 					
 					// Recalculate distances
 					r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
@@ -1250,7 +1283,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 					info->lossFactor = lossFactor;
 					
-					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r1, corrected:" <<lossFactor;
+					//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r1, corrected:" <<lossFactor;
 					
 					// Recalculate distances
 					r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
@@ -1308,7 +1341,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 						r0 += errorDist * .51; // overlay a bit
 						r1 += errorDist * .51;
 
-						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 					}
 	
 				//}
@@ -1324,11 +1357,11 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 				p.save();
 
-					p.setPen(QPen(color0, 3. * m_pixelsPerFoot));
+					p.setPen(QPen(darkenColor(color0, value0), 3. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
 					p.drawEllipse(p0, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
-					p.setPen(QPen(color0, 3. * m_pixelsPerFoot));
+					p.setPen(QPen(darkenColor(color0, value1), 3. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
 					p.drawEllipse(p1, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 
@@ -1343,7 +1376,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 				// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
 				// At end, good points forms the probability cluster of where the user probably is
 	
-				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", i:"<<i<<",j:"<<j<<", numVals:"<<numVals<<", p0:"<<p0<<", r0:"<<r0<<", p1:"<<p1<<", r1:"<<r1;
+				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] #goodPoints:"<<goodPoints.size()<<", i:"<<i<<",j:"<<j<<", numVals:"<<numVals<<", p0:"<<p0<<", r0:"<<r0<<", p1:"<<p1<<", r1:"<<r1;
 	
 // 				qDebug() << " -test done-";
 // 				exit(-1);
@@ -1492,14 +1525,14 @@ void MapGraphicsScene::updateApLocationOverlay()
 			// 			p.setPen(QPen(color1, penWidth));
 			// 			p.drawLine(p1, calcPoint);
 	
-						p.setPen(QPen(color0, 1.0 * m_pixelsPerFoot));
+						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1.0 * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
 						if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
 							p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 	
 						p.restore();
 	
-						avgPoint += tmpPoint;
+						avgPoint += tmpPoint/* * inverseDistanceWeight(tmpPoint, strongestReading, 2.5)*/;
 						count ++;
 					}
 	
@@ -1514,19 +1547,31 @@ void MapGraphicsScene::updateApLocationOverlay()
 						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
 						//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
 	
-						userPoly << goodPoint;
+						//double w = (value0 + value1) / 2.;
+						double w = inverseDistanceWeight(calcPoint, strongestReading, 0.1);
+						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): Point:" <<calcPoint<<", strongest:"<<strongestReading<<", weight:"<<w;
+						
+						QLineF baseline(strongestReading, calcPoint);
+						baseline.setLength(baseline.length() * w);
+						
+						//avgPoint += baseline.p2();
+						calcPoint = baseline.p2();
+						
+						p.setPen(QPen(Qt::gray, penWidth * m_pixelsPerFoot));
+						p.drawLine(baseline);
+						
+						userPoly << calcPoint;
 	
 						p.save();
 	
-						p.setPen(QPen(color0, 1. * m_pixelsPerFoot));
+						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1. * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
 						if(calcPoint.x() > 0 && calcPoint.y() > 0)
 							p.drawEllipse(calcPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 	
 						p.restore();
 	
-	
-						avgPoint += calcPoint;
+						avgPoint += calcPoint/* * w*/;
 						count ++;
 					}
 				}
@@ -1559,47 +1604,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
 		{
-// 			p.setPen(QPen(color0, 10.));
-// 			p.setBrush(QColor(0,0,0,127));
-// 			p.drawEllipse(avgPoint, 12 * m_pixelsPerFoot, 12 * m_pixelsPerFoot);
-// 
-// 			QImage markerGroup(":/data/images/ap-marker.png");
-// 			p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
-// 			if(avgPoint.x() > 0 && avgPoint.y() > 0)
-// 				p.drawEllipse(avgPoint, penWidth, penWidth);
-// 
-// // 				if(avgPoint == avgPoint)
-// // 					p.setPen(QPen(Qt::yellow, 10.));
-// // 				else
-// 					//p.setPen(QPen(Qt::green, 4)); //10.));
-// 
-// 
-// 			qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
-
-			/*
-			#ifdef OPENCV_ENABLED
-			info->locationGuessKalman.predictionUpdate((float)avgPoint.x(), (float)avgPoint.y());
-
-			float x = avgPoint.x(), y = avgPoint.y();
-			info->locationGuessKalman.predictionReport(x, y);
-			QPointF thisPredict(x,y);
-
-			p.setPen(QPen(Qt::darkGreen, 15.));
-
-			p.setBrush(QColor(0,0,0,127));
-			p.drawEllipse(thisPredict, penWidth, penWidth);
-
-			info->locationGuess = thisPredict;
-
-			#else
-
 			info->locationGuess = avgPoint;
-
-			#endif
-			*/
-
-			info->locationGuess = avgPoint;
-			if(!info->marked) // marked means user set point, so don't override if user marked
+			
+			// marked means user set point, so don't override if user marked
+			if(!info->marked)
 				info->point = avgPoint;
 		}
 
@@ -1607,8 +1615,13 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 	foreach(QString apMac, m_apInfo.keys())
 	{
+		MapApInfo *info = apInfo(apMac);
+		if(!info->renderOnMap)
+			continue;
+		
 		QColor color0 = baseColorForAp(apMac);
-		QPointF avgPoint = apInfo(apMac)->locationGuess;
+		
+		QPointF avgPoint = info->locationGuess;
 		
 		p.setPen(QPen(color0, 10.));
 		p.setBrush(QColor(0,0,0,127));
