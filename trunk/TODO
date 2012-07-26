@@ -30,7 +30,8 @@ Enhancements:
 			my $oui_raw = `$oui_cmd`;
 			my ($mfg) = $oui_raw =~ /<h2>(.*?)<\/h2>/i;
 	- Add "instant mark" (no longpress)
-
+	- Options Dialog:
+		- Add button to select all APs/deselct all
 
 Android TODO:
 	- New dialog to prompt to choose AP in "mark AP" mode (ok button too far off right of screen)

@@ -160,7 +160,7 @@ public:
 		, mfg("")
 		, txPower(11.9)
 		, txGain(5.0)
-		, lossFactor(2.,2.)
+		, lossFactor(4.,2.)
 		, lossFactorKey(0) // init to 0, not -1, because -1 means user specified lossFactor,
 		// but 0 means auto calculate (and store points used in lossFactoryKey to regenerate if # points changes)
 		, shortCutoff(-49)

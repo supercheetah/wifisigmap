@@ -604,7 +604,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	QString size = "32x32";
 	#endif
 
-	double penWidth = 15.0;
+	double penWidth = 3.0 * m_pixelsPerMeter;
 
 	QHash<QString,bool> drawnFlag;
 	QHash<QString,int> badLossFactor;
@@ -663,63 +663,63 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			double dist = QLineF(p1,p0).length();
 
-			if(dist > r0 + r1 ||
-			   dist < fabs(r0 - r1))
-			{
-				// If d > r0 + r1 then there are no solutions, the circles are separate.
-				// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
-		
-				// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
-				// therefore the solution given by dBmToDistance() must be wrong.
-
-				// Therefore, we will adjust the lossFactor for these APs inorder to provide
-				// an intersection by allocation part of the error to each AP
-
-				double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
-
-				double correctR0 = (r0 + errorDist*.6) / m_pixelsPerMeter;
-				double correctR1 = (r1 + errorDist*.6) / m_pixelsPerMeter;
-
-				double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
-				double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
-
-				if(isnan(absLossFactor0))
-				{
-					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-				}
-				else
-				{
-					QPointF lossFactor = info0->lossFactor;
-					if(apMacToDbm[ap0] > info0->shortCutoff)
-						lossFactor.setY(absLossFactor0);
-					else
-						lossFactor.setX(absLossFactor0);
-
-					info0->lossFactor = lossFactor;
-
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Corrected loss factor for ap0:" <<lossFactor<<", correctR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-				}
-
-				if(isnan(absLossFactor1))
-				{
-					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-				}
-				else
-				{
-					QPointF lossFactor = info1->lossFactor;
-					if(apMacToDbm[ap1] > info1->shortCutoff)
-						lossFactor.setY(absLossFactor1);
-					else
-						lossFactor.setX(absLossFactor1);
-
-					info0->lossFactor = lossFactor;
-
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Corrected loss factor for ap1:" <<lossFactor<<", correctR1:"<<correctR1<<", absLossFactor:"<<absLossFactor1;
-				}
-
-				// Recalculate distances
-				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
-				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+// 			if(dist > r0 + r1 ||
+// 			   dist < fabs(r0 - r1))
+// 			{
+// 				// If d > r0 + r1 then there are no solutions, the circles are separate.
+// 				// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
+// 		
+// 				// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
+// 				// therefore the solution given by dBmToDistance() must be wrong.
+// 
+// 				// Therefore, we will adjust the lossFactor for these APs inorder to provide
+// 				// an intersection by allocation part of the error to each AP
+// 
+// 				double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
+// 
+// 				double correctR0 = (r0 + errorDist*.6) / m_pixelsPerMeter;
+// 				double correctR1 = (r1 + errorDist*.6) / m_pixelsPerMeter;
+// 
+// 				double absLossFactor0 = deriveLossFactor(ap0, apMacToDbm[ap0], correctR0 /*, gRx*/);
+// 				double absLossFactor1 = deriveLossFactor(ap1, apMacToDbm[ap1], correctR1 /*, gRx*/);
+// 
+// 				if(isnan(absLossFactor0))
+// 				{
+// 					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+// 				}
+// 				else
+// 				{
+// 					QPointF lossFactor = info0->lossFactor;
+// 					if(apMacToDbm[ap0] > info0->shortCutoff)
+// 						lossFactor.setY(absLossFactor0);
+// 					else
+// 						lossFactor.setX(absLossFactor0);
+// 
+// 					info0->lossFactor = lossFactor;
+// 
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<": Corrected loss factor for ap0:" <<lossFactor<<", correctR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+// 				}
+// 
+// 				if(isnan(absLossFactor1))
+// 				{
+// 					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR1:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+// 				}
+// 				else
+// 				{
+// 					QPointF lossFactor = info1->lossFactor;
+// 					if(apMacToDbm[ap1] > info1->shortCutoff)
+// 						lossFactor.setY(absLossFactor1);
+// 					else
+// 						lossFactor.setX(absLossFactor1);
+// 
+// 					info0->lossFactor = lossFactor;
+// 
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap1<<": Corrected loss factor for ap1:" <<lossFactor<<", correctR1:"<<correctR1<<", absLossFactor:"<<absLossFactor1;
+// 				}
+// 
+// 				// Recalculate distances
+// 				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
+// 				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
 				if(dist > r0 + r1 ||
 				   dist < fabs(r0 - r1))
@@ -729,13 +729,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 							   dist - (r0 + r1):
 							      fabs(r0 - r1);
 
-					r0 += errorDist * .51; // overlay a bit
-					r1 += errorDist * .51;
+					r0 += errorDist * .55; // overlay a bit
+					r1 += errorDist * .55;
 
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
 
-			}
+			//}
 
 
 			QColor color0 = baseColorForAp(ap0);
@@ -923,9 +923,9 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		// 			p.setPen(QPen(color1, penWidth));
 		// 			p.drawLine(p1, calcPoint);
 
-					p.setPen(QPen(Qt::gray, 3.));
+					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(tmpPoint, 10, 10);
+					p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
 					p.restore();
 
@@ -954,9 +954,9 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		// 			p.setPen(QPen(color1, penWidth));
 		// 			p.drawLine(p1, calcPoint);
 
-					p.setPen(QPen(Qt::gray, 3.));
+					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(calcPoint, 10, 10);
+					p.drawEllipse(p0, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
 					p.restore();
 
@@ -997,7 +997,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
 	{
-		p.setPen(QPen(Qt::red, 10.));
+		p.setPen(QPen(Qt::red, 2. * m_pixelsPerFoot));
 
 		p.setBrush(QColor(0,0,0,127));
 		p.drawEllipse(avgPoint, penWidth, penWidth);
@@ -1009,7 +1009,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		m_kalman.predictionReport(x, y);
 		QPointF thisPredict(x,y);
 
-		p.setPen(QPen(Qt::blue, 15.));
+		p.setPen(QPen(Qt::blue, 3. * m_pixelsPerFoot.));
 
 		p.setBrush(QColor(0,0,0,127));
 		p.drawEllipse(thisPredict, penWidth, penWidth);
@@ -1129,6 +1129,8 @@ void MapGraphicsScene::updateApLocationOverlay()
 	QPainter p(&image);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
 	p.translate(origSize.width()/2,origSize.height()/2);
+	
+	double invalidRadiusSize = sqrt(origSize.width()*2 + origSize.height()*2);
 
 
 	#ifdef Q_OS_ANDROID
@@ -1137,7 +1139,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 	QString size = "32x32";
 	#endif
 
-	double penWidth = 5.0;
+	double penWidth = 1.0;
 
 	QHash<QString,bool> drawnFlag;
 	QHash<QString,int> badLossFactor;
@@ -1146,7 +1148,6 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 	QPointF avgPoint(0.,0.);
 	int count = 0;
-
 
 	QHash<QString, QList<SigMapValue*> > valuesByAp;
 	foreach(QString apMac, m_apInfo.keys())
@@ -1198,13 +1199,13 @@ void MapGraphicsScene::updateApLocationOverlay()
 			for(int j=0; j<numVals; j++)
 			{
 				QString key = QString("%1%2").arg(i<j?i:j).arg(i<j?j:i);
-				qDebug() << "AP Intersect: Processing: "<<i<<", "<<j<<" ....";
 				if(i == j || pairsTested.contains(key))
 				{
 					//qDebug() << "\t not testing ("<<i<<"/"<<j<<"): key:"<<key;
 					continue;
 				}
 				
+				qDebug() << "AP Intersect: Processing: "<<i<<", "<<j<<" ....";
 				pairsTested << key;
 				
 				//SigMapValue *val1 = list[i];
@@ -1223,43 +1224,75 @@ void MapGraphicsScene::updateApLocationOverlay()
 				double r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
 				double r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
 				
+				if(r0 < 1.0 || r0 > invalidRadiusSize) // loss factor is invalid
+				{
+					QPointF lossFactor = info->lossFactor;
+					if(dbm0 > info->shortCutoff)
+						lossFactor.setY(2.);
+					else
+						lossFactor.setX(4.);
+
+					info->lossFactor = lossFactor;
+					
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r0, corrected:" <<lossFactor;
+					
+					// Recalculate distances
+					r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
+				}
+				
+				if(r1 < 1.0 || r1 > invalidRadiusSize) // loss factor is invalid
+				{
+					QPointF lossFactor = info->lossFactor;
+					if(dbm1 > info->shortCutoff)
+						lossFactor.setY(2.);
+					else
+						lossFactor.setX(4.);
+
+					info->lossFactor = lossFactor;
+					
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Invalid loss factor r1, corrected:" <<lossFactor;
+					
+					// Recalculate distances
+					r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
+				}
+				
 				double dist = QLineF(p1,p0).length();
 				
-				if(dist > r0 + r1 ||
-				   dist < fabs(r0 - r1))
-				{
-					// If d > r0 + r1 then there are no solutions, the circles are separate.
-					// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
-			
-					// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
-					// therefore the solution given by dBmToDistance() must be wrong.
-	
-					// Therefore, we will adjust the lossFactor for these APs inorder to provide
-					// an intersection by allocation part of the error to each AP
-	
-					double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
-	
-					double corrected = (r0 + errorDist * .6) / m_pixelsPerMeter;
-					
-					double absLossFactor = deriveLossFactor(apMac, dbm0, corrected/*, gRx*/);
-					
-					if(isnan(absLossFactor))
-					{
-						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
-					}
-					else
-					{
-						QPointF lossFactor = info->lossFactor;
-						if(dbm0 > info->shortCutoff)
-							lossFactor.setY(absLossFactor);
-						else
-							lossFactor.setX(absLossFactor);
-	
-						info->lossFactor = lossFactor;
-	
-						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Corrected loss factor for apMac:" <<lossFactor<<", corrected:"<<corrected<<", absLossFactor:"<<absLossFactor;
-					}
-	
+// 				if(dist > r0 + r1 ||
+// 				   dist < fabs(r0 - r1))
+// 				{
+// 					// If d > r0 + r1 then there are no solutions, the circles are separate.
+// 					// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
+// 			
+// 					// Logic tells us that since both signals were observed by the user in the same reading, they must intersect,
+// 					// therefore the solution given by dBmToDistance() must be wrong.
+// 	
+// 					// Therefore, we will adjust the lossFactor for these APs inorder to provide
+// 					// an intersection by allocation part of the error to each AP
+// 	
+// 					double errorDist = dist > r0 + r1 ? dist - (r0 + r1) : fabs(r0 - r1);
+// 	
+// 					double corrected = (r0 + errorDist * .6) / m_pixelsPerMeter;
+// 					
+// 					double absLossFactor = deriveLossFactor(apMac, dbm0, corrected/*, gRx*/);
+// 					
+// 					if(isnan(absLossFactor))
+// 					{
+// 						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<ap0<<": Unable to correct (d>r0+r1), received NaN loss factor, corretR0:"<<correctR0<<", absLossFactor0:"<<absLossFactor0;
+// 					}
+// 					else
+// 					{
+// 						QPointF lossFactor = info->lossFactor;
+// 						if(dbm0 > info->shortCutoff)
+// 							lossFactor.setY(absLossFactor);
+// 						else
+// 							lossFactor.setX(absLossFactor);
+// 	
+// 						info->lossFactor = lossFactor;
+// 	
+// 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Corrected loss factor for apMac:" <<lossFactor<<", corrected:"<<corrected<<", absLossFactor:"<<absLossFactor;
+// 					}
+// 	
 					// Recalculate distances
 					r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
 					r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
@@ -1271,21 +1304,35 @@ void MapGraphicsScene::updateApLocationOverlay()
 						double errorDist = dist >  r0 + r1 ?
 								   dist - (r0 + r1):
 								      fabs(r0 - r1);
-	
-						r0 += errorDist * .51; // overlay a bit 
+
+						r0 += errorDist * .51; // overlay a bit
 						r1 += errorDist * .51;
-	
-						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+
+						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
 					}
 	
-				}
+				//}
 				
-				// Draw ellipses 
+				// Draw ellipses
+				/*
 				p.setPen(QPen(color0, penWidth));
-//  				if(p0.x() > 0 && p0.y() > 0 && r0 > 1)
-//  					p.drawEllipse(p0, r0, r0);
-//  				if(p1.x() > 0 && p1.y() > 0 && r1 > 1)
-//  					p.drawEllipse(p1, r1, r1);
+ 				if(p0.x() > 0 && p0.y() > 0 && r0 > 1)
+ 					p.drawEllipse(p0, r0, r0);
+ 				if(p1.x() > 0 && p1.y() > 0 && r1 > 1)
+ 					p.drawEllipse(p1, r1, r1);
+				*/
+
+				p.save();
+
+					p.setPen(QPen(color0, 3. * m_pixelsPerFoot));
+					p.setBrush(QColor(0,0,0,127));
+					p.drawEllipse(p0, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+
+					p.setPen(QPen(color0, 3. * m_pixelsPerFoot));
+					p.setBrush(QColor(0,0,0,127));
+					p.drawEllipse(p1, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
+
+				p.restore();
 				
 				
 				// The revised idea here is this:
@@ -1296,8 +1343,11 @@ void MapGraphicsScene::updateApLocationOverlay()
 				// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
 				// At end, good points forms the probability cluster of where the user probably is
 	
-				//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
+				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", i:"<<i<<",j:"<<j<<", numVals:"<<numVals<<", p0:"<<p0<<", r0:"<<r0<<", p1:"<<p1<<", r1:"<<r1;
 	
+// 				qDebug() << " -test done-";
+// 				exit(-1);
+				
 				QPointF goodPoint;
 	
 				//QLineF line  = calcIntersect(p0, r0, p1, r1);
@@ -1324,8 +1374,9 @@ void MapGraphicsScene::updateApLocationOverlay()
 				}
 				else
 				{
-					p.setPen(QPen(Qt::gray, penWidth));
-					p.drawLine(line);
+					//p.setPen(QPen(Qt::gray, penWidth));
+					p.setPen(QPen(color0, penWidth));
+					//p.drawLine(line);
 	
 					if(goodPoints.isEmpty())
 					{
@@ -1441,10 +1492,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 			// 			p.setPen(QPen(color1, penWidth));
 			// 			p.drawLine(p1, calcPoint);
 	
-						p.setPen(QPen(Qt::gray, 3.));
+						p.setPen(QPen(color0, 1.0 * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
 						if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
-							p.drawEllipse(tmpPoint, 10, 10);
+							p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 	
 						p.restore();
 	
@@ -1467,10 +1518,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 	
 						p.save();
 	
-						p.setPen(QPen(Qt::gray, 3.));
+						p.setPen(QPen(color0, 1. * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
 						if(calcPoint.x() > 0 && calcPoint.y() > 0)
-							p.drawEllipse(calcPoint, 10, 10);
+							p.drawEllipse(calcPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 	
 						p.restore();
 	
@@ -1488,6 +1539,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 		//p.setPen(QPen(Qt::red, 30.));
 		//p.drawPolygon(userPoly);
 		
+		if(0)
 		{
 			p.save();
 			p.setPen(QPen(Qt::black, 5));
@@ -1507,22 +1559,22 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
 		{
-			p.setPen(QPen(color0, 10.));
-			p.setBrush(QColor(0,0,0,127));
-			p.drawEllipse(avgPoint, 64, 64);
-
-			QImage markerGroup(":/data/images/ap-marker.png");
-			p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
-			if(avgPoint.x() > 0 && avgPoint.y() > 0)
-				p.drawEllipse(avgPoint, penWidth, penWidth);
-
-// 				if(avgPoint == avgPoint)
-// 					p.setPen(QPen(Qt::yellow, 10.));
-// 				else
-					//p.setPen(QPen(Qt::green, 4)); //10.));
-
-
-			qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
+// 			p.setPen(QPen(color0, 10.));
+// 			p.setBrush(QColor(0,0,0,127));
+// 			p.drawEllipse(avgPoint, 12 * m_pixelsPerFoot, 12 * m_pixelsPerFoot);
+// 
+// 			QImage markerGroup(":/data/images/ap-marker.png");
+// 			p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
+// 			if(avgPoint.x() > 0 && avgPoint.y() > 0)
+// 				p.drawEllipse(avgPoint, penWidth, penWidth);
+// 
+// // 				if(avgPoint == avgPoint)
+// // 					p.setPen(QPen(Qt::yellow, 10.));
+// // 				else
+// 					//p.setPen(QPen(Qt::green, 4)); //10.));
+// 
+// 
+// 			qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
 
 			/*
 			#ifdef OPENCV_ENABLED
@@ -1550,6 +1602,30 @@ void MapGraphicsScene::updateApLocationOverlay()
 			if(!info->marked) // marked means user set point, so don't override if user marked
 				info->point = avgPoint;
 		}
+
+	}
+
+	foreach(QString apMac, m_apInfo.keys())
+	{
+		QColor color0 = baseColorForAp(apMac);
+		QPointF avgPoint = apInfo(apMac)->locationGuess;
+		
+		p.setPen(QPen(color0, 10.));
+		p.setBrush(QColor(0,0,0,127));
+		p.drawEllipse(avgPoint, 12 * m_pixelsPerFoot, 12 * m_pixelsPerFoot);
+
+		QImage markerGroup(":/data/images/ap-marker.png");
+		p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
+		if(avgPoint.x() > 0 && avgPoint.y() > 0)
+			p.drawEllipse(avgPoint, penWidth, penWidth);
+
+// 				if(avgPoint == avgPoint)
+// 					p.setPen(QPen(Qt::yellow, 10.));
+// 				else
+					//p.setPen(QPen(Qt::green, 4)); //10.));
+
+
+		qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
 
 	}
 
@@ -1844,7 +1920,7 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 
 	int shortCutoff = info->shortCutoff;
 
-	QPointF lossFactor(2.,2.);
+	QPointF lossFactor(4.,2.);
 
 	int method = 1;
 	if(method == 1)
@@ -1905,7 +1981,7 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 
 		if(!longCount)
 		{
-			longFactor = 1.;
+			longFactor = 4.;
 			longCount  = 1;
 		}
 
@@ -1927,8 +2003,8 @@ QPointF MapGraphicsScene::deriveObservedLossFactor(QString apMac)
 		double error = 1.0; // starting error, meaningless
 		int numIterations = 0;
 
-		double shortFactor = 6.0; // starting factor guesses
-		double longFactor  = 2.0; // starting factor guesses
+		double shortFactor = 2.0; // starting factor guesses
+		double longFactor  = 4.0; // starting factor guesses
 
 		double stepFactor = 0.001; // minimum step
 		double stepChangeFactor = 0.0001; // amount to change step by
@@ -2027,7 +2103,7 @@ QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
 
 	int shortCutoff = info->shortCutoff;
 
-	QPointF lossFactor(2.,2.);
+	QPointF lossFactor(4.,2.);
 
 	// Use a reworked distance formula to calculate lossFactor for each point, then average together
 
@@ -2087,7 +2163,7 @@ QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
 
 	if(!longCount)
 	{
-		longFactor = 1.;
+		longFactor = 4.;
 		longCount  = 1;
 	}
 
