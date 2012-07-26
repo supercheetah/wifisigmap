@@ -2,6 +2,15 @@
 #include "ui_OptionsDialog.h"
 #include "MapGraphicsScene.h"
 
+
+bool OptionsDialog_sort_byEssid(MapApInfo *a, MapApInfo *b)
+{
+	if(!a || !b) return false;
+
+	return a->essid.toLower() < b->essid.toLower();
+
+}
+
 OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 	: QDialog(parent)
 	, ui(new Ui::OptionsDialog)
@@ -95,6 +104,8 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 	
 	QVBoxLayout *vbox = new QVBoxLayout(ui->apListBox);
 	
+	qSort(apList.begin(), apList.end(), OptionsDialog_sort_byEssid);
+
 	foreach(MapApInfo *info, apList)
 	{
 		QCheckBox *cb = new QCheckBox(QString("%1 (%2)").arg(info->essid).arg(info->mac));
@@ -140,6 +151,9 @@ void OptionsDialog::applySettings()
 {
 	bool oldFlag = m_scene->pauseRenderUpdates(true);
 	
+	foreach(QString mac, m_apCheckboxes.keys())
+		m_scene->setRenderAp(mac, m_apCheckboxes[mac]->isChecked());
+
 	//qDebug() << "OptionsDialog::applySettings()";
 	int curIdx = ui->wifiDevice->currentIndex();
 	QStringList devices = WifiDataCollector::findWlanInterfaces();
@@ -166,10 +180,7 @@ void OptionsDialog::applySettings()
 	renderOpts.radialLineWeight	= ui->lineWeight->value();
 	
 	m_scene->setRenderOpts(renderOpts);
-	
-	foreach(QString mac, m_apCheckboxes.keys())
-		m_scene->setRenderAp(mac, m_apCheckboxes[mac]->isChecked());
-		
+
 	m_scene->pauseRenderUpdates(oldFlag);
 	
 }

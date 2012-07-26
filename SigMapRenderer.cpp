@@ -499,7 +499,7 @@ void SigMapRenderer::render()
 
 			qPointValue p = qPointValue(val->point,  count == 0 ? 0 : sum/(double)count); // signalForAp() returns 0 if not in this reading
 			points << p;
-			qDebug() << "\tpoints << qPointValue(" << p.point << ", " << p.value << ");";
+			//qDebug() << "\tpoints << qPointValue(" << p.point << ", " << p.value << ");";
 		}
 
 		QList<qPointValue> originalInputs = points;
