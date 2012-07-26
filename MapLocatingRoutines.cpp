@@ -1241,8 +1241,8 @@ void MapGraphicsScene::updateApLocationOverlay()
 				
 				// For sake of speed on large data sets, 
 				// don't use points that had less than 40% signal reading
-				if(value0 < 0.4 ||
-				   value1 < 0.4)
+				if(value0 < 0.1 ||
+				   value1 < 0.1)
 				   continue;
 				
 				QPointF p0 = val0->point;
@@ -1548,17 +1548,17 @@ void MapGraphicsScene::updateApLocationOverlay()
 						//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
 	
 						//double w = (value0 + value1) / 2.;
-						double w = inverseDistanceWeight(calcPoint, strongestReading, 0.1);
-						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): Point:" <<calcPoint<<", strongest:"<<strongestReading<<", weight:"<<w;
-						
-						QLineF baseline(strongestReading, calcPoint);
-						baseline.setLength(baseline.length() * w);
-						
-						//avgPoint += baseline.p2();
-						calcPoint = baseline.p2();
-						
-						p.setPen(QPen(Qt::gray, penWidth * m_pixelsPerFoot));
-						p.drawLine(baseline);
+// 						double w = inverseDistanceWeight(calcPoint, strongestReading, 0.1);
+// 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): Point:" <<calcPoint<<", strongest:"<<strongestReading<<", weight:"<<w;
+// 						
+// 						QLineF baseline(strongestReading, calcPoint);
+// 						baseline.setLength(baseline.length() * w);
+// 						
+// 						//avgPoint += baseline.p2();
+// 						calcPoint = baseline.p2();
+// 						
+// 						p.setPen(QPen(Qt::gray, penWidth * m_pixelsPerFoot));
+// 						p.drawLine(baseline);
 						
 						userPoly << calcPoint;
 	
