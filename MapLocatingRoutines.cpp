@@ -621,7 +621,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	QString size = "32x32";
 	#endif
 
-	double penWidth = 3.0 * m_pixelsPerMeter;
+	double penWidth = 1.0 * m_pixelsPerMeter;
 
 	QHash<QString,bool> drawnFlag;
 	QHash<QString,int> badLossFactor;
@@ -738,13 +738,14 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 // 				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
+				const double overlap = 0.55;
 				if(dist > r0 + r1)
 				{
 					// Distance still wrong, so force-set the proper distance
 					double errorDist = dist - (r0 + r1);
 
-					r0 += errorDist * .55; // overlay a bit
-					r1 += errorDist * .55;
+					r0 += errorDist * overlap; // overlay a bit
+					r1 += errorDist * overlap;
 
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				
@@ -757,13 +758,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 					if(r0 > r1)
 					{
-						r0 -= errorDist * .55; // overlay a bit
-						r1 += errorDist * .55;
+						r0 -= errorDist * overlap; // overlay a bit
+						r1 += errorDist * overlap;
 					}
 					else
 					{
-						r0 += errorDist * .55; // overlay a bit
-						r1 -= errorDist * .55;
+						r0 += errorDist * overlap; // overlay a bit
+						r1 -= errorDist * overlap;
 					
 					}
 
@@ -1042,7 +1043,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		m_kalman.predictionReport(x, y);
 		QPointF thisPredict(x,y);
 
-		p.setPen(QPen(Qt::blue, 3. * m_pixelsPerFoot.));
+		p.setPen(QPen(Qt::blue, 2. * m_pixelsPerFoot));
 
 		p.setBrush(QColor(0,0,0,127));
 		p.drawEllipse(thisPredict, penWidth, penWidth);
