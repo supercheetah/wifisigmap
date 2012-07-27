@@ -223,7 +223,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 
 	QSize origSize = m_bgPixmap.size();
-	if(origSize.width() * 2 * origSize.height() * 2 * 3 > 128*1024*1024)
+	if(origSize.width() * 2 * origSize.height() * 2 * 3 > 256*1024*1024)
 	{
 		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Size too large, not updating: "<<origSize;
 		m_userItem->setVisible(false);
@@ -738,18 +738,36 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 // 				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
-				if(dist > r0 + r1 ||
-				   dist < fabs(r0 - r1))
+				if(dist > r0 + r1)
 				{
 					// Distance still wrong, so force-set the proper distance
-					double errorDist = dist >  r0 + r1 ?
-							   dist - (r0 + r1):
-							      fabs(r0 - r1);
+					double errorDist = dist - (r0 + r1);
 
 					r0 += errorDist * .55; // overlay a bit
 					r1 += errorDist * .55;
 
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+				
+				}
+				else
+				if(dist < fabs(r0 - r1))
+				{
+					// Distance still wrong, so force-set the proper distance
+					double errorDist = fabs(r0 - r1);
+
+					if(r0 > r1)
+					{
+						r0 -= errorDist * .55; // overlay a bit
+						r1 += errorDist * .55;
+					}
+					else
+					{
+						r0 += errorDist * .55; // overlay a bit
+						r1 -= errorDist * .55;
+					
+					}
+
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
 
 			//}
@@ -983,12 +1001,10 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				}
 			}
 
-
 			//p.setPen(QPen(Qt::gray, penWidth));
 			//p.drawLine(p0, p1);
 
 			//break;
-
 		}
 	}
 
@@ -1213,7 +1229,13 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 // 		QPointF strongestReading = numVals > 0 ? list[0]->point : QPointF();
 		
-		for(int i=0; i<numVals; i++)
+
+		QFont font = p.font();
+		font.setPointSizeF(6 * m_pixelsPerFoot);
+		p.setFont(font);
+
+// 		for(int i=0; i<numVals; i++)
+		for(int i=0; i<1; i++)
 		{
 			QPointF strongestReading;
 			for(int j=0; j<numVals; j++)
@@ -1325,46 +1347,68 @@ void MapGraphicsScene::updateApLocationOverlay()
 // 	
 // 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): "<<apMac<<": Corrected loss factor for apMac:" <<lossFactor<<", corrected:"<<corrected<<", absLossFactor:"<<absLossFactor;
 // 					}
-// 	
+//
+					
 					// Recalculate distances
 					r0 = dBmToDistance(dbm0, apMac) * m_pixelsPerMeter;
 					r1 = dBmToDistance(dbm1, apMac) * m_pixelsPerMeter;
 	
-					if(dist > r0 + r1 ||
-					   dist < fabs(r0 - r1))
+					if(dist > r0 + r1)
+					{
+						// Allocate distance to the secondary radius
+						double errorDist = dist - (r0 + r1);
+
+						r1 += errorDist * 1.1;
+
+						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius [case 0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+
+					}
+					else
+					if(dist < fabs(r0 - r1))
 					{
 						// Distance still wrong, so force-set the proper distance
-						double errorDist = dist >  r0 + r1 ?
-								   dist - (r0 + r1):
-								      fabs(r0 - r1);
+						double errorDist = fabs(r0 - r1);
+						r1 += (r0 > r1 ? -1:1) * errorDist * 1.1;
 
-						r0 += errorDist * .51; // overlay a bit
-						r1 += errorDist * .51;
-
-						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius: "<<r0<<r1<<", errorDist: "<<errorDist;
+						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius [case 1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 					}
-	
+				
 				//}
 				
 				// Draw ellipses
-				/*
-				p.setPen(QPen(color0, penWidth));
+    /*
+				p.setPen(QPen(darkenColor(color0, value0), penWidth * m_pixelsPerFoot));
  				if(p0.x() > 0 && p0.y() > 0 && r0 > 1)
  					p.drawEllipse(p0, r0, r0);
+				p.setPen(QPen(darkenColor(color0, value1), penWidth * m_pixelsPerFoot));
  				if(p1.x() > 0 && p1.y() > 0 && r1 > 1)
  					p.drawEllipse(p1, r1, r1);
 				*/
 
 				p.save();
-
+				{
+					QFont font = p.font();
+					font.setPointSizeF(6 * m_pixelsPerFoot);
+					p.setFont(font);
+					
 					p.setPen(QPen(darkenColor(color0, value0), 3. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(p0, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+					QPointF randPoint(
+						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot,
+						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot
+					);
+					p.drawEllipse(p0 + randPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+					//qDrawTextO(p, (int)p0.x(), (int)p0.y(), QString().sprintf("%d%% #%d", (int)(value0*100), i));
 
 					p.setPen(QPen(darkenColor(color0, value1), 3. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(p1, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
-
+					randPoint = QPointF(
+						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot,
+						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot
+					);
+					p.drawEllipse(p1 + randPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
+					//qDrawTextO(p, (int)p1.x(), (int)p1.y(), QString().sprintf("%d%% #%d", (int)(value1*100), j));
+				}
 				p.restore();
 				
 				
@@ -1527,8 +1571,10 @@ void MapGraphicsScene::updateApLocationOverlay()
 	
 						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1.0 * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
-						if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
+						//if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
 							p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
+
+						//qDrawTextO(p, (int)tmpPoint.x(), (int)tmpPoint.y(), QString().sprintf("%d%% / %d%% #%d", (int)(value0*100), (int)(value1*100), j));
 	
 						p.restore();
 	
@@ -1566,8 +1612,11 @@ void MapGraphicsScene::updateApLocationOverlay()
 	
 						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1. * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
-						if(calcPoint.x() > 0 && calcPoint.y() > 0)
+						//if(calcPoint.x() > 0 && calcPoint.y() > 0)
 							p.drawEllipse(calcPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
+
+						//qDrawTextO(p, (int)calcPoint.x(), (int)calcPoint.y(), QString().sprintf("%d%% / %d%% #%d", (int)(value0*100), (int)(value1*100), j));
+						
 	
 						p.restore();
 	
@@ -1629,14 +1678,13 @@ void MapGraphicsScene::updateApLocationOverlay()
 
 		QImage markerGroup(":/data/images/ap-marker.png");
 		p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
-		if(avgPoint.x() > 0 && avgPoint.y() > 0)
+		//if(avgPoint.x() > 0 && avgPoint.y() > 0)
 			p.drawEllipse(avgPoint, penWidth, penWidth);
 
 // 				if(avgPoint == avgPoint)
 // 					p.setPen(QPen(Qt::yellow, 10.));
 // 				else
 					//p.setPen(QPen(Qt::green, 4)); //10.));
-
 
 		qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
 

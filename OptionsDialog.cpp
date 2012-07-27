@@ -103,6 +103,18 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 	QList<MapApInfo*> apList = ms->apInfo();
 	
 	QVBoxLayout *vbox = new QVBoxLayout(ui->apListBox);
+
+	QPushButton *btn;
+	QHBoxLayout *hbox = new QHBoxLayout();
+	btn = new QPushButton("Check All");
+	connect(btn, SIGNAL(clicked()), this, SLOT(selectAllAp()));
+	hbox->addWidget(btn);
+
+	btn = new QPushButton("Clear All");
+	connect(btn, SIGNAL(clicked()), this, SLOT(clearAllAp()));
+	hbox->addWidget(btn);
+
+	vbox->addLayout(hbox);
 	
 	qSort(apList.begin(), apList.end(), OptionsDialog_sort_byEssid);
 
@@ -123,6 +135,18 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 
 	setWindowTitle("Options");
 	setWindowIcon(QPixmap(":/data/images/icon.png"));
+}
+
+void OptionsDialog::clearAllAp()
+{
+	foreach(QCheckBox *cb, m_apCheckboxes)
+		cb->setChecked(false);
+}
+
+void OptionsDialog::selectAllAp()
+{
+	foreach(QCheckBox *cb, m_apCheckboxes)
+		cb->setChecked(true);
 }
 
 void OptionsDialog::renderModeChanged(int mode)

@@ -212,6 +212,7 @@ void MapWindow::prefsSlot()
 
 	OptionsDialog d(m_scene);
 	d.show();
+	//d.adjustSize();
 	AndroidDialogHelper(this, d);
 	d.exec();
 }
