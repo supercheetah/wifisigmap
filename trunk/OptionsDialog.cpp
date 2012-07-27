@@ -16,6 +16,12 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 	, ui(new Ui::OptionsDialog)
 	, m_scene(ms)
 {
+	// NOTE: JUST for debugging (put here because the qDebug() output at start of MapWindow never reaches the
+	// nc listner on the socket (socket probably isn't set up quick enough)
+	QSize strut(physicalDpiX() * 0.20,physicalDpiY() * 0.20);
+	qDebug() << "OptionsDialog: Debug: Global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
+
+
 	ui->setupUi(this);
 	connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(applySettings()));
 	
@@ -120,7 +126,7 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 
 	foreach(MapApInfo *info, apList)
 	{
-		QCheckBox *cb = new QCheckBox(QString("%1 (%2)").arg(info->essid).arg(info->mac));
+		QCheckBox *cb = new QCheckBox(QString("%1 (%2)").arg(info->essid).arg(info->mac.right(6)));
 		
 		cb->setChecked(info->renderOnMap);
 

@@ -1,0 +1,116 @@
+QWidget {
+	font-size: 22px;
+}
+
+QCheckBox {
+	spacing: 13px;
+}
+
+QCheckBox::indicator {
+	width:	32px;
+	height: 32px;
+}
+
+/*** QPushButton copied directly from ... */
+QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 6px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+			       stop: 0 #f6f7fa, stop: 1 #dadbde);
+	min-width: 80px;
+}
+
+QPushButton:pressed {
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+			       stop: 0 #dadbde, stop: 1 #f6f7fa);
+}
+
+QPushButton:flat {
+	border: none; /* no border for a flat push button */
+}
+
+QPushButton:default {
+	border-color: navy; /* make the default button prominent */
+}
+
+/*** QComboBox */
+QComboBox {
+	font-size: 26px;
+	font-weight: bold;
+	
+	border: 2px solid #8f8f91;
+	border-radius: 6px;
+
+	padding: 1px 18px 1px 3px;
+	min-width: 6em;
+}
+
+ QComboBox:editable {
+     background: white;
+ }
+
+ QComboBox:!editable, QComboBox::drop-down:editable {
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+			       stop: 0 #f6f7fa, stop: 1 #dadbde);
+
+ }
+
+ /* QComboBox gets the "on" state when the popup is open */
+ QComboBox:!editable:on, QComboBox::drop-down:editable:on {
+     background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                 stop: 0 #D3D3D3, stop: 0.4 #D8D8D8,
+                                 stop: 0.5 #DDDDDD, stop: 1.0 #E1E1E1);
+ }
+
+ QComboBox:on { /* shift the text when the popup opens */
+     padding-top: 3px;
+     padding-left: 4px;
+ }
+
+ QComboBox::drop-down {
+     subcontrol-origin: padding;
+     subcontrol-position: top right;
+     width: 15px;
+
+     border-left-width: 1px;
+     border-left-color: darkgray;
+     border-left-style: solid; /* just a single line */
+     border-top-right-radius: 3px; /* same radius as the QComboBox */
+     border-bottom-right-radius: 3px;
+ }
+/*
+ QComboBox::down-arrow {
+     image: url(/usr/share/icons/crystalsvg/16x16/actions/1downarrow.png);
+ }
+*/
+ QComboBox::down-arrow:on { /* shift the arrow when popup is open */
+     top: 1px;
+     left: 1px;
+ }
+ 
+  QComboBox QAbstractItemView {
+      border: 2px solid darkgray;
+      selection-background-color: lightgray;
+ }
+ 
+ 
+ /*** QScrollBar */
+ /*
+  QScrollBar:vertical {
+      border: 2px solid #8f8f91;
+      background: #dadbde;
+      width: 20px;
+  }
+  */
+
+/* These don't work as intended...*/
+QScrollBar::handle:vertical {
+	height:0;
+}
+QScrollBar::add-line:vertical {
+	height: 0;
+}
+
+QScrollBar::sub-line:vertical {
+	height:0;
+}
