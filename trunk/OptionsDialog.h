@@ -24,6 +24,8 @@ private slots:
 	void applySettings();
 	void wifiDeviceIdxChanged(int);
 	void renderModeChanged(int);
+	void selectAllAp();
+	void clearAllAp();
 	
 private:
 	Ui::OptionsDialog *ui;

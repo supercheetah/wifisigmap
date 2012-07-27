@@ -221,7 +221,7 @@ double Interpolator::interpolateValue(QPointF point, QList<qPointValue> inputs)
 	Where:
 	W(i,X) = 1/(d(X,Xi)^p
 	*/
-	double p = 1.5;
+	double p = 1.8;
 	int n = inputs.size();
 	double sum = 0;
 	for(int i=0; i<n; i++)
