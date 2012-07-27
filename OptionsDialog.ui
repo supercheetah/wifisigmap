@@ -24,8 +24,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>320</width>
-        <height>453</height>
+        <width>321</width>
+        <height>421</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -40,48 +40,6 @@
          </item>
          <item row="0" column="1">
           <widget class="QComboBox" name="wifiDevice"/>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>Auto Locate APs</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QCheckBox" name="autoLocateAPs">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>Guess My Location</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="QCheckBox" name="guessMyLocation">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_5">
-           <property name="text">
-            <string>Show Reading Markers</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="QCheckBox" name="showReadingMarkers">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
          </item>
          <item row="5" column="0">
           <widget class="QLabel" name="label_4">
@@ -100,6 +58,27 @@
            </property>
           </widget>
          </item>
+         <item row="4" column="0" colspan="2">
+          <widget class="QCheckBox" name="showReadingMarkers">
+           <property name="text">
+            <string>Show Reading Markers</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="2">
+          <widget class="QCheckBox" name="guessMyLocation">
+           <property name="text">
+            <string>Guess My Location</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0" colspan="2">
+          <widget class="QCheckBox" name="autoLocateAPs">
+           <property name="text">
+            <string>Auto Locate APs</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>
@@ -109,30 +88,16 @@
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
           <item row="0" column="0">
-           <widget class="QLabel" name="label_6">
+           <widget class="QCheckBox" name="multipleCircles">
             <property name="text">
              <string>Draw Multiple Circles</string>
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
-           <widget class="QCheckBox" name="multipleCircles">
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="0">
-           <widget class="QLabel" name="label_7">
-            <property name="text">
-             <string>Fill Circles</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
            <widget class="QCheckBox" name="fillCircles">
             <property name="text">
-             <string/>
+             <string>Fill Circles</string>
             </property>
            </widget>
           </item>

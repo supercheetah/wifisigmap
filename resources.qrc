@@ -10,5 +10,6 @@
 	<file>data/images/icon.png</file>
 	<file>data/android/iwlist</file>
 	<file>data/android/iwconfig</file>
+	<file>data/android-tweaks.qss</file>
  </qresource>
  </RCC>

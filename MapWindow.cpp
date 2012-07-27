@@ -90,6 +90,7 @@ MapWindow::MapWindow(QWidget *parent)
 		qt_debugSocket = new QTcpSocket(this);
 		//qt_debugSocket->connectToHost("192.168.2.104", 3729);
 		qt_debugSocket->connectToHost("10.10.9.90", 3729);
+		//qt_debugSocket->connectToHost("10.1.5.181", 3729);
 		qt_origMsgHandler = qInstallMsgHandler(myMessageOutput);
 	#endif
 	
@@ -100,8 +101,8 @@ MapWindow::MapWindow(QWidget *parent)
 	// TODO maybe use int QPaintDevice::heightMM () / width() and widthMM() / height() 
 	// NOTE http://stackoverflow.com/a/2019766 cites Target Size Study for One-Handed Thumb Use on Small Touchscreen Devices (Parhi, Karlson, & Bederson 2006). Other sources agree on this "close-to-0.4-inch-rule" (e.g. Designing Gestural Interfaces (Saffer 2008, p. 42))
 	//	- Which gives 9.2mm-9.6mm or approx 0.4in
-	QSize strut(physicalDpiX() * 0.4,physicalDpiY() * 0.4);
-	qDebug() << "NapWindow: Setting global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
+	QSize strut(physicalDpiX() * 0.20,physicalDpiY() * 0.20);
+	//qDebug() << "MapWindow: Setting global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
 	QApplication::setGlobalStrut(strut);
 	#endif
 	
@@ -123,6 +124,44 @@ MapWindow::MapWindow(QWidget *parent)
 	//m_scene->loadResults("wmz/test.wmz");
 	//m_scene->loadResults("wmz/pci4000-livedata2.wmz");
 	//m_scene->loadResults("wmz/pci-track-test.wmz");
+
+	#ifdef Q_OS_ANDROID
+	QFile styleSheet(":/data/android-tweaks.qss");
+	if(!styleSheet.open(QIODevice::ReadOnly))
+	{
+		qWarning("Unable to read :/data/android-tweaks.qss");
+	}
+	else
+	{
+		int fontSize = (int)((((double)physicalDpiY()) / 276.)  * 24);
+		QString qss = styleSheet.readAll();
+		qss.replace("font-size: 22px", QString("font-size: %1px").arg(fontSize));
+		qApp->setStyleSheet(qss);
+	}
+
+	// So we can figure out which key is the meny key...
+	if(parent)
+		parent->installEventFilter(this);
+	#endif
+}
+
+bool MapWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    //if (obj == textEdit) {
+	if (event->type() == QEvent::KeyPress) {
+	    QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+	    qDebug() << "Got key press" << keyEvent->key();
+	}
+	/*
+	    return true;
+	} else {
+	    return false;
+	}
+    } else {
+    */
+	// pass the event on to the parent class
+	return QWidget::eventFilter(obj, event);
+//    }
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -280,7 +319,7 @@ void MapWindow::chooseBgSlot()
 void MapWindow::loadSlot()
 {
 	/// TODO just for debugging till the filedialog works better on android
-	#ifdef Q_OS_ANDROID
+	#ifdef Q_OS_ANDROID2
 	setStatusMessage(tr("Loading..."));
 	m_scene->loadResults("/tmp/test.wmz");
 	setStatusMessage(tr("<font color='green'>Loaded /tmp/test.wmz</font>"), 3000);
@@ -313,7 +352,7 @@ void MapWindow::loadSlot()
 void MapWindow::saveSlot()
 {
 	/// TODO just for debugging till the filedialog works better on android
-	#ifdef Q_OS_ANDROID
+	#ifdef Q_OS_ANDROID2
 	setStatusMessage(tr("Saving..."));
 	m_scene->saveResults("/tmp/test.wmz");
 	setStatusMessage(tr("<font color='green'>Saved /tmp/test.wmz</font>"), 3000);

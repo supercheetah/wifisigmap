@@ -78,12 +78,12 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 
 	// Setup the "longpress" timer
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
-	m_longPressTimer.setInterval(500);
+	m_longPressTimer.setInterval(1500);
 	m_longPressTimer.setSingleShot(true);
 	
 	// Setup the longpress "progress counter" (display progress to user)
 	connect(&m_longPressCountTimer, SIGNAL(timeout()), this, SLOT(longPressCount()));
-	m_longPressCountTimer.setInterval(m_longPressTimer.interval() / 10);
+	m_longPressCountTimer.setInterval(m_longPressTimer.interval() / 15);
 	m_longPressCountTimer.setSingleShot(false);
 	
 	// Setup rendering thread

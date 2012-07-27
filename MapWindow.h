@@ -20,6 +20,8 @@ protected:
 	
 	MapGraphicsView *gv() { return m_gv; }
 	
+	bool eventFilter(QObject *obj, QEvent *event);
+
 protected slots:
 	void saveSlot();
 	void loadSlot();
