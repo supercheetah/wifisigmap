@@ -1,6 +1,6 @@
 #include "MapGraphicsView.h"
 #include "MapGraphicsScene.h"
-
+#include "3rdparty/flickcharm.h"
 
 MapSignalHistory::MapSignalHistory(QColor c, int maxHistory)
 	: color(c)
@@ -86,6 +86,9 @@ MapGraphicsView::MapGraphicsView()
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	#endif
+
+	FlickCharm *flickCharm = new FlickCharm(this);
+	flickCharm->activateOn(this);
 }
 
 void MapGraphicsView::reset()

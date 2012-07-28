@@ -29,7 +29,8 @@ HEADERS += \
 	OptionsDialog.h \
 	SigMapRenderer.h \
 	LongPressSpinner.h \
-	MapGraphicsView.h
+	MapGraphicsView.h \
+	3rdparty/flickcharm.h
 SOURCES += \
 	MapWindow.cpp \
 	MapGraphicsScene.cpp \
@@ -39,4 +40,5 @@ SOURCES += \
 	LongPressSpinner.cpp \
 	MapGraphicsView.cpp \
 	SurfaceInterpolate.cpp \
-	MapLocatingRoutines.cpp
+	MapLocatingRoutines.cpp \
+	3rdparty/flickcharm.cpp
