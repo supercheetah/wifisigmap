@@ -834,7 +834,11 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		#ifdef Q_OS_LINUX
 		#ifndef Q_OS_ANDROID
 		if(getuid() != 0)
+			// kdesu doesn't work correctly for our needs (or rather, I don't know how to make it work)
+			// - We never get any output from the subcommand (the contents of cmd) (sudo gives us the output we need)
+			// - The kdesu process (and subcommand) stay active even after pclose() (just using sudo doesn't stay active after pclose)
 			//cmd = "kdesu /bin/bash -c '" + cmd.replace("'", "\\'") + "'";
+			
 			cmd = "sudo " + cmd;
 		#endif
 		#endif

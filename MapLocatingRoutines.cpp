@@ -642,6 +642,10 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 	QStringList pairsTested;
 
+	QFont font = p.font();
+	font.setPointSizeF(6 * m_pixelsPerFoot);
+	p.setFont(font);
+
 	bool needFirstGoodPoint = false;
 	for(int i=0; i<numAps; i++)
 	{
@@ -668,6 +672,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			QPointF p0 = info0->point;
 			QPointF p1 = info1->point;
+
+			qDebug() << "[user locate] testing ("<<i<<"/"<<j<<"): essids:"<<info0->essid<<"/"<<info1->essid;
 
 			// Not really used - unneeded really since we're using the circle_circle_intersection
 			// routine below
@@ -738,24 +744,38 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 // 				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
-				const double overlap = 0.55;
-				if(dist > r0 + r1)
+			const double overlap = 0.55;
+			if(dist > r0 + r1)
+			{
+				// Distance still wrong, so force-set the proper distance
+				double errorDist = dist - (r0 + r1);
+
+				if(!drawnFlag.contains(ap0) &&
+				   !drawnFlag.contains(ap1))
 				{
-					// Distance still wrong, so force-set the proper distance
-					double errorDist = dist - (r0 + r1);
 
 					r0 += errorDist * overlap; // overlay a bit
 					r1 += errorDist * overlap;
 
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0]: "<<r0<<r1<<", errorDist: "<<errorDist;
-				
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
 				else
-				if(dist < fabs(r0 - r1))
 				{
-					// Distance still wrong, so force-set the proper distance
-					double errorDist = fabs(r0 - r1);
+					r1 += errorDist * 1.1;
 
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+				}
+				
+			}
+			else
+			if(dist < fabs(r0 - r1))
+			{
+				// Distance still wrong, so force-set the proper distance
+				double errorDist = fabs(r0 - r1);
+
+				if(!drawnFlag.contains(ap0) &&
+				   !drawnFlag.contains(ap1))
+				{
 					if(r0 > r1)
 					{
 						r0 -= errorDist * overlap; // overlay a bit
@@ -768,9 +788,16 @@ void MapGraphicsScene::updateUserLocationOverlay()
 					
 					}
 
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
+				else
+				{
+					r1 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
 
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+				}
+			}
+			
 			//}
 
 
@@ -963,6 +990,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 					p.setBrush(QColor(0,0,0,127));
 					p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
+					qDrawTextO(p, (int)tmpPoint.x(), (int)tmpPoint.y(), QString("%1 - %2 (%3/%4) [a]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+
 					p.restore();
 
 					avgPoint += tmpPoint;
@@ -992,7 +1021,9 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(p0, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+					p.drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+
+					qDrawTextO(p, (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
 
 					p.restore();
 
@@ -1369,7 +1400,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 					{
 						// Distance still wrong, so force-set the proper distance
 						double errorDist = fabs(r0 - r1);
-						r1 += (r0 > r1 ? -1:1) * errorDist * 1.1;
+						r1 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
 
 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius [case 1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 					}
