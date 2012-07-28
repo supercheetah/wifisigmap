@@ -14,19 +14,27 @@
 
 	#define IWCONFIG_BINARY QString("%1/iwconfig").arg(QDir::tempPath())
 	#define IWLIST_BINARY   QString("%1/iwlist").arg(QDir::tempPath())
+	#define IWSCAN_SCRIPT   QString("%1/iwscan.sh").arg(QDir::tempPath())
 
 	#define INTERNAL_IWCONFIG_BINARY ":/data/android/iwconfig"
 	#define INTERNAL_IWLIST_BINARY   ":/data/android/iwlist"
-
+	#define INTERNAL_IWSCAN_SCRIPT   ":/data/iwscan.sh"
 #else
 #ifdef Q_OS_LINUX
 
 	#define IWCONFIG_BINARY "iwconfig"
 	#define IWLIST_BINARY   "iwlist"
+	#define IWSCAN_SCRIPT   "data/iwscan.sh"
 
 	#define INTERNAL_IWCONFIG_BINARY ""
 	#define INTERNAL_IWLIST_BINARY   ""
+	#define INTERNAL_IWSCAN_SCRIPT   ""
 #endif
+#endif
+
+#ifdef Q_OS_WIN
+	#define popen  _popen
+	#define pclose _pclose
 #endif
 
 #ifdef Q_OS_ANDROID
@@ -108,6 +116,8 @@ WifiDataCollector::WifiDataCollector()
 	, m_numScans(3)
 	, m_scanNum(0)
 	, m_continuousMode(true)
+	, m_scanProcessStarted(false)
+	, m_scanPipe(0)
 {
 	// Register so it can be passed in a queued connection via signal/slots between threads
 	qRegisterMetaType<QList<WifiDataResult> >("QList<WifiDataResult> ");
@@ -128,7 +138,43 @@ WifiDataCollector::WifiDataCollector()
 		// Start a continous scan running (in the scan thread)
 		QTimer::singleShot(0, this, SLOT(startScan()));
 	}
+
+	/*
+	qRegisterMetaType<QProcess::ProcessError>("QProcess::ProcessError");
+	qRegisterMetaType<QProcess::ExitStatus>("QProcess::ExitStatus");
+	qRegisterMetaType<QProcess::ProcessState>("QProcess::ProcessState");
+	
+	connect(&m_scanProcess, SIGNAL(error(QProcess::ProcessError)), this, SLOT(scanProcError ( QProcess::ProcessError )));
+	connect(&m_scanProcess, SIGNAL(finished(int , QProcess::ExitStatus )), this, SLOT(scanProcFinished ( int , QProcess::ExitStatus )));
+	connect(&m_scanProcess, SIGNAL(readyReadStandardOutput ()), this, SLOT(scanProcReadyReadStandardOutput ()));
+	connect(&m_scanProcess, SIGNAL(stateChanged ( QProcess::ProcessState )), this, SLOT(scanProcStateChanged ( QProcess::ProcessState )));
+	connect(&m_scanProcess, SIGNAL(readyRead()), this, SLOT(scanProcReadyRead()));
+	*/
 }
+
+WifiDataCollector::~WifiDataCollector()
+{
+	//m_scanProcess.close();
+	if(m_scanPipe)
+	{
+		pclose(m_scanPipe);
+		m_scanPipe = 0;
+	}
+
+}
+
+void WifiDataCollector::scanProcError ( QProcess::ProcessError error )
+	{ qDebug() << "WifiDataCollector::scanProcError(): "<<error; }
+void WifiDataCollector::scanProcFinished ( int exitCode, QProcess::ExitStatus exitStatus )
+	{ qDebug() << "WifiDataCollector::scanProcFinished(): "<<exitCode<<", "<<exitStatus; }
+void WifiDataCollector::scanProcReadyReadStandardOutput ()
+	{ qDebug() << "WifiDataCollector::scanProcReadyReadStandardOutput()"; }
+void WifiDataCollector::scanProcStateChanged ( QProcess::ProcessState newState )
+	{ qDebug() << "WifiDataCollector::scanProcStateChanged(): "<<newState; }
+void WifiDataCollector::scanProcReadyRead ()
+	{ qDebug() << "WifiDataCollector::scanProcReadyRead()"; }
+
+
 
 void WifiDataCollector::setWlanDevice(QString dev)
 {
@@ -157,7 +203,9 @@ void WifiDataCollector::updateScanInterval()
 		m_scanTimer.setInterval(500);
 	else
 		// iwlist will delay long enough between scans, we don't need to add more delay here on non-Android systems
-		m_scanTimer.setInterval(10);
+		//m_scanTimer.setInterval(10);
+
+		m_scanTimer.setInterval(750);
 	#endif
 }
 
@@ -488,7 +536,7 @@ void WifiDataCollector::scanWifi()
 	// Parse the resulting input buffer
 	if(buffer.isEmpty() || buffer.contains("No scan results") || buffer.contains("Operation not supported"))
 	{
-		qDebug() << "WifiDataCollector::scanWifi(): No scan results";
+		//qDebug() << "WifiDataCollector::scanWifi(): No scan results";
 		//return results; // return empty list
 	}
 	else
@@ -639,6 +687,21 @@ bool WifiDataCollector::auditIwlistBinary()
 		}
 	}
 
+	if(!QFile::exists(IWSCAN_SCRIPT))
+	{
+		if(!QFile(INTERNAL_IWSCAN_SCRIPT).copy(IWSCAN_SCRIPT))
+		{
+			QString errorMsg = QString("Error copying " INTERNAL_IWSCAN_SCRIPT " to %1, app likely will not function.").arg(IWSCAN_SCRIPT);
+			qDebug() << "WifiDataCollector::auditIwlistBinary(): " << qPrintable(errorMsg);
+			QMessageBox::critical(0, "Setup Error", errorMsg);
+			return false;
+		}
+		else
+		{
+			qDebug() << "WifiDataCollector::auditIwlistBinary(): Successfully extracted " << INTERNAL_IWSCAN_SCRIPT << " to " << IWSCAN_SCRIPT;
+		}
+	}
+
 	// Check/set the executable bits on the iwlist/iwconfig binaries
 	if(!QFileInfo(IWCONFIG_BINARY).isExecutable())
 	{
@@ -652,6 +715,13 @@ bool WifiDataCollector::auditIwlistBinary()
 		//QFile(IWLIST_BINARY).setPermissions(QFile::ExeOwner | QFile::ExeUser | QFile::ExeGroup | QFile::ExeOther))
 		system(qPrintable(QString("chmod 755 %1").arg(IWLIST_BINARY)));
 		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWLIST_BINARY;
+	}
+
+	if(!QFileInfo(IWSCAN_SCRIPT).isExecutable())
+	{
+		//QFile(IWLIST_BINARY).setPermissions(QFile::ExeOwner | QFile::ExeUser | QFile::ExeGroup | QFile::ExeOther))
+		system(qPrintable(QString("chmod 755 %1").arg(IWSCAN_SCRIPT)));
+		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWSCAN_SCRIPT;
 	}
 
 
@@ -739,14 +809,92 @@ QStringList WifiDataCollector::findWlanInterfaces()
 
 QString WifiDataCollector::getIwlistOutput(QString interface)
 {
-	#ifdef Q_OS_ANDROID
-		if(interface.isEmpty())
-			interface = "tiwlan0";
-	#else
-		if(interface.isEmpty())
-			interface = findWlanIf();
-	#endif
+	if(!m_scanProcessStarted) //m_scanProcess.state() == QProcess::NotRunning)
+	{
+		#ifdef Q_OS_ANDROID
+			if(interface.isEmpty())
+				interface = "tiwlan0";
+		#else
+			if(interface.isEmpty())
+				interface = findWlanIf();
+		#endif
 
+		m_scanProcessStarted = true;
+		QString cmd;
+
+		#ifdef Q_OS_ANDROID
+			cmd = QString("su -c 'IWSCAN=%1 IF=%2 SLEEP=1.0 %3'")
+		#else
+			cmd = QString(  "sudo IWSCAN=%1 IF=%2 SLEEP=0.2 %3" )
+		#endif
+			.arg(IWLIST_BINARY)
+			.arg(interface)
+			.arg(IWSCAN_SCRIPT);
+
+		qDebug() << "WifiDataCollector::getIwlistOutput(): Starting scan loop: "<<cmd;
+
+		m_scanPipe = popen(qPrintable(cmd), "r");
+		if(!m_scanPipe)
+		{
+			qDebug() << "WifiDataCollector::getIwlistOutput(): Error opening pipe for cmd: "<<cmd;
+			m_scanProcessStarted = false;
+			return "";
+		}
+	}
+
+	if(m_scanProcessStarted)
+	{
+		QString fileContents;
+		char buffer[128];
+
+		bool done = false;
+		while(!done)
+		{
+			if(feof(m_scanPipe))
+			{
+				m_scanProcessStarted = false;
+				pclose(m_scanPipe);
+				m_scanPipe = 0;
+				qDebug() << "WifiDataCollector::getIwlistOutput(): EOF on scan pipe, reopen on next scan call";
+				return "";
+			}
+
+			if(fgets(buffer, 128, m_scanPipe) != NULL)
+				fileContents += buffer;
+
+			//qDebug() << "WifiDataCollector::getIwlistOutput(): [loop] current fileContents:"<<fileContents.trimmed();
+			
+			if(fileContents.contains("--EOS--"))
+			{
+				fileContents = fileContents.replace("--EOS--","");
+				done = true;
+			}
+		}
+
+		if(!fileContents.contains(" Cell "))
+			qDebug() << "WifiDataCollector::getIwlistOutput(): Bad output from" << IWLIST_BINARY << ": "<<fileContents.trimmed();
+
+		//qDebug() << "WifiDataCollector::getIwlistOutput(): Raw pipe read:"<<fileContents.trimmed();
+
+		return fileContents;
+	}
+
+	// scan process not started by now, just return an empty string and let the next level of code handle it
+	return ""; 
+	
+
+/*
+		QString fileContents = m_scanProcess.readAll();//m_scanProcess.readAllStandardOutput();
+		if(!fileContents.contains(" Cell "))
+			qDebug() << "WifiDataCollector::getIwlistOutput(): Bad output from" << IWLIST_BINARY << ": "<<fileContents.trimmed()<<", scan pid: "<<m_scanProcess.pid();
+
+		//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
+
+		return fileContents;
+*/
+
+	
+/*
 
 	#ifdef Q_OS_ANDROID
 		// Must scan as root first to force the wifi card to re-scan the area
@@ -771,14 +919,6 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 
 	QProcess proc;
 
-	/*
-	QStringList commandArgs = QStringList()
-		<< "-c" << QString("%1 %2 scan")
-			.arg(IWLIST_BINARY)
-			.arg(interface);
-	*/
-
-
 	//qDebug() << "WifiDataCollector::getIwlistOutput(): su commandArgs: "<<commandArgs;
 
 	proc.setProcessChannelMode(QProcess::MergedChannels);
@@ -798,15 +938,6 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
 	}
 	
-	/*
-	if(!proc.waitForFinished(10000))
-	{
-		qDebug() << "WifiDataCollector::getIwlistOutput(): Error: Timeout while waiting for " IWLIST_BINARY " to finish.";
-		QMessageBox::information(0, "Debug", IWLIST_BINARY " timeout");
-		return "";
-	}
-	*/
-
 	QString fileContents = proc.readAllStandardOutput();
 	if(!fileContents.contains(" Cell "))
 		qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents.trimmed();
@@ -814,6 +945,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
 
 	return fileContents;
+*/
 }
 
 QString WifiDataCollector::readTextFile(QString fileName)
