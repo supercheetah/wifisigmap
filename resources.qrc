@@ -11,5 +11,6 @@
 	<file>data/android/iwlist</file>
 	<file>data/android/iwconfig</file>
 	<file>data/android-tweaks.qss</file>
+	<file>data/iwscan.sh</file>
  </qresource>
  </RCC>
