@@ -3,6 +3,9 @@
 
 #include <QtGui>
 
+#include <iostream>
+#include <stdio.h>
+
 typedef QHash<QString,QString> QStringHash;
 
 class WifiDataResult
@@ -36,6 +39,7 @@ class WifiDataCollector : public QObject
 	Q_OBJECT
 public:
 	WifiDataCollector();
+	~WifiDataCollector();
 	
 	QList<WifiDataResult> scanResults();
 
@@ -67,6 +71,12 @@ signals:
 protected slots:
 	void scanWifi();
 
+	void scanProcError ( QProcess::ProcessError error );
+	void scanProcFinished ( int exitCode, QProcess::ExitStatus exitStatus );
+	void scanProcReadyReadStandardOutput ();
+	void scanProcStateChanged ( QProcess::ProcessState newState );
+	void scanProcReadyRead();
+
 protected:
 	void updateScanInterval();
 	
@@ -91,6 +101,11 @@ protected:
 	QString m_dataTextfile;
 
 	QString m_wlanDevice;
+
+	bool m_scanProcessStarted;
+	//QProcess m_scanProcess;
+
+	FILE *m_scanPipe;
 };
 
 #endif
