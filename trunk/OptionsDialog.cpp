@@ -1,7 +1,7 @@
 #include "OptionsDialog.h"
 #include "ui_OptionsDialog.h"
 #include "MapGraphicsScene.h"
-
+#include "3rdparty/flickcharm.h"
 
 bool OptionsDialog_sort_byEssid(MapApInfo *a, MapApInfo *b)
 {
@@ -139,9 +139,12 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 		vbox->addWidget(cb);
 	}
 
+	// FlickCharm doesn't seem to work with the scroll area in the dialog ... not important right now ...
+	//FlickCharm *flickCharm = new FlickCharm(this);
+	//flickCharm->activateOn(ui->scrollArea);
+
 	setWindowTitle("Options");
 	setWindowIcon(QPixmap(":/data/images/icon.png"));
-
 }
 
 void OptionsDialog::showEvent(QShowEvent *)
