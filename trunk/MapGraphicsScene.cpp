@@ -721,11 +721,11 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	QPointF realPoint;
 
-// 	static bool firstScan = true;
-// 	if(!firstScan)
-// 		return;
-// 		
-// 	firstScan = false;
+	static bool firstScan = true;
+	if(!firstScan)
+		return;
+
+	firstScan = false;
 	
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
 	
