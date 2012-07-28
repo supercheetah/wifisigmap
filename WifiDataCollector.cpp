@@ -825,11 +825,19 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		#ifdef Q_OS_ANDROID
 			cmd = QString("su -c 'IWSCAN=%1 IF=%2 SLEEP=1.0 %3'")
 		#else
-			cmd = QString(  "sudo IWSCAN=%1 IF=%2 SLEEP=0.2 %3" )
+			cmd = QString(       "IWSCAN=%1 IF=%2 SLEEP=0.2 %3" )
 		#endif
 			.arg(IWLIST_BINARY)
 			.arg(interface)
 			.arg(IWSCAN_SCRIPT);
+
+		#ifdef Q_OS_LINUX
+		#ifndef Q_OS_ANDROID
+		if(getuid() != 0)
+			//cmd = "kdesu /bin/bash -c '" + cmd.replace("'", "\\'") + "'";
+			cmd = "sudo " + cmd;
+		#endif
+		#endif
 
 		qDebug() << "WifiDataCollector::getIwlistOutput(): Starting scan loop: "<<cmd;
 
@@ -881,18 +889,6 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 
 	// scan process not started by now, just return an empty string and let the next level of code handle it
 	return ""; 
-	
-
-/*
-		QString fileContents = m_scanProcess.readAll();//m_scanProcess.readAllStandardOutput();
-		if(!fileContents.contains(" Cell "))
-			qDebug() << "WifiDataCollector::getIwlistOutput(): Bad output from" << IWLIST_BINARY << ": "<<fileContents.trimmed()<<", scan pid: "<<m_scanProcess.pid();
-
-		//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
-
-		return fileContents;
-*/
-
 	
 /*
 
@@ -950,8 +946,6 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 
 QString WifiDataCollector::readTextFile(QString fileName)
 {
-	/// JUST FOR DEVELOPMENT
-
 	// Load text file
 	QFile file(fileName);
 	if(!file.open(QIODevice::ReadOnly))

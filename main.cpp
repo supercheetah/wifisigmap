@@ -15,5 +15,7 @@ int main(int argc, char **argv)
 	
 	MapWindow win;
 	win.show();
+	win.move(0,0);
+	win.resize(800,400);
 	return app.exec();
 }

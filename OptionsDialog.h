@@ -19,6 +19,7 @@ public:
 	
 protected:
 	void changeEvent(QEvent *e);
+	void showEvent(QShowEvent *);
 	
 private slots:
 	void applySettings();

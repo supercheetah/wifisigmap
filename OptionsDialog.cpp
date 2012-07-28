@@ -141,6 +141,14 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 
 	setWindowTitle("Options");
 	setWindowIcon(QPixmap(":/data/images/icon.png"));
+
+}
+
+void OptionsDialog::showEvent(QShowEvent *)
+{
+	// TODO: Ideally, I'd like to resize the dialog to fit the contents (assuming it doesnt exceede screen size)
+	// but the below code doesn't work - I can't seem to find the code to get the size of the scroll panels content area
+	//resize(ui->scrollArea->viewport()->size());
 }
 
 void OptionsDialog::clearAllAp()
