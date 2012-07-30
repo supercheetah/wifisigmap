@@ -6,7 +6,12 @@
 class MapGraphicsView;
 class MapGraphicsScene;
 
-class MapWindow : public QWidget
+class MapWindow : 
+#ifdef Q_OS_ANDROID
+	public QWidget
+#else
+	public QMainWindow
+#endif
 {
 	Q_OBJECT
 public:
@@ -37,6 +42,7 @@ private:
 	MapGraphicsScene *m_scene;
 	QLabel *m_statusMsg;
 	QPushButton *m_apButton;
+	QAction *m_apAction;
 
 	QTimer m_statusClearTimer;
 };
