@@ -8,6 +8,10 @@
 	<file>data/images/64x64/stock-media-rec.png</file>
 	<file>data/images/64x64/stock-cancel.png</file>
 	<file>data/images/icon.png</file>
+	<file>data/images/android-zoom-minus-button.png</file>
+	<file>data/images/android-zoom-plus-button.png</file>
+	<file>data/images/zoom-minus-button.png</file>
+	<file>data/images/zoom-plus-button.png</file>
 	<file>data/android/iwlist</file>
 	<file>data/android/iwconfig</file>
 	<file>data/android/styles.qss</file>
