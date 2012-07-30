@@ -1,3 +1,4 @@
+/* Global Styles for the app */
 QWidget {
 	font-size: 22px;
 }

@@ -259,6 +259,9 @@ public:
 
 	QColor baseColorForAp(QString apMac);
 
+signals:
+	void scanResultsAvailable(QList<WifiDataResult> results);
+
 public slots:
 	void saveResults(QString filename);
 	void loadResults(QString filename);

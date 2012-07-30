@@ -190,7 +190,8 @@ bool MapWindow::eventFilter(QObject *obj, QEvent *event)
 void MapWindow::setupUi()
 {
 	m_gv = new MapGraphicsView();
-	
+	m_scene = new MapGraphicsScene(this);
+	m_gv->setMapScene(m_scene);
 	
 // 	QAction *act;
 	
@@ -248,8 +249,6 @@ void MapWindow::setupUi()
 	
 	vbox->addWidget(m_gv);
 	
-	m_scene = new MapGraphicsScene(this);
-	m_gv->setScene(m_scene);
 	
 // 	hbox = new QHBoxLayout();
 // 	m_apButton = new QPushButton("Mark AP");

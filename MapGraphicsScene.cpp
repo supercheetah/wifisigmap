@@ -746,7 +746,8 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		}
 	}
 		
-	update(); // allow HUD to update
+	// Used by MapGraphicsView HUD
+	emit scanResultsAvailable(results);
 	
 	updateUserLocationOverlay();
 	//updateApLocationOverlay();
