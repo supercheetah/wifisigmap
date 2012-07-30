@@ -87,8 +87,9 @@ MapGraphicsView::MapGraphicsView()
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	#endif
 
-	FlickCharm *flickCharm = new FlickCharm(this);
-	flickCharm->activateOn(this);
+	// Disable here because it interferes with the 'longpress' functionality in MapGraphicsScene
+// 	FlickCharm *flickCharm = new FlickCharm(this);
+// 	flickCharm->activateOn(this);
 }
 
 void MapGraphicsView::reset()
