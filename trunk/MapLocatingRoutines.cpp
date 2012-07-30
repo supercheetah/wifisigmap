@@ -646,6 +646,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	font.setPointSizeF(6 * m_pixelsPerFoot);
 	p.setFont(font);
 
+	QHash<QString,double> distOverride;
+
 	bool needFirstGoodPoint = false;
 	for(int i=0; i<numAps; i++)
 	{
@@ -683,6 +685,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			// We assume triangulate() already stored drived loss factor into apInfo()
 			double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 			double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+
+			if(distOverride.contains(ap0))
+			       r0 = distOverride[ap0];
+
+			if(distOverride.contains(ap1))
+			       r1 = distOverride[ap1];
 
 			double dist = QLineF(p1,p0).length();
 
@@ -750,20 +758,35 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				// Distance still wrong, so force-set the proper distance
 				double errorDist = dist - (r0 + r1);
 
-				if(!drawnFlag.contains(ap0) &&
-				   !drawnFlag.contains(ap1))
+// 				if(!distOverride.contains(ap0) &&
+// 				   !distOverride.contains(ap1))
+// 				{
+// 
+// 					r0 += errorDist * overlap; // overlay a bit
+// 					r1 += errorDist * overlap;
+// 
+// 					distOverride[ap0] = r0;
+// 					distOverride[ap1] = r1;
+// 
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+// 				}
+// 				else
+// 				if(!distOverride.contains(ap0))
+// 				{
+// 					r0 += errorDist * 1.1;
+// 					distOverride[ap0] = r0;
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+// 				}
+// 				else
+				if(!distOverride.contains(ap1))
 				{
-
-					r0 += errorDist * overlap; // overlay a bit
-					r1 += errorDist * overlap;
-
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					r1 += errorDist * 1.1;
+					distOverride[ap1] = r1;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
 				else
 				{
-					r1 += errorDist * 1.1;
-
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): *Unable* to force-correct the radius [case 3.0]: "<<r0<<r1<<", errorDist: "<<errorDist<<", intersect will fail";
 				}
 				
 			}
@@ -773,29 +796,47 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				// Distance still wrong, so force-set the proper distance
 				double errorDist = fabs(r0 - r1);
 
-				if(!drawnFlag.contains(ap0) &&
-				   !drawnFlag.contains(ap1))
+// 				if(!distOverride.contains(ap0) &&
+// 				   !distOverride.contains(ap1))
+// 				{
+// 					if(r0 > r1)
+// 					{
+// 						r0 -= errorDist * overlap; // overlay a bit
+// 						r1 += errorDist * overlap;
+// 					}
+// 					else
+// 					{
+// 						r0 += errorDist * overlap; // overlay a bit
+// 						r1 -= errorDist * overlap;
+// 					
+// 					}
+// 
+// 					distOverride[ap0] = r0;
+// 					distOverride[ap1] = r1;
+// 
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+// 				}
+// 				else
+// 				if(!distOverride.contains(ap0))
+// 				{
+// 					r0 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
+// 					distOverride[ap0] = r0;
+// 					
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+// 				}
+// 				else
+				if(!distOverride.contains(ap1))
 				{
-					if(r0 > r1)
-					{
-						r0 -= errorDist * overlap; // overlay a bit
-						r1 += errorDist * overlap;
-					}
-					else
-					{
-						r0 += errorDist * overlap; // overlay a bit
-						r1 -= errorDist * overlap;
-					
-					}
+					r1 += (r0 > r1 ? +1:-1) * errorDist * 1.1;
+					distOverride[ap1] = r1;
 
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
 				else
 				{
-					r1 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
-
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): *Unable* to force-correct the radius [case 3.1]: "<<r0<<r1<<", errorDist: "<<errorDist<<", intersect will fail";
 				}
+					
 			}
 			
 			//}

@@ -200,7 +200,7 @@ void WifiDataCollector::updateScanInterval()
 	if(!m_dataTextfile.isEmpty() || findWlanIf().isEmpty())
 		// We are running on a machine WITHOUT wireless, so we are going to use a dummy data source,
 		// therefore add artificial delay between scans
-		m_scanTimer.setInterval(500);
+		m_scanTimer.setInterval(750);
 	else
 		// iwlist will delay long enough between scans, we don't need to add more delay here on non-Android systems
 		//m_scanTimer.setInterval(10);
