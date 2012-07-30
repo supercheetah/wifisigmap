@@ -675,7 +675,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QPointF p0 = info0->point;
 			QPointF p1 = info1->point;
 
-			qDebug() << "[user locate] testing ("<<i<<"/"<<j<<"): essids:"<<info0->essid<<"/"<<info1->essid;
+			qDebug() << "[user locate] testing ("<<i<<"/"<<j<<"): essids:"<<info0->essid<<qPrintable(ap0.right(6))<<"/"<<info1->essid<<qPrintable(ap1.right(6));
 
 			// Not really used - unneeded really since we're using the circle_circle_intersection
 			// routine below
@@ -794,7 +794,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			if(dist < fabs(r0 - r1))
 			{
 				// Distance still wrong, so force-set the proper distance
-				double errorDist = fabs(r0 - r1);
+				double errorDist = fabs(r0 - r1) - dist;
 
 // 				if(!distOverride.contains(ap0) &&
 // 				   !distOverride.contains(ap1))
@@ -827,6 +827,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				else
 				if(!distOverride.contains(ap1))
 				{
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): values prior to correction[case 2.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+					
 					r1 += (r0 > r1 ? +1:-1) * errorDist * 1.1;
 					distOverride[ap1] = r1;
 
@@ -1431,7 +1433,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 						// Allocate distance to the secondary radius
 						double errorDist = dist - (r0 + r1);
 
-						r1 += errorDist * 1.1;
+						r1 += errorDist;// * 1.1;
 
 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius [case 0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 
@@ -1440,9 +1442,9 @@ void MapGraphicsScene::updateApLocationOverlay()
 					if(dist < fabs(r0 - r1))
 					{
 						// Distance still wrong, so force-set the proper distance
-						double errorDist = fabs(r0 - r1);
-						r1 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
-
+						double errorDist = fabs(r0 - r1) - dist;
+						r1 += (r0 > r1 ? +1:-1) * errorDist * 1.1;
+						
 						qDebug() << "MapGraphicsScene::updateApLocationOverlay(): force-corrected the radius [case 1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 					}
 				

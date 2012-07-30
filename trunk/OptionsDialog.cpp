@@ -18,8 +18,8 @@ OptionsDialog::OptionsDialog(MapGraphicsScene *ms, QWidget *parent)
 {
 	// NOTE: JUST for debugging (put here because the qDebug() output at start of MapWindow never reaches the
 	// nc listner on the socket (socket probably isn't set up quick enough)
-	QSize strut(physicalDpiX() * 0.20,physicalDpiY() * 0.20);
-	qDebug() << "OptionsDialog: Debug: Global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
+// 	QSize strut(physicalDpiX() * 0.20,physicalDpiY() * 0.20);
+// 	qDebug() << "OptionsDialog: Debug: Global strut: "<<strut<<", based on:"<<physicalDpiX()<<" x "<<physicalDpiY()<<" dpi";
 
 
 	ui->setupUi(this);

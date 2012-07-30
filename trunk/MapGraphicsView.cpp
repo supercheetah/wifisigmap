@@ -21,7 +21,7 @@ QImage MapSignalHistory::renderGraph(QSize size)
 	QPainter p(&img);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::HighQualityAntialiasing);
 	
-	double height = (double)size.height();
+	double height = (double)size.height() * 1.2; // HACK
 	double width  = (double)size.width();
 	double step   = width / (double)history.size();
 	
@@ -40,9 +40,9 @@ QImage MapSignalHistory::renderGraph(QSize size)
 // 		p.drawLine(lastPoint-pntOne/2, pnt-pntOne/2);
 		
 		p.setPen(QPen(color.darker(500), 1.));
-		p.drawLine(lastPoint/*+pntOne*/, pnt+pntOne);
+//		p.drawLine(lastPoint/*+pntOne*/, pnt+pntOne);
 		
-		p.setPen(QPen(color, 1.));
+//		p.setPen(QPen(color, 1.));
 		p.drawLine(lastPoint, pnt);
 		
 		lastPoint = pnt;
@@ -217,7 +217,17 @@ void MapGraphicsView::drawForeground(QPainter *p, const QRectF & /*upRect*/)
 			color);
 			
 		p->setOpacity(0.80);
-		p->drawImage(rect.topLeft() + QPoint(margin, y - lineJump*.75), hist->renderGraph(QSize((int)(w - pad*2), (int)(lineJump - 4.))).mirrored(true,false));
+		p->drawImage(
+			rect.topLeft() + QPoint(
+				margin, 
+				(int)(y - lineJump*.75)
+			), 
+			hist->renderGraph(QSize(
+				(int)(w - pad*2), 
+				(int)(lineJump - 4.))
+			).mirrored(true,false)
+		);
+		
 		p->setOpacity(1.0);
 	}
 
