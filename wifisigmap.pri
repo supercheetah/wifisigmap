@@ -30,7 +30,10 @@ HEADERS += \
 	SigMapRenderer.h \
 	LongPressSpinner.h \
 	MapGraphicsView.h \
-	3rdparty/flickcharm.h
+	3rdparty/flickcharm.h \
+	3rdparty/FlowLayout.h \
+	ImageUtils.h
+	
 SOURCES += \
 	MapWindow.cpp \
 	MapGraphicsScene.cpp \
@@ -41,4 +44,6 @@ SOURCES += \
 	MapGraphicsView.cpp \
 	SurfaceInterpolate.cpp \
 	MapLocatingRoutines.cpp \
-	3rdparty/flickcharm.cpp
+	3rdparty/flickcharm.cpp \
+	3rdparty/FlowLayout.cpp \
+	ImageUtils.cpp

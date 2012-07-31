@@ -327,7 +327,9 @@ protected:
 
 	//SigMapValue *findNearest(SigMapValue *match, QString apMac);
 	SigMapValue *findNearest(QPointF match, QString apMac);
-	QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
+
+	// Moved to ImageUtils.h
+	//QImage addDropShadow(QImage markerGroup, double shadowSize=16.);
 	
 	double getRenderLevel(double level,double angle,QPointF realPoint,QString apMac,QPointF center,double circleRadius);
 	

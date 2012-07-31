@@ -4,6 +4,7 @@
 #include "MapGraphicsView.h"
 #include "LongPressSpinner.h"
 #include "SigMapRenderer.h"
+#include "ImageUtils.h"
 
 #ifdef Q_OS_ANDROID
 #include <QSensor>
@@ -661,6 +662,7 @@ QImage grayscaled(const QImage &image)
 QImage tinted(const QImage &image, const QColor &color, QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay)
 {
     QImage resultImage(image.size(), QImage::Format_ARGB32_Premultiplied);
+    memset(resultImage.bits(), 0, resultImage.byteCount());
     QPainter painter(&resultImage);
     painter.drawImage(0, 0, grayscaled(image));
     painter.setCompositionMode(mode);
@@ -678,7 +680,7 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 	info->marked = true;
 	
 	QImage markerGroup(":/data/images/ap-marker.png");
-	markerGroup = addDropShadow(markerGroup, (double)(markerGroup.width()/2));
+	markerGroup = ImageUtils::addDropShadow(markerGroup, (double)(markerGroup.width()/2));
 		
 	//markerGroup.save("apMarkerDebug.png");
 	
@@ -962,60 +964,6 @@ void MapGraphicsScene::setRenderMode(RenderMode r)
 	}
 }
 
-/// ImageFilters class, inlined here for ease of implementation
-
-class ImageFilters
-{
-public:
-	static QImage blurred(const QImage& image, const QRect& rect, int radius);
-	
-	// Modifies 'image'
-	static void blurImage(QImage& image, int radius, bool highQuality = false);
-	static QRectF blurredBoundingRectFor(const QRectF &rect, int radius);
-	static QSizeF blurredSizeFor(const QSizeF &size, int radius);
-
-};
-
-// Qt 4.6.2 includes a wonderfully optimized blur function in /src/gui/image/qpixmapfilter.cpp
-// I'll just hook into their implementation here, instead of reinventing the wheel.
-extern void qt_blurImage(QImage &blurImage, qreal radius, bool quality, int transposed = 0);
-
-const qreal radiusScale = qreal(1.5);
-
-// Copied from QPixmapBlurFilter::boundingRectFor(const QRectF &rect)
-QRectF ImageFilters::blurredBoundingRectFor(const QRectF &rect, int radius) 
-{
-	const qreal delta = radiusScale * radius + 1;
-	return rect.adjusted(-delta, -delta, delta, delta);
-}
-
-QSizeF ImageFilters::blurredSizeFor(const QSizeF &size, int radius)
-{
-	const qreal delta = radiusScale * radius + 1;
-	QSizeF newSize(size.width()  + delta, 
-	               size.height() + delta);
-	
-	return newSize;
-}
-
-// Modifies the input image, no copying
-void ImageFilters::blurImage(QImage& image, int radius, bool highQuality)
-{
-	qt_blurImage(image, radius, highQuality);
-}
-
-// Blur the image according to the blur radius
-// Based on exponential blur algorithm by Jani Huhtanen
-// (maximum radius is set to 16)
-QImage ImageFilters::blurred(const QImage& image, const QRect& /*rect*/, int radius)
-{
-	QImage copy = image.copy();
-	qt_blurImage(copy, radius, false);
-	return copy;
-}
-
-/// End ImageFilters implementation
-
 QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 {
 #ifdef Q_OS_ANDROID
@@ -1157,7 +1105,7 @@ QImage MapGraphicsScene::renderSignalMarker(QList<WifiDataResult> results)
 	
 	p.end();
 	
-	markerGroup = addDropShadow(markerGroup, (double)iconSize / 2.);
+	markerGroup = ImageUtils::addDropShadow(markerGroup, (double)iconSize / 2.);
 	
 	return markerGroup;
 }
@@ -1208,53 +1156,6 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	return val;
 }
 
-QImage MapGraphicsScene::addDropShadow(QImage markerGroup, double shadowSize)
-{
-	// Add in drop shadow
-	if(shadowSize > 0.0)
-	{
-// 		double shadowOffsetX = 0.0;
-// 		double shadowOffsetY = 0.0;
-		QColor shadowColor = Qt::black;
-		
-		// create temporary pixmap to hold a copy of the text
-		QSizeF blurSize = ImageFilters::blurredSizeFor(markerGroup.size(), (int)shadowSize);
-		//qDebug() << "Blur size:"<<blurSize<<", doc:"<<doc.size()<<", shadowSize:"<<shadowSize;
-		QImage tmpImage(blurSize.toSize(),QImage::Format_ARGB32_Premultiplied);
-		memset(tmpImage.bits(),0,tmpImage.byteCount()); // init transparent
-		
-		// render the text
-		QPainter tmpPainter(&tmpImage);
-		
-		tmpPainter.save();
-		tmpPainter.translate(shadowSize, shadowSize);
-		tmpPainter.drawImage(0,0,markerGroup);
-		tmpPainter.restore();
-		
-		// blacken the image by applying a color to the copy using a QPainter::CompositionMode_DestinationIn operation. 
-		// This produces a homogeneously-colored pixmap.
-		QRect rect = tmpImage.rect();
-		tmpPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-		tmpPainter.fillRect(rect, shadowColor);
-		tmpPainter.end();
-	
-		// blur the colored image
-		ImageFilters::blurImage(tmpImage, (int)shadowSize);
-		
-		// Render the original image back over the shadow
-		tmpPainter.begin(&tmpImage);
-		tmpPainter.save();
-// 		tmpPainter.translate(shadowOffsetX - shadowSize,
-// 				     shadowOffsetY - shadowSize);
-		tmpPainter.translate(shadowSize, shadowSize);
-		tmpPainter.drawImage(0,0,markerGroup);
-		tmpPainter.restore();
-		
-		markerGroup = tmpImage;
-	}
-	
-	return markerGroup;
-}
 
 /// SigMapValue method implementations:
 
