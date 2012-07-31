@@ -446,6 +446,8 @@ protected:
 	QTimer m_updateSignalMarkerTimer;
 	
 	bool m_renderUpdatesPaused;
+
+	bool m_debugFirstScan;
 };
 
 #endif

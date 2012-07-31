@@ -45,6 +45,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	, m_renderMode(DEFAULT_RENDER_MODE)
 	, m_userItem(0)
 	, m_apLocationOverlay(0)
+	, m_debugFirstScan(true)
 {
 	m_renderUpdatesPaused = false;
 	
@@ -161,6 +162,8 @@ void MapGraphicsScene::setDevice(QString dev)
 	m_device = dev;
 
 	QSettings("wifisigmap").setValue("device", dev);
+
+	m_debugFirstScan = true;
 	
 	if(dev.contains("/") || dev.contains("\\")) // HACK to see if it's a file
 	{
@@ -723,11 +726,13 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	
 	QPointF realPoint;
 
-// 	static bool firstScan = true;
-// 	if(!firstScan)
-// 		return;
-// 
-// 	firstScan = false;
+	if(!m_scanIf.dataTextfile().isEmpty())
+	{
+		if(!m_debugFirstScan)
+			return;
+
+		m_debugFirstScan = false;
+	}
 	
 	//qDebug() << "MapGraphicsScene::scanFinished(): currentThreadId:"<<QThread::currentThreadId();
 	

@@ -1,7 +1,7 @@
 #include "MapGraphicsScene.h"
 #include "MapWindow.h"
 
-//#define VERBOSE_USER_GRAPHICS
+#define VERBOSE_USER_GRAPHICS
 
 QColor darkenColor(QColor color, double value)
 {
@@ -759,7 +759,9 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 // 				r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
-			const double overlap = 0.55;
+
+#if 1
+			//const double overlap = 0.55;
 			if(dist > r0 + r1)
 			{
 				// Distance still wrong, so force-set the proper distance
@@ -847,7 +849,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 				}
 					
 			}
-			
+#endif			
 			//}
 
 
