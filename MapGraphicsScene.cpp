@@ -796,7 +796,7 @@ void MapGraphicsScene::invalidateLongPress(QPointF curPoint)
 		m_longPressCountTimer.stop();
 		m_longPressSpinner->setVisible(false);
 		
-		//m_mapWindow->setStatusMessage("");
+		m_mapWindow->clearStatusMessage();
 	}
 }
 
@@ -1728,6 +1728,9 @@ void MapGraphicsScene::loadResults(QString filename)
 				   // dBm (typically -49) value at which to swith from loss factor X to loss factor Y for calculating distance 
 				   // (less than shortCutoff [close to AP], use X, greater [farther from AP] - use Y)
 		QPointF guess  = qPointFFromString(data.value("locationguess", "").toString());
+
+		if(apMac.isEmpty())
+			continue;
 		
 		if(!color.isValid())
 		{

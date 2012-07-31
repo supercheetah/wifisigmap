@@ -59,7 +59,7 @@ int circle_circle_intersection(double x0, double y0, double r0,
                                double *xi, double *yi,
                                double *xi_prime, double *yi_prime)
 {
-  double a, dx, dy, d, h, rx, ry;
+  double a, dx, dy, d, h, rx, ry, hx;
   double x2, y2;
 
   /* dx and dy are the vertical and horizontal distances between
@@ -101,13 +101,18 @@ int circle_circle_intersection(double x0, double y0, double r0,
   /* Determine the distance from point 2 to either of the
    * intersection points.
    */
-  h = sqrt((r0*r0) - (a*a));
+  hx = (r0*r0) - (a*a);
+  if(hx < 0)
+	  hx = 0;
+  h = sqrt(hx);
 
   /* Now determine the offsets of the intersection points from
    * point 2.
    */
   rx = -dy * (h/d);
   ry = dx * (h/d);
+
+  //qDebug() << "circle_circle_intersection: dx:"<<dx<<", dy:"<<dy<<", d:"<<d<<", a:"<<a<<", x2:"<<x2<<", y2:"<<y2<<", h:"<<h<<", rx:"<<rx<<", ry:"<<ry<<", r0:"<<r0<<", hx:"<<hx;
 
   /* Determine the absolute intersection points. */
   *xi = x2 + rx;
@@ -1454,7 +1459,7 @@ void MapGraphicsScene::updateApLocationOverlay()
     /*
 				p.setPen(QPen(darkenColor(color0, value0), penWidth * m_pixelsPerFoot));
  				if(p0.x() > 0 && p0.y() > 0 && r0 > 1)
- 					p.drawEllipse(p0, r0, r0);
+ 					p.ipse(p0, r0, r0);
 				p.setPen(QPen(darkenColor(color0, value1), penWidth * m_pixelsPerFoot));
  				if(p1.x() > 0 && p1.y() > 0 && r1 > 1)
  					p.drawEllipse(p1, r1, r1);
@@ -1472,6 +1477,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot,
 						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot
 					);
+					//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", drawing p0 at:"<<(p0 + randPoint);
 					p.drawEllipse(p0 + randPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 					//qDrawTextO(p, (int)p0.x(), (int)p0.y(), QString().sprintf("%d%% #%d", (int)(value0*100), i));
 
@@ -1481,6 +1487,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot,
 						(double)rand()/(double)RAND_MAX * m_pixelsPerFoot*2 - m_pixelsPerFoot
 					);
+					//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", drawing p1 at:"<<(p1 + randPoint);
 					p.drawEllipse(p1 + randPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 					//qDrawTextO(p, (int)p1.x(), (int)p1.y(), QString().sprintf("%d%% #%d", (int)(value1*100), j));
 				}
@@ -1495,7 +1502,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 				// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
 				// At end, good points forms the probability cluster of where the user probably is
 	
-				qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] #goodPoints:"<<goodPoints.size()<<", i:"<<i<<",j:"<<j<<", numVals:"<<numVals<<", p0:"<<p0<<", r0:"<<r0<<", p1:"<<p1<<", r1:"<<r1;
+				//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [circle:pre] #goodPoints:"<<goodPoints.size()<<", i:"<<i<<",j:"<<j<<", numVals:"<<numVals<<", p0:"<<p0<<", r0:"<<r0<<", p1:"<<p1<<", r1:"<<r1;
 	
 // 				qDebug() << " -test done-";
 // 				exit(-1);
@@ -1513,11 +1520,20 @@ void MapGraphicsScene::updateApLocationOverlay()
 							&xi_prime, &yi_prime);
 				if(!ret)
 				{
-					qDebug() << "triangulate2(): circle_circle_intersection() returned 0";
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): circle_circle_intersection() returned 0";
 					continue;
 				}
 	
 				QLineF line(xi, yi, xi_prime, yi_prime);
+
+				if(isnan(xi))
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): circle_circle_intersection(): xi is NaN";
+				if(isnan(yi))
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): circle_circle_intersection(): yi is NaN";
+				if(isnan(xi_prime))
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): circle_circle_intersection(): xi_prime is NaN";
+				if(isnan(yi_prime))
+					qDebug() << "MapGraphicsScene::updateApLocationOverlay(): circle_circle_intersection(): yi_prime is NaN";
 	
 	
 				if(line.isNull())
@@ -1646,6 +1662,7 @@ void MapGraphicsScene::updateApLocationOverlay()
 	
 						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1.0 * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", drawing tmpPoint at:"<<tmpPoint<<", goodPoints:"<<goodPoints;
 						//if(tmpPoint.x() > 0 && tmpPoint.y() > 0)
 							p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2 * m_pixelsPerFoot);
 
@@ -1684,7 +1701,9 @@ void MapGraphicsScene::updateApLocationOverlay()
 						userPoly << calcPoint;
 	
 						p.save();
-	
+
+						//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", drawing calcPoint at:"<<calcPoint;
+						
 						p.setPen(QPen(darkenColor(color0, (value0 + value1)/2), 1. * m_pixelsPerFoot));
 						p.setBrush(QColor(0,0,0,127));
 						//if(calcPoint.x() > 0 && calcPoint.y() > 0)
@@ -1742,26 +1761,26 @@ void MapGraphicsScene::updateApLocationOverlay()
 		MapApInfo *info = apInfo(apMac);
 		if(!info->renderOnMap)
 			continue;
+
+		//qDebug() << "MapGraphicsScene::updateApLocationOverlay(): [apLocationGuess] ap:"<<apMac<<", rendering at avgPoint:"<<avgPoint;
 		
 		QColor color0 = baseColorForAp(apMac);
 		
 		QPointF avgPoint = info->locationGuess;
-		
-		p.setPen(QPen(color0, 10.));
-		p.setBrush(QColor(0,0,0,127));
-		p.drawEllipse(avgPoint, 12 * m_pixelsPerFoot, 12 * m_pixelsPerFoot);
+		if(!avgPoint.isNull())
+		{
+			p.setPen(QPen(color0, 10.));
+			p.setBrush(QColor(0,0,0,127));
 
-		QImage markerGroup(":/data/images/ap-marker.png");
-		p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
-		//if(avgPoint.x() > 0 && avgPoint.y() > 0)
+			p.drawEllipse(avgPoint, 12 * m_pixelsPerFoot, 12 * m_pixelsPerFoot);
+
+			QImage markerGroup(":/data/images/ap-marker.png");
+			p.drawImage(avgPoint - QPoint(markerGroup.width()/2,markerGroup.height()/2), markerGroup);
+
 			p.drawEllipse(avgPoint, penWidth, penWidth);
 
-// 				if(avgPoint == avgPoint)
-// 					p.setPen(QPen(Qt::yellow, 10.));
-// 				else
-					//p.setPen(QPen(Qt::green, 4)); //10.));
-
-		qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
+			qDrawTextO(p,(int)avgPoint.x(),(int)avgPoint.y(),apInfo(apMac)->essid);
+		}
 
 	}
 
