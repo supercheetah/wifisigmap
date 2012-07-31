@@ -7,7 +7,10 @@ MapSignalHistory::MapSignalHistory(QColor c, int maxHistory)
 	: color(c)
 	, maxSize(maxHistory)
 {
-	for(int i=0; i<maxHistory; i++)
+	if(maxSize < 0)
+		maxSize = 10;
+	
+	for(int i=0; i<maxSize; i++)
 		history << -1;
 }
 

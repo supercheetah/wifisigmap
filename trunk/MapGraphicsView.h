@@ -7,7 +7,7 @@
 class MapSignalHistory
 {
 public:
-	MapSignalHistory(QColor color = Qt::white, int maxHistory=10);
+	MapSignalHistory(QColor color = Qt::white, int maxHistory=-1);
 	void addValue(double);
 	QImage renderGraph(QSize);
 
