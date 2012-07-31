@@ -34,6 +34,8 @@ protected slots:
 	void clearSlot();
 	void prefsSlot();
 	
+	void toggleApMarkMode();
+	
 	void flagApModeCleared();
 	void clearStatusMessage();
 
@@ -45,6 +47,12 @@ private:
 	QAction *m_apAction;
 
 	QTimer m_statusClearTimer;
+	
+	void showMainMenu();
+	
+	QToolButton *makeAndroidToolButton(QWidget *parent, QObject *obj, const char *slot, QString text, QString icon, int width=270);
+	
+	QWidget *m_mainMenuWidget;
 };
 
 #endif

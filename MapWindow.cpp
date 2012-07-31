@@ -3,6 +3,7 @@
 #include "MapGraphicsView.h"
 #include "MapGraphicsScene.h"
 #include "OptionsDialog.h"
+#include "3rdparty/FlowLayout.h"
 
 #include <QTcpSocket>
 #include <QApplication>
@@ -147,25 +148,23 @@ MapWindow::MapWindow(QWidget *parent)
 	if(parent)
 		parent->installEventFilter(this);
 	#endif
+	
+	// Just here for debugging
+	//showMainMenu();
 }
 
 bool MapWindow::eventFilter(QObject *obj, QEvent *event)
 {
-    //if (obj == textEdit) {
-	if (event->type() == QEvent::KeyPress) {
-	    QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-	    qDebug() << "Got key press" << keyEvent->key();
+	if (event->type() == QEvent::KeyPress)
+	{
+		QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+		//qDebug() << "Got key press" << keyEvent->key();
+		if(keyEvent->key() == 16777301)
+			showMainMenu();
 	}
-	/*
-	    return true;
-	} else {
-	    return false;
-	}
-    } else {
-    */
+	
 	// pass the event on to the parent class
 	return QWidget::eventFilter(obj, event);
-//    }
 }
 
 #define makeButton2(object,layout,title,slot) \
@@ -193,8 +192,10 @@ void MapWindow::setupUi()
 	m_scene = new MapGraphicsScene(this);
 	m_gv->setMapScene(m_scene);
 	
-// 	QAction *act;
+	m_apAction = 0;
+	m_mainMenuWidget = 0;
 	
+	#ifndef Q_OS_ANDROID
 	QMenu *menu;
 	 
 	menu = menuBar()->addMenu(tr("&File"));
@@ -217,6 +218,7 @@ void MapWindow::setupUi()
 	
 	menu->addSeparator();
 	makeAction("&Options...", SLOT(prefsSlot()), QKeySequence::Preferences);
+	#endif
 	
 	#ifdef Q_OS_ANDROID
 	QVBoxLayout *vbox = new QVBoxLayout(this);
@@ -347,7 +349,9 @@ void MapWindow::clearStatusMessage()
 void MapWindow::flagApModeCleared()
 {
 	clearStatusMessage();
-	m_apButton->setChecked(false);
+	
+	if(m_apAction)
+		m_apAction->setChecked(false);
 }
 
 void MapWindow::chooseBgSlot()
@@ -447,5 +451,114 @@ void MapWindow::clearSlot()
 	m_scene->clear();
 }
 
+#define AndroidButtonDarkColor "rgb(180,180,180)"
+QToolButton *MapWindow::makeAndroidToolButton(QWidget *parent, QObject *obj, const char *slot, QString text, QString icon, int width)
+{
+	QToolButton* btn = new QToolButton(parent);
+	btn->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	btn->setIcon(QPixmap(icon));
+	btn->setText(text);
+	btn->setStyleSheet(QString(
+			"QToolButton { "
+				"width:         %1; "
+ 				"height:        100; "
+				"padding:       0; "
+ 				"margin:        0; "
+ 				"padding-top:   10px; "
+				"outline:       none; "
+				"font-size:     20px; "
+				"border-bottom: 1px solid " AndroidButtonDarkColor "; "
+				"border-right:  1px solid " AndroidButtonDarkColor "; "
+				"border-top:    1px solid white; "
+				"border-left:   1px solid white; "
+			"} "
+			"QToolButton:focus:pressed, QToolButton:pressed {"
+				"border-top:    1px solid " AndroidButtonDarkColor "; "
+				"border-left:   1px solid " AndroidButtonDarkColor "; "
+				"border-bottom: 1px solid white; "
+				"border-right:  1px solid white; "
+				"padding-top:   12px; "
+				"padding-left:  2px; "
+				"background:    #e7e7e7; "
+				
+			"}").arg(width));
+	btn->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
+	btn->setIconSize(QSize(48, 48));
+	btn->setMinimumSize(QSize(width,100));
+	btn->setMaximumSize(QSize(width,100));
+	
+	connect(btn, SIGNAL(clicked()), obj, slot);
+	connect(btn, SIGNAL(clicked()), m_mainMenuWidget, SLOT(hide()));
+	connect(btn, SIGNAL(clicked()), m_mainMenuWidget, SLOT(deleteLater()));
+	
+	return btn;
+}
 
+void MapWindow::showMainMenu()
+{
+	QWidget *base = new QWidget();
+	m_mainMenuWidget = base;
+	
+	//base->setAttribute(Qt::WA_TranslucentBackground, true);
+	
+	base->setWindowFlags(Qt::FramelessWindowHint | Qt::ToolTip);
+	
+	FlowLayout *layout = new FlowLayout(base, 0, 0, 0);
+	layout->setContentsMargins(0,0,0,0);
+	layout->setSpacing(0);
+	
+	//base->resize(544,960);
+	QDesktopWidget *desktop = qApp->desktop();
+	base->resize(desktop->size());
+	
+	int numButtons = 6; // the number of buttons we plan to use (below)
+	
+	int btnWidth = base->width() / numButtons;
+	if(btnWidth < 200) // arbitrary minimum size
+		btnWidth = 200;
+	
+	int numPerRow = (int)(base->width() / btnWidth);
+	btnWidth = base->width() / numPerRow - 1; // allow for border
+	
+	int numRows = numButtons / numPerRow;
+	
+	//qDebug() << "Using numPerRow:"<<numPerRow<<", btnWidth:"<<btnWidth<<", numRows: "<<numRows;
+	
+	base->resize(base->width(), numRows * 100); // 100 is height of button
+	
+	base->move(0, desktop->height() - base->height());
+	
+// 	QWidget *shadow = new QWidget(base);
+// 	shadow->setMinimumSize(QSize(base->width(),20));
+// 	shadow->setMaximumSize(QSize(base->width(),20));
+// 	shadow->setStyleSheet("QWidget { background: url('data/images/simple-shadow.png'); height: 20px; }");
+// 	
+// 	layout->addWidget(shadow);
+	
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(clearSlot()),
+		"New", 			"data/images/48x48/document-new.png", btnWidth));
+	
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(loadSlot()),
+		"Open", 		"data/images/48x48/document-open.png", btnWidth));
+	
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(saveSlot()),
+		"Save As...", 	 	"data/images/48x48/document-save.png", btnWidth));
+	
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(chooseBgSlot()),
+		"Background...",	"data/images/48x48/document-save-as.png", btnWidth));
+	
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(toggleApMarkMode()),
+		m_scene->markApMode() ? "Disable Mark AP Mode" : "Mark AP Location",	
+		"data/images/48x48/go-jump.png", btnWidth));
+		
+	layout->addWidget(makeAndroidToolButton(base, this, SLOT(prefsSlot()),
+		"Options...", 		"data/images/48x48/document-properties.png", btnWidth));
 
+	base->show();
+	
+}
+
+void MapWindow::toggleApMarkMode()
+{
+	m_scene->setMarkApMode(!m_scene->markApMode());
+}

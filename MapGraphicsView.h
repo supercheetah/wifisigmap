@@ -48,7 +48,7 @@ protected:
 	void wheelEvent(QWheelEvent *event);
 	void showEvent(QShowEvent *);
 	//void drawBackground(QPainter *painter, const QRectF &rect);
-
+	
 	double m_scaleFactor;
 	
 	QHash<QString, MapSignalHistory*> m_apSigHist;
