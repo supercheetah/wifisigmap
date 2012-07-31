@@ -369,6 +369,13 @@ void MapGraphicsView::setStatusMessage(QString msg)
 		m_statusLabel->setPixmap(QPixmap());
 		return;
 	}
+
+	if(Qt::mightBeRichText(msg))
+	{
+		QTextDocument doc;
+		doc.setHtml(msg);
+		msg = doc.toPlainText();
+	}
 	
 	QImage tmp(1,1,QImage::Format_ARGB32_Premultiplied);
 	QPainter tmpPainter(&tmp);
