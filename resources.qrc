@@ -10,6 +10,9 @@
 	<file>data/images/icon.png</file>
 	<file>data/images/android-zoom-minus-button.png</file>
 	<file>data/images/android-zoom-plus-button.png</file>
+	<file>data/images/android-checkbox-off.png</file>
+	<file>data/images/android-checkbox-on.png</file>
+	<file>data/images/android-checkbox-empty.png</file>
 	<file>data/images/zoom-minus-button.png</file>
 	<file>data/images/zoom-plus-button.png</file>
 	<file>data/android/iwlist</file>

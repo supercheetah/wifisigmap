@@ -8,9 +8,20 @@ QCheckBox {
 }
 
 QCheckBox::indicator {
-	width:	32px;
-	height: 32px;
+/*	width:	32px;
+	height: 32px;*/
+	width: 44;
+	height: 44;
 }
+
+QCheckBox::indicator:unchecked {
+	image: url(:/data/images/android-checkbox-empty.png);
+}
+
+QCheckBox::indicator:checked {
+	image: url(:/data/images/android-checkbox-on.png);
+}
+
 
 /*** QPushButton copied directly from ... */
 QPushButton {
