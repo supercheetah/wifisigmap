@@ -126,6 +126,8 @@ MapGraphicsView::MapGraphicsView()
 		m_statusLabel = new QLabel();
 		hbox->addWidget(m_statusLabel);
 
+		m_statusLabel->hide();
+
 		hbox->addStretch(1);
 	}
 
@@ -141,14 +143,15 @@ MapGraphicsView::MapGraphicsView()
 			btn = new QPushButton("-");
 			btn->setStyleSheet("QPushButton {"
 				#ifdef Q_OS_ANDROID
-				"background: url(':/data/images/android-zoom-minus-button.png'); width: 117px; height: 48px; "
+				"background: url(':/data/images/android-zoom-minus-button.png'); width: 117px; height: 47px; "
 				#else
 				"background: url(':/data/images/zoom-minus-button.png'); width: 58px; height: 24px; "
 				#endif
 				"padding:0; margin:0; border:none; color: transparent; outline: none; }");
 			btn->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
 			btn->setAutoRepeat(true);
-			
+			btn->setMaximumSize(117,48);
+
 			connect(btn, SIGNAL(clicked()), this, SLOT(zoomOut()));
 			hbox->addWidget(btn);
 		}
@@ -157,7 +160,7 @@ MapGraphicsView::MapGraphicsView()
 			btn = new QPushButton("+");
 			btn->setStyleSheet("QPushButton {"
 				#ifdef Q_OS_ANDROID
-				"background: url(':/data/images/android-zoom-plus-button.png'); width: 117px; height: 48px; "
+				"background: url(':/data/images/android-zoom-plus-button.png'); width: 117px; height: 47px; "
 				#else
 				"background: url(':/data/images/zoom-plus-button.png'); width: 58px; height: 24px; "
 				#endif
@@ -165,6 +168,7 @@ MapGraphicsView::MapGraphicsView()
 			btn->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
 			btn->setAttribute(Qt::WA_TranslucentBackground, true);
 			btn->setAutoRepeat(true);
+			btn->setMaximumSize(117,48);
 			
 			connect(btn, SIGNAL(clicked()), this, SLOT(zoomIn()));
 			hbox->addWidget(btn);
@@ -346,7 +350,7 @@ void MapGraphicsView::scanFinished(QList<WifiDataResult> results)
 	
 	if(results.size() <= 0)
 	{
-		qDrawTextC(p, margin, margin, tr("No APs nearby or WiFi off"), Qt::red, Qt::white);
+		qDrawTextC(p, margin, margin + margin + p.font().pointSize() * 2, tr("No APs nearby or WiFi off"), Qt::red, Qt::white);
 	}
 	
 	// Draw border on top of any text that may overflow
@@ -367,8 +371,11 @@ void MapGraphicsView::setStatusMessage(QString msg)
 	if(msg.isEmpty())
 	{
 		m_statusLabel->setPixmap(QPixmap());
+		m_statusLabel->hide();
 		return;
 	}
+
+	m_statusLabel->show();
 
 	if(Qt::mightBeRichText(msg))
 	{
@@ -412,7 +419,11 @@ void MapGraphicsView::setStatusMessage(QString msg)
 	
 	p.end();
 
+#ifdef Q_OS_ANDROID
+	m_statusLabel->setPixmap(QPixmap::fromImage(labelImage));
+#else
 	m_statusLabel->setPixmap(QPixmap::fromImage(ImageUtils::addDropShadow(labelImage, ss)));
+#endif
 }
 
 /// End MapGraphicsView implementation

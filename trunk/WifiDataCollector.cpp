@@ -823,7 +823,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		QString cmd;
 
 		#ifdef Q_OS_ANDROID
-			cmd = QString("su -c 'IWSCAN=%1 IF=%2 SLEEP=1.0 %3'")
+			cmd = QString("su -c 'IWSCAN=%1 IF=%2 SLEEP=0.8 %3 2>&1'")
 		#else
 			cmd = QString(       "IWSCAN=%1 IF=%2 SLEEP=0.2 %3" )
 		#endif

@@ -39,6 +39,9 @@ protected slots:
 	void flagApModeCleared();
 	void clearStatusMessage();
 
+	void closeMainMenu();
+	void showMainMenu();
+
 private:
 	MapGraphicsView *m_gv;
 	MapGraphicsScene *m_scene;
@@ -47,8 +50,6 @@ private:
 	QAction *m_apAction;
 
 	QTimer m_statusClearTimer;
-	
-	void showMainMenu();
 	
 	QToolButton *makeAndroidToolButton(QWidget *parent, QObject *obj, const char *slot, QString text, QString icon, int width=270);
 	

@@ -160,7 +160,12 @@ bool MapWindow::eventFilter(QObject *obj, QEvent *event)
 		QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
 		//qDebug() << "Got key press" << keyEvent->key();
 		if(keyEvent->key() == 16777301)
-			showMainMenu();
+		{
+			if(m_mainMenuWidget)
+				closeMainMenu();
+			else
+				showMainMenu();
+		}
 	}
 	
 	// pass the event on to the parent class
@@ -228,9 +233,10 @@ void MapWindow::setupUi()
 	setCentralWidget(centerWidget);
 	
 	QVBoxLayout *vbox = new QVBoxLayout(centerWidget);
-	vbox->setContentsMargins(0,0,0,0);
 	#endif
 	
+	vbox->setContentsMargins(0,0,0,0);
+
 // 	QHBoxLayout *hbox;
 // 	hbox = new QHBoxLayout();
 // 	
@@ -488,8 +494,7 @@ QToolButton *MapWindow::makeAndroidToolButton(QWidget *parent, QObject *obj, con
 	btn->setMaximumSize(QSize(width,100));
 	
 	connect(btn, SIGNAL(clicked()), obj, slot);
-	connect(btn, SIGNAL(clicked()), m_mainMenuWidget, SLOT(hide()));
-	connect(btn, SIGNAL(clicked()), m_mainMenuWidget, SLOT(deleteLater()));
+	connect(btn, SIGNAL(clicked()), this, SLOT(closeMainMenu()));
 	
 	return btn;
 }
@@ -523,10 +528,8 @@ void MapWindow::showMainMenu()
 	int numRows = numButtons / numPerRow;
 	
 	//qDebug() << "Using numPerRow:"<<numPerRow<<", btnWidth:"<<btnWidth<<", numRows: "<<numRows;
-	
-	base->resize(base->width(), numRows * 100); // 100 is height of button
-	
-	base->move(0, desktop->height() - base->height());
+
+	//qDebug() << "MapWindow::showMainMenu(): desktop size: "<<desktop->width()<<" x "<<desktop->height()<<", base height:"<<(numRows * 100)<<", base Y pos: "<< (desktop->height() - base->height());
 	
 // 	QWidget *shadow = new QWidget(base);
 // 	shadow->setMinimumSize(QSize(base->width(),20));
@@ -555,7 +558,21 @@ void MapWindow::showMainMenu()
 		"Options...", 		"data/images/48x48/document-properties.png", btnWidth));
 
 	base->show();
-	
+
+	base->resize(base->width(), numRows * 100); // 100 is height of button
+
+	base->move(0, desktop->height() - base->height());
+
+}
+
+void MapWindow::closeMainMenu()
+{
+	if(m_mainMenuWidget)
+	{
+		m_mainMenuWidget->hide();
+		m_mainMenuWidget->deleteLater();
+		m_mainMenuWidget = 0;
+	}
 }
 
 void MapWindow::toggleApMarkMode()
