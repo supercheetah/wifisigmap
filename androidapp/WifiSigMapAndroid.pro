@@ -8,6 +8,7 @@ MOBILITY += sensors
 # location
 # Still crashes as of 7/15
 
+DEFINES += Q_OS_ANDROID
 
 # Input
 HEADERS += \
