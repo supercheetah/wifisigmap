@@ -1,6 +1,8 @@
 #include "MapGraphicsScene.h"
 #include "MapWindow.h"
 
+//#define VERBOSE_USER_GRAPHICS
+
 QColor darkenColor(QColor color, double value)
 {
 	int h = color.hue();
@@ -852,7 +854,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QColor color0 = baseColorForAp(ap0);
 			QColor color1 = baseColorForAp(ap1);
 
-
+			#ifdef VERBOSE_USER_GRAPHICS
 			// Render the estimated circles covered by these APs
 			if(!drawnFlag.contains(ap0))
 			{
@@ -878,6 +880,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 					p.drawEllipse(p1, r1, r1);
 
 			}
+			#endif
 
 			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] i:"<<i<<", r0:"<<r0<<", r1:"<<r1;
 
@@ -917,8 +920,10 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			}
 			else
 			{
+				#ifdef VERBOSE_USER_GRAPHICS
 				p.setPen(QPen(Qt::gray, penWidth));
 				p.drawLine(line);
+				#endif
 
 				if(goodPoints.isEmpty())
 				{
@@ -1034,11 +1039,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		// 			p.setPen(QPen(color1, penWidth));
 		// 			p.drawLine(p1, calcPoint);
 
+					#ifdef VERBOSE_USER_GRAPHICS
 					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
 					p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
 					qDrawTextO(p, (int)tmpPoint.x(), (int)tmpPoint.y(), QString("%1 - %2 (%3/%4) [a]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+					#endif
 
 					p.restore();
 
@@ -1067,11 +1074,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		// 			p.setPen(QPen(color1, penWidth));
 		// 			p.drawLine(p1, calcPoint);
 
+					#ifdef VERBOSE_USER_GRAPHICS
 					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
 					p.setBrush(QColor(0,0,0,127));
 					p.drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
 
 					qDrawTextO(p, (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+					#endif
 
 					p.restore();
 
