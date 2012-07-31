@@ -258,6 +258,8 @@ public:
 	MapRenderOptions renderOpts() { return m_renderOpts; }
 
 	QColor baseColorForAp(QString apMac);
+	
+	bool markApMode() { return m_markApMode; }
 
 signals:
 	void scanResultsAvailable(QList<WifiDataResult> results);

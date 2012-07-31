@@ -408,7 +408,7 @@ void MapGraphicsView::setStatusMessage(QString msg)
 	tp.end();
 
 	double ss = 8.;
-	p.drawImage(-ss,-ss, ImageUtils::addDropShadow(txtImage, ss));
+	p.drawImage((int)-ss,(int)-ss, ImageUtils::addDropShadow(txtImage, ss));
 	
 	p.end();
 
