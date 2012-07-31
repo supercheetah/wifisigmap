@@ -160,12 +160,7 @@ bool MapWindow::eventFilter(QObject *obj, QEvent *event)
 		QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
 		//qDebug() << "Got key press" << keyEvent->key();
 		if(keyEvent->key() == 16777301)
-		{
-			if(m_mainMenuWidget)
-				closeMainMenu();
-			else
-				showMainMenu();
-		}
+			toggleMainMenu();
 	}
 	
 	// pass the event on to the parent class
@@ -237,10 +232,14 @@ void MapWindow::setupUi()
 	
 	vbox->setContentsMargins(0,0,0,0);
 
-// 	QHBoxLayout *hbox;
-// 	hbox = new QHBoxLayout();
-// 	
-// 	makeButton(hbox, "New",  SLOT(clearSlot()));
+#if 0
+	QHBoxLayout *hbox;
+	hbox = new QHBoxLayout();
+
+	// Just for testing
+	makeButton(hbox, "Menu Button",  SLOT(toggleMainMenu()));
+	
+//	makeButton(hbox, "New",  SLOT(clearSlot()));
 // 	makeButton(hbox, "Load", SLOT(loadSlot()));
 // 	makeButton(hbox, "Save", SLOT(saveSlot()));
 	
@@ -253,8 +252,9 @@ void MapWindow::setupUi()
 // 	makeButton2(m_gv, hbox, "+", SLOT(zoomIn()));
 // 	makeButton2(m_gv, hbox, "-", SLOT(zoomOut()));
 // 	
-// 	vbox->addLayout(hbox);
-	
+ 	vbox->addLayout(hbox);
+#endif
+
 	vbox->addWidget(m_gv);
 	
 	
@@ -578,4 +578,12 @@ void MapWindow::closeMainMenu()
 void MapWindow::toggleApMarkMode()
 {
 	m_scene->setMarkApMode(!m_scene->markApMode());
+}
+
+void MapWindow::toggleMainMenu()
+{
+	if(m_mainMenuWidget)
+		closeMainMenu();
+	else
+		showMainMenu();
 }

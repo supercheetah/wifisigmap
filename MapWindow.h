@@ -41,6 +41,7 @@ protected slots:
 
 	void closeMainMenu();
 	void showMainMenu();
+	void toggleMainMenu();
 
 private:
 	MapGraphicsView *m_gv;

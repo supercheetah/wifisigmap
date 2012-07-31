@@ -8,7 +8,9 @@
 
 #include <QDir>
 
-//#define OLD_SCAN_METHOD
+#ifndef Q_OS_ANDROID
+	#define FORKED_SCAN
+#endif
 
 #ifdef Q_OS_ANDROID
 
@@ -38,13 +40,13 @@
 #endif
 
 #ifdef Q_OS_ANDROID
-// Just guesses based on observations
-#define DBM_MAX  -40
-#define DBM_MIN -100
+	// Just guesses based on observations
+	#define DBM_MAX  -40
+	#define DBM_MIN -100
 #else
-// Just guesses based on observations and the assumption that laptop antenna gains are better than the android's 
-#define DBM_MAX  -25
-#define DBM_MIN  -100
+	// Just guesses based on observations and the assumption that laptop antenna gains are better than the android's
+	#define DBM_MAX  -25
+	#define DBM_MIN  -100
 #endif
 
 #ifdef Q_OS_WIN
@@ -809,6 +811,8 @@ QStringList WifiDataCollector::findWlanInterfaces()
 
 QString WifiDataCollector::getIwlistOutput(QString interface)
 {
+#ifdef FORKED_SCAN
+
 	if(!m_scanProcessStarted) //m_scanProcess.state() == QProcess::NotRunning)
 	{
 		#ifdef Q_OS_ANDROID
@@ -892,9 +896,18 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	}
 
 	// scan process not started by now, just return an empty string and let the next level of code handle it
-	return ""; 
+	return "";
 	
-/*
+#else
+
+	#ifdef Q_OS_ANDROID
+		if(interface.isEmpty())
+			interface = "tiwlan0";
+	#else
+		if(interface.isEmpty())
+			interface = findWlanIf();
+	#endif
+
 
 	#ifdef Q_OS_ANDROID
 		// Must scan as root first to force the wifi card to re-scan the area
@@ -919,12 +932,20 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 
 	QProcess proc;
 
+	/*
+	QStringList commandArgs = QStringList()
+		<< "-c" << QString("%1 %2 scan")
+			.arg(IWLIST_BINARY)
+			.arg(interface);
+	*/
+
+
 	//qDebug() << "WifiDataCollector::getIwlistOutput(): su commandArgs: "<<commandArgs;
 
 	proc.setProcessChannelMode(QProcess::MergedChannels);
 	//proc.start("su", commandArgs);
 	proc.start(IWLIST_BINARY, scanArgs);
-	
+
 	if (!proc.waitForStarted())
 	{
 		qDebug() << "********************** Scanner start failed! " << proc.errorString();
@@ -937,7 +958,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 		qDebug() << "********************** Scanner unable to finish! " << proc.errorString();
 		QMessageBox::information(0, "Debug", "finish err:" + proc.errorString());
 	}
-	
+
 	QString fileContents = proc.readAllStandardOutput();
 	if(!fileContents.contains(" Cell "))
 		qDebug() << "WifiDataCollector::getIwlistOutput(): Raw output of" << IWLIST_BINARY << ": "<<fileContents.trimmed();
@@ -945,7 +966,7 @@ QString WifiDataCollector::getIwlistOutput(QString interface)
 	//QMessageBox::information(0, "Debug", QString("Raw output: %1").arg(fileContents));
 
 	return fileContents;
-*/
+#endif
 }
 
 QString WifiDataCollector::readTextFile(QString fileName)
