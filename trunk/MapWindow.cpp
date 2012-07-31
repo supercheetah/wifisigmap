@@ -273,8 +273,8 @@ void MapWindow::setupUi()
 // 	connect(prefs, SIGNAL(clicked()), this, SLOT(prefsSlot()));
 // 	hbox->addWidget(prefs);
 // 	
-// 	connect(&m_statusClearTimer, SIGNAL(timeout()), this, SLOT(clearStatusMessage()));
-// 	m_statusClearTimer.setSingleShot(true);
+	connect(&m_statusClearTimer, SIGNAL(timeout()), this, SLOT(clearStatusMessage()));
+	m_statusClearTimer.setSingleShot(true);
 	
 //	vbox->addLayout(hbox);
 
@@ -316,15 +316,18 @@ void MapWindow::setStatusMessage(const QString& msg, int timeout)
 // 	#else
 // 	m_statusMsg->setText("<b>"+msg+"</b>");
 // 	#endif
-// 	
-// 	if(timeout>0)
-// 	{
-// 		if(m_statusClearTimer.isActive())
-// 			m_statusClearTimer.stop();
-// 			
-// 		m_statusClearTimer.setInterval(timeout);
-// 		m_statusClearTimer.start();
-// 	}
+//
+	m_gv->setStatusMessage(msg);
+	//qDebug() << "MapWindow::setStatusMessage("<<msg<<","<<timeout<<")";
+
+	if(timeout > 0)
+	{
+		if(m_statusClearTimer.isActive())
+			m_statusClearTimer.stop();
+
+		m_statusClearTimer.setInterval(timeout);
+		m_statusClearTimer.start();
+	}
 	
 	// Allow the UI to update in case the caller's next action is going to block the UI thread for any amount of time
 	QApplication::processEvents();
@@ -334,9 +337,11 @@ void MapWindow::clearStatusMessage()
 {
 	#ifndef Q_OS_ANDROID
 	statusBar()->clearMessage();
-	#else
-	setStatusMessage("");
+	//#else
+	//setStatusMessage("");
 	#endif
+
+	setStatusMessage("");
 }
 
 void MapWindow::flagApModeCleared()

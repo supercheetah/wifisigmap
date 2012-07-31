@@ -297,7 +297,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	if(apsVisible.size() < 2)
 	{
 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two known APs marked AND visble, unable to guess user location";
-		m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
+		//m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
 		m_userItem->setVisible(false);
 		return;
 	}
@@ -761,13 +761,13 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				if(!distOverride.contains(ap0) &&
 // 				   !distOverride.contains(ap1))
 // 				{
-// 
+//
 // 					r0 += errorDist * overlap; // overlay a bit
 // 					r1 += errorDist * overlap;
-// 
+//
 // 					distOverride[ap0] = r0;
 // 					distOverride[ap1] = r1;
-// 
+//
 // 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 // 				}
 // 				else
@@ -780,7 +780,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				else
 				if(!distOverride.contains(ap1))
 				{
-					r1 += errorDist * 1.1;
+					r1 += errorDist * 1.0;
 					distOverride[ap1] = r1;
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}

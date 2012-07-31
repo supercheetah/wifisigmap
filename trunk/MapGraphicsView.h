@@ -7,13 +7,14 @@
 class MapSignalHistory
 {
 public:
-	MapSignalHistory(QColor color = Qt::white, int maxHistory=100);
+	MapSignalHistory(QColor color = Qt::white, int maxHistory=10);
 	void addValue(double);
 	QImage renderGraph(QSize);
 
 private:
 	QColor color;
 	QList<double> history;
+	int maxSize;
 };
 
 class MapGraphicsScene;
@@ -29,17 +30,18 @@ public:
 	void reset();
 	
 	void setMapScene(MapGraphicsScene *);
-	
+
 public slots:
 	void zoomIn();
 	void zoomOut();
+
+	void setStatusMessage(QString);
 	
 protected slots:
 	void scanFinished(QList<WifiDataResult> results);
 	void updateViewportLayout();
 
 protected:
-	void drawForeground(QPainter *p, const QRectF & rect);
 
 	void keyPressEvent(QKeyEvent *event);
 	void mouseMoveEvent(QMouseEvent * mouseEvent);
@@ -55,6 +57,8 @@ protected:
 	
 	MapGraphicsScene *m_gs;
 	QLabel *m_hudLabel;
+
+	QLabel *m_statusLabel;
 };
 
 #endif
