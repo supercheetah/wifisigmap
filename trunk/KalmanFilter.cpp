@@ -122,7 +122,7 @@ void KalmanFilter::predictionUpdate(float x, float y)
 //void KalmanFilter::predictionReport(CvPoint &pnt)
 void KalmanFilter::predictionReport(float& x, float& y)
 { 
-	clock_t timeCurrent = clock(); 
+//	clock_t timeCurrent = clock(); 
 
 //	EnterCriticalSection(&mutexPrediction); 
 

@@ -399,8 +399,12 @@ void MapGraphicsView::setStatusMessage(QString msg)
 	
 	QPainter p(&labelImage);
 
-	QColor bgColor(0, 127, 254, 160);
+	QColor bgColor(0, 127, 254, 180);
 
+#ifdef Q_OS_ANDROID
+	bgColor = bgColor.lighter(300);
+#endif
+	
 	p.setPen(QPen(Qt::white, 2.5));
 	p.setBrush(bgColor);
 	p.drawRoundedRect(labelImage.rect().adjusted(0,0,-1,-1), 3., 3.);
