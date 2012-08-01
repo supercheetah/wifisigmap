@@ -972,14 +972,14 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	}
 #endif
 #if 1
-	if(numAps < 3)
-	{
-		qDebug() << "[user locate] Unable to locate, less than 3 APs visible";
-		m_userItem->setVisible(false);
-		return;
-	}
+// 	if(numAps < 3)
+// 	{
+// 		qDebug() << "[user locate] Unable to locate, less than 3 APs visible";
+// 		m_userItem->setVisible(false);
+// 		return;
+// 	}
 
-	numAps = 3; // only consider the first 3 APs if more than 3
+	numAps = qMin(numAps, 3); // only consider the first 3 APs if more than 3
 
 	bool needFirstGoodPoint = false;
 	for(int i=0; i<numAps; i++)
@@ -1490,8 +1490,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 		p.setBrush(QColor(0,0,0,127));
 		p.drawEllipse(thisPredict, penWidth, penWidth);
+		
+		avgPoint = thisPredict;
 		#endif
 	}
+	
+	m_userLocation = avgPoint;
 
 
 /*

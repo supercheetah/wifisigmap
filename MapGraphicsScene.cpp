@@ -759,6 +759,66 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	updateUserLocationOverlay();
 	//updateApLocationOverlay();
 }
+
+void MapGraphicsScene::testUserLocatorAccuracy()
+{
+	double sum = 0.;
+	double min = 999999999.;
+	double max = 0.;
+	int count = 0;
+	QList<double> errs;
+	foreach(SigMapValue *val, m_sigValues)
+	{
+		QList<WifiDataResult> results = val->scanResults;
+		 
+		// Sort the results high-low
+		qSort(results.begin(), results.end(), MapGraphicsScene_sort_WifiDataResult);
+		
+		m_lastScanResults = results;
+		
+		updateUserLocationOverlay();
+		
+		QLineF errorLine(val->point, m_userLocation);
+		double len = errorLine.length(), lenFoot = len / m_pixelsPerFoot;
+		qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error: "<< lenFoot<<"ft";
+		
+		QApplication::processEvents();
+		
+		if(!isnan(lenFoot))
+		{
+			sum += lenFoot;
+			count ++;
+			
+			errs << lenFoot;
+		}
+		if(lenFoot < min)
+			min = lenFoot;
+		if(lenFoot > max)
+			max = lenFoot;
+	}
+	
+	double avg = sum / count;
+	
+	// find the standard deviation
+	float numerator = 0;
+	float denominator = (float)count;
+
+	foreach(double len, errs)
+		numerator = numerator + pow((len - avg), 2);
+
+	float standard_deviation = sqrt (numerator/denominator);
+	
+	QString results = QString("Accuracy: Avg error: %1 ft, min: %2 ft, max: %3 ft, std dev: %4 ft")
+		.arg(avg)
+		.arg(min)
+		.arg(max)
+		.arg(standard_deviation);
+		
+	qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): avg error:"<<avg<<"ft, min:"<<min<<"ft, max:"<<max<<"ft, std dev:"<<standard_deviation<<"ft";
+	
+	QMessageBox::information(0, "Accuracy Results", results);
+
+}
 	
 	
 void MapGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent)
