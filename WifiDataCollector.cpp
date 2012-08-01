@@ -66,6 +66,113 @@
 
 #endif
 
+static QHash<int,int> rssiLookup;
+
+void populateRssiLookup()
+{
+	// From http://www.wildpackets.com/elements/whitepapers/Converting_Signal_Strength.pdf
+	rssiLookup[0] = -113;
+	rssiLookup[1] = -112;
+	rssiLookup[2] = -111;
+	rssiLookup[3] = -110;
+	rssiLookup[4] = -109;
+	rssiLookup[5] = -108;
+	rssiLookup[6] = -107;
+	rssiLookup[7] = -106;
+	rssiLookup[8] = -105;
+	rssiLookup[9] = -104;
+	rssiLookup[10] = -103;
+	rssiLookup[11] = -102;
+	rssiLookup[12] = -101;
+	rssiLookup[13] = -99;
+	rssiLookup[14] = -98;
+	rssiLookup[15] = -97;
+	rssiLookup[16] = -96;
+	rssiLookup[17] = -95;
+	rssiLookup[18] = -94;
+	rssiLookup[19] = -93;
+	rssiLookup[20] = -92;
+	rssiLookup[21] = -91;
+	rssiLookup[22] = -90;
+	rssiLookup[23] = -89;
+	rssiLookup[24] = -88;
+	rssiLookup[25] = -87;
+	rssiLookup[26] = -86;
+	rssiLookup[27] = -85;
+	rssiLookup[28] = -84;
+	rssiLookup[29] = -83;
+	rssiLookup[30] = -82;
+	rssiLookup[31] = -81;
+	rssiLookup[32] = -80;
+	rssiLookup[33] = -79;
+	rssiLookup[34] = -78;
+	rssiLookup[35] = -77;
+	rssiLookup[36] = -75;
+	rssiLookup[37] = -74;
+	rssiLookup[38] = -73;
+	rssiLookup[39] = -72;
+	rssiLookup[40] = -70;
+	rssiLookup[41] = -69;
+	rssiLookup[42] = -68;
+	rssiLookup[43] = -67;
+	rssiLookup[44] = -65;
+	rssiLookup[45] = -64;
+	rssiLookup[46] = -63;
+	rssiLookup[47] = -62;
+	rssiLookup[48] = -60;
+	rssiLookup[49] = -59;
+	rssiLookup[50] = -58;
+	rssiLookup[51] = -56;
+	rssiLookup[52] = -55;
+	rssiLookup[53] = -53;
+	rssiLookup[54] = -52;
+	rssiLookup[55] = -50;
+	rssiLookup[56] = -50;
+	rssiLookup[57] = -49;
+	rssiLookup[58] = -48;
+	rssiLookup[59] = -48;
+	rssiLookup[60] = -47;
+	rssiLookup[61] = -46;
+	rssiLookup[62] = -45;
+	rssiLookup[63] = -44;
+	rssiLookup[64] = -44;
+	rssiLookup[65] = -43;
+	rssiLookup[66] = -42;
+	rssiLookup[67] = -42;
+	rssiLookup[68] = -41;
+	rssiLookup[69] = -40;
+	rssiLookup[70] = -39;
+	rssiLookup[71] = -38;
+	rssiLookup[72] = -37;
+	rssiLookup[73] = -35;
+	rssiLookup[74] = -34;
+	rssiLookup[75] = -33;
+	rssiLookup[76] = -32;
+	rssiLookup[77] = -30;
+	rssiLookup[78] = -29;
+	rssiLookup[79] = -28;
+	rssiLookup[80] = -27;
+	rssiLookup[81] = -25;
+	rssiLookup[82] = -24;
+	rssiLookup[83] = -23;
+	rssiLookup[84] = -22;
+	rssiLookup[85] = -20;
+	rssiLookup[86] = -19;
+	rssiLookup[87] = -18;
+	rssiLookup[88] = -17;
+	rssiLookup[89] = -16;
+	rssiLookup[90] = -15;
+	rssiLookup[91] = -14;
+	rssiLookup[92] = -13;
+	rssiLookup[93] = -12;
+	rssiLookup[94] = -10;
+	rssiLookup[95] = -10;
+	rssiLookup[96] = -10;
+	rssiLookup[97] = -10;
+	rssiLookup[98] = -10;
+	rssiLookup[99] = -10;
+	rssiLookup[100] = -10;
+}
 
 // #define ENABLE_WIRELESS_TOOLS
 //
@@ -121,6 +228,9 @@ WifiDataCollector::WifiDataCollector()
 	, m_scanProcessStarted(false)
 	, m_scanPipe(0)
 {
+	if(rssiLookup.isEmpty())
+		populateRssiLookup();
+		
 	// Register so it can be passed in a queued connection via signal/slots between threads
 	qRegisterMetaType<QList<WifiDataResult> >("QList<WifiDataResult> ");
 	
@@ -1086,11 +1196,17 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 				int val0 = sigLvl.cap(1).toInt();
 				int val1 = sigLvl.cap(2).toInt();
 				double value = (double)val0 / (double)val1;
-				double range = DBM_MAX - DBM_MIN;
-				int    dBm   = (int)(DBM_MIN + range * value);
+				
+				//double range = DBM_MAX - DBM_MIN;
+				//int    dBm   = (int)(DBM_MIN + range * value);
+				
+				int percent = (int)(value * 100);
+				int dBm = rssiLookup[percent];
+				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", dBm:"<<dBm;
+				
 				values["signal level"] = QString("%1 dBm").arg(dBm);
 
-				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", range:"<<range<<", dNm:"<<dBm;
+				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", range:"<<range<<", dBm:"<<dBm;
 			}
 			else
 			{
