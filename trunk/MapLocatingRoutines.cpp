@@ -205,6 +205,192 @@ double dist23(const QPointF &p0, const QPointF &p1, const QPointF &p2)
 	return delta.x()*delta.x() + delta.y()*delta.y();
 }
 
+#if 0
+
+#include <stdio.h>
+#include <math.h>
+
+/* From http://en.wikipedia.org/wiki/Talk%3ATrilateration#Example_C_program */
+
+/* No rights reserved (CC0, see http://wiki.creativecommons.org/CC0_FAQ).
+ * The author has waived all copyright and related or neighboring rights
+ * to this program, to the fullest extent possible under law.
+*/
+
+/* Largest nonnegative number still considered zero */
+#define   MAXZERO  0.0
+
+typedef struct vec3d    vec3d;
+struct vec3d {
+        double  x;
+        double  y;
+        double  z;
+};
+
+/* Return the difference of two vectors, (vector1 - vector2). */
+vec3d vdiff(const vec3d vector1, const vec3d vector2)
+{
+        vec3d v;
+        v.x = vector1.x - vector2.x;
+        v.y = vector1.y - vector2.y;
+        v.z = vector1.z - vector2.z;
+        return v;
+}
+
+/* Return the sum of two vectors. */
+vec3d vsum(const vec3d vector1, const vec3d vector2)
+{
+        vec3d v;
+        v.x = vector1.x + vector2.x;
+        v.y = vector1.y + vector2.y;
+        v.z = vector1.z + vector2.z;
+        return v;
+}
+
+/* Multiply vector by a number. */
+vec3d vmul(const vec3d vector, const double n)
+{
+        vec3d v;
+        v.x = vector.x * n;
+        v.y = vector.y * n;
+        v.z = vector.z * n;
+        return v;
+}
+
+/* Divide vector by a number. */
+vec3d vdiv(const vec3d vector, const double n)
+{
+        vec3d v;
+        v.x = vector.x / n;
+        v.y = vector.y / n;
+        v.z = vector.z / n;
+        return v;
+}
+
+/* Return the Euclidean norm. */
+double vnorm(const vec3d vector)
+{
+        return sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+/* Return the dot product of two vectors. */
+double dot(const vec3d vector1, const vec3d vector2)
+{
+        return vector1.x * vector2.x + vector1.y * vector2.y + vector1.z * vector2.z;
+}
+
+/* Replace vector with its cross product with another vector. */
+vec3d cross(const vec3d vector1, const vec3d vector2)
+{
+        vec3d v;
+        v.x = vector1.y * vector2.z - vector1.z * vector2.y;
+        v.y = vector1.z * vector2.x - vector1.x * vector2.z;
+        v.z = vector1.x * vector2.y - vector1.y * vector2.x;
+        return v;
+}
+
+/* Return zero if successful, negative error otherwise.
+ * The last parameter is the largest nonnegative number considered zero;
+ * it is somewhat analoguous to machine epsilon (but inclusive).
+*/
+int trilateration(vec3d *const result1, vec3d *const result2,
+                  const vec3d p1, const double r1,
+                  const vec3d p2, const double r2,
+                  const vec3d p3, const double r3,
+                  const double maxzero)
+{
+        vec3d   ex, ey, ez, t1, t2;
+        double  h, i, j, x, y, z, t;
+
+        /* h = |p2 - p1|, ex = (p2 - p1) / |p2 - p1| */
+        ex = vdiff(p2, p1);
+        h = vnorm(ex);
+        if (h <= maxzero) {
+                /* p1 and p2 are concentric. */
+                return -1;
+        }
+        ex = vdiv(ex, h);
+
+        /* t1 = p3 - p1, t2 = ex (ex . (p3 - p1)) */
+        t1 = vdiff(p3, p1);
+        i = dot(ex, t1);
+        t2 = vmul(ex, i);
+
+        /* ey = (t1 - t2), t = |t1 - t2| */
+        ey = vdiff(t1, t2);
+        t = vnorm(ey);
+        if (t > maxzero) {
+                /* ey = (t1 - t2) / |t1 - t2| */
+                ey = vdiv(ey, t);
+
+                /* j = ey . (p3 - p1) */
+                j = dot(ey, t1);
+        } else
+                j = 0.0;
+
+        /* Note: t <= maxzero implies j = 0.0. */
+        if (fabs(j) <= maxzero) {
+                /* p1, p2 and p3 are colinear. */
+
+                /* Is point p1 + (r1 along the axis) the intersection? */
+                t2 = vsum(p1, vmul(ex, r1));
+                if (fabs(vnorm(vdiff(p2, t2)) - r2) <= maxzero &&
+                    fabs(vnorm(vdiff(p3, t2)) - r3) <= maxzero) {
+                        /* Yes, t2 is the only intersection point. */
+                        if (result1)
+                                *result1 = t2;
+                        if (result2)
+                                *result2 = t2;
+                        return 0;
+                }
+
+                /* Is point p1 - (r1 along the axis) the intersection? */
+                t2 = vsum(p1, vmul(ex, -r1));
+                if (fabs(vnorm(vdiff(p2, t2)) - r2) <= maxzero &&
+                    fabs(vnorm(vdiff(p3, t2)) - r3) <= maxzero) {
+                        /* Yes, t2 is the only intersection point. */
+                        if (result1)
+                                *result1 = t2;
+                        if (result2)
+                                *result2 = t2;
+                        return 0;
+                }
+
+                return -2;
+        }
+
+        /* ez = ex x ey */
+        ez = cross(ex, ey);
+
+        x = (r1*r1 - r2*r2) / (2*h) + h / 2;
+        y = (r1*r1 - r3*r3 + i*i) / (2*j) + j / 2 - x * i / j;
+        z = r1*r1 - x*x - y*y;
+        if (z < -maxzero) {
+                /* The solution is invalid. */
+                return -3;
+        } else
+        if (z > 0.0)
+                z = sqrt(z);
+        else
+                z = 0.0;
+
+        /* t2 = p1 + x ex + y ey */
+        t2 = vsum(p1, vmul(ex, x));
+        t2 = vsum(t2, vmul(ey, y));
+
+        /* result1 = p1 + x ex + y ey + z ez */
+        if (result1)
+                *result1 = vsum(t2, vmul(ez, z));
+
+        /* result1 = p1 + x ex + y ey - z ez */
+        if (result2)
+                *result2 = vsum(t2, vmul(ez, -z));
+
+        return 0;
+}
+#endif
+
+
 // double operator-(const QPointF &a, const QPointF &b)
 // {
 // 	return sqrt(dist2(a,b));
@@ -655,6 +841,146 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 	QHash<QString,double> distOverride;
 
+
+#if 0
+	if(numAps >= 3)
+	{
+		QString ap0 = apsVisible[0];
+		QString ap1 = apsVisible[1];
+		QString ap2 = apsVisible[2];
+
+		MapApInfo *info0 = apInfo(ap0);
+		MapApInfo *info1 = apInfo(ap1);
+		MapApInfo *info2 = apInfo(ap2);
+
+		QPointF p0 = info0->point;
+		QPointF p1 = info1->point;
+		QPointF p2 = info2->point;
+
+		QColor color0 = baseColorForAp(ap0);
+		QColor color1 = baseColorForAp(ap1);
+		QColor color2 = baseColorForAp(ap2);
+
+		// We assume triangulate() already stored drived loss factor into apInfo()
+		double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
+		double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+		double r2 = dBmToDistance(apMacToDbm[ap2], ap2) * m_pixelsPerMeter;
+
+		#ifdef VERBOSE_USER_GRAPHICS
+		// Render the estimated circles covered by these APs
+		if(!drawnFlag.contains(ap0))
+		{
+			drawnFlag.insert(ap0, true);
+
+			p.setPen(QPen(color0, penWidth));
+
+			if(isnan(r0))
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+			else
+				p.drawEllipse(p0, r0, r0);
+		}
+
+		if(!drawnFlag.contains(ap1))
+		{
+			drawnFlag.insert(ap1, true);
+
+			p.setPen(QPen(color1, penWidth));
+
+			if(isnan(r1))
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p1/r1 - radius 1 is NaN";
+			else
+				p.drawEllipse(p1, r1, r1);
+
+		}
+
+		if(!drawnFlag.contains(ap2))
+		{
+			drawnFlag.insert(ap2, true);
+
+			p.setPen(QPen(color2, penWidth));
+
+			if(isnan(r2))
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p2/r2 - radius 2 is NaN";
+			else
+				p.drawEllipse(p2, r2, r2);
+
+		}
+		#endif
+
+		vec3d   v0, v1, v2, o1, o2;
+		int     result;
+
+// 		&p1.x, &p1.y, &p1.z, &r1,
+// 		&p2.x, &p2.y, &p2.z, &r2,
+// 		&p3.x, &p3.y, &p3.z, &r3) == 12) {
+
+		v0.x = p0.x();
+		v0.y = p0.y();
+		v0.z = 0.0;
+
+		v1.x = p1.x();
+		v1.y = p1.y();
+		v1.z = 0.0;
+
+		v2.x = p2.x();
+		v2.y = p2.y();
+		v2.z = 0.0;
+		
+		result = trilateration(&o1, &o2, v0, r0, v1, r1, v2, r2, MAXZERO);
+
+		QPointF goodPoint;
+
+		if (result)
+			printf("[user locate] No solution (%d).\n", result);
+		else {
+			printf("[user locate] Solutions:\n");
+			printf("Solution 1: %g %g %g\n", o1.x, o1.y, o1.z);
+			printf("  Distance to sphere 1 is %g (radius %g)\n", vnorm(vdiff(o1, v0)), r0);
+			printf("  Distance to sphere 2 is %g (radius %g)\n", vnorm(vdiff(o1, v1)), r1);
+			printf("  Distance to sphere 3 is %g (radius %g)\n", vnorm(vdiff(o1, v2)), r2);
+			printf("Solution 2: %g %g %g\n", o2.x, o2.y, o2.z);
+			printf("  Distance to sphere 1 is %g (radius %g)\n", vnorm(vdiff(o2, v0)), r0);
+			printf("  Distance to sphere 2 is %g (radius %g)\n", vnorm(vdiff(o2, v1)), r1);
+			printf("  Distance to sphere 3 is %g (radius %g)\n", vnorm(vdiff(o2, v2)), r2);
+
+			QLineF line(o1.x, o1.y, o2.x, o2.y);
+			userPoly << line.p1() << line.p2();
+
+			goodPoint = line.pointAt(0.5);
+			
+
+			p.save();
+
+			#ifdef VERBOSE_USER_GRAPHICS
+			p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
+			p.setBrush(QColor(0,0,0,127));
+			p.drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+
+			//qDrawTextO(p, (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+			#endif
+
+			p.restore();
+
+			avgPoint += goodPoint;
+			count ++;
+		}
+
+	}
+	else
+	{
+		qDebug() << "[user locate] Less than 3 aps visible, cant trilaterate";
+	}
+#endif
+#if 1
+	if(numAps < 3)
+	{
+		qDebug() << "[user locate] Unable to locate, less than 3 APs visible";
+		m_userItem->setVisible(false);
+		return;
+	}
+
+	numAps = 3; // only consider the first 3 APs if more than 3
+
 	bool needFirstGoodPoint = false;
 	for(int i=0; i<numAps; i++)
 	{
@@ -686,13 +1012,19 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 			// Not really used - unneeded really since we're using the circle_circle_intersection
 			// routine below
-			QPointF calcPoint = triangulate(ap0, apMacToDbm[ap0],
-							ap1, apMacToDbm[ap1]);
+			QPointF calcPoint/* = triangulate(ap0, apMacToDbm[ap0],
+							ap1, apMacToDbm[ap1])*/;
 
 			// We assume triangulate() already stored drived loss factor into apInfo()
 			double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
 			double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
 
+// 			QPointF lossModel(2.7, 2.9);
+// 			double r0 = dBmToDistance(apMacToDbm[ap0], lossModel, -60, info0->txPower, info0->txGain) * m_pixelsPerMeter;
+// 			double r1 = dBmToDistance(apMacToDbm[ap1], lossModel, -60, info1->txPower, info1->txGain) * m_pixelsPerMeter;
+
+			//n = dBm < -60 ? 2.7 : 1.75;
+			
 			if(distOverride.contains(ap0))
 			       r0 = distOverride[ap0];
 
@@ -1099,6 +1431,8 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		}
 	}
 
+#endif
+
 // 	avgPoint.setX( avgPoint.x() / count );
 // 	avgPoint.setY( avgPoint.y() / count );
 	avgPoint /= count;
@@ -1109,7 +1443,26 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		p.setPen(QPen(Qt::black, 5));
 		p.setBrush(QColor(0,0,255,127));
 		p.drawPolygon(userPoly);
+
+		if(userPoly.size() >= 2)
+		{
+			double lenSum=0;
+			int lenCount=0;
+			for(int i=1; i<userPoly.size(); i++)
+			{
+				QLineF line(userPoly[i-1], userPoly[i]);
+
+				lenSum += line.length();
+				lenCount ++;
+			}
+
+			lenSum /= lenCount;
+			qDebug() << "avg len: "<<lenSum;
+		}
+		
 		p.restore();
+		
+		
 	}
 
 	penWidth = 20;
@@ -1139,6 +1492,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		p.drawEllipse(thisPredict, penWidth, penWidth);
 		#endif
 	}
+
 
 /*
 	p.setPen(QPen(Qt::blue,penWidth));
@@ -2371,9 +2725,10 @@ double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCut
 	// Merging the two provided gives:
 	// r=pow(10,(pTx+(gTx+gRx)*n-pRx)/20) / (41.88 * f) where r is in km and f is the frequency, e.g. 2442
 
-
+	//shortCutoff = 40;
 	// n is the loss factor describing obstacles, walls, reflection, etc, can be derived from existing data with driveObservedLossFactor()
 	double n   = dBm < shortCutoff ? lossFactor.x() : lossFactor.y();
+	//n = dBm < -60 ? 2.7 : 1.75;
 
 	double m   =  0.12; // (meters) - wavelength of 2442 MHz, freq of 802.11b/g radio
 	double Xa  =  3.00; // (double)rand()/(double)RAND_MAX * 17. + 3.; // normal rand var, std dev a=[3,20]
@@ -2381,7 +2736,7 @@ double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCut
 	double logDist = (1/(10*n)) * (txPower - dBm + txGain + rxGain - Xa + 20*log10(m) - 20*log10(4*Pi));
 	double distMeters = pow(10, logDist); // distance in meters
 
-	//qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist;
+	qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist<<", lf:"<<lossFactor<<", sc:"<<shortCutoff;
 
 	return distMeters;
 }
