@@ -209,7 +209,7 @@ void MapWindow::setupUi()
 	
 	
 	menu = menuBar()->addMenu(tr("&Edit"));
-	makeAction("Choose &Background...", SLOT(chooseBgSlot()), QKeySequence::UnknownKey); // 2nd arg to tr() is translator comment
+	makeAction("Choose &Background...", SLOT(chooseBgSlot()), QKeySequence::UnknownKey);
 	
 	m_apAction = new QAction(tr("&Mark AP Location"), this);
 	m_apAction->setCheckable(true);
@@ -218,6 +218,10 @@ void MapWindow::setupUi()
 	
 	menu->addSeparator();
 	makeAction("&Options...", SLOT(prefsSlot()), QKeySequence::Preferences);
+	
+	menu->addSeparator();
+	makeAction2("&Test Accuracy", m_scene, SLOT(testUserLocatorAccuracy()), QKeySequence::UnknownKey);
+	
 	#endif
 	
 	#ifdef Q_OS_ANDROID

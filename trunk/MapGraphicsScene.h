@@ -285,6 +285,8 @@ public slots:
 	
 	void setDevice(QString device);
 	
+	void testUserLocatorAccuracy();
+	
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent * mouseEvent);
 	virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent * mouseEvent);
@@ -448,6 +450,8 @@ protected:
 	bool m_renderUpdatesPaused;
 
 	bool m_debugFirstScan;
+	
+	QPointF m_userLocation;
 };
 
 #endif
