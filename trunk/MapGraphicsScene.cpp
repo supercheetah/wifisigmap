@@ -774,8 +774,14 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 		
 	// Used by MapGraphicsView HUD
 	emit scanResultsAvailable(results);
-	
-	updateUserLocationOverlay();
+		
+	updateUserLocationOverlay(
+	#ifdef Q_OS_ANDROID
+		-3
+	#else
+		+3
+	#endif
+	);
 	//updateApLocationOverlay();
 }
 
@@ -788,6 +794,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 	QList<double> errs;
 	QList<int> bins;
 	double binSize = 10.;
+	int maxCount = m_sigValues.size();
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		QList<WifiDataResult> results = val->scanResults;
@@ -798,7 +805,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		m_lastScanResults = results;
 		
 		// Do the location calculation and store the result in m_userLocation
-		updateUserLocationOverlay();
+		updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
 		
 		QLineF errorLine(val->point, m_userLocation);
 		double len     = errorLine.length(),
@@ -841,15 +848,32 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		printf("%d,%d\n", (int)(bin * binSize), bins[bin]);
 	printf("\n\n");
 
-	float standard_deviation = sqrt(numerator/denominator);
+	float stdDev = sqrt(numerator/denominator);
 	
-	QString results = QString("Accuracy (Error): \n   Avg: %1 ft\n   Min: %2 ft\n   Max: %3 ft\n   Std dev: %4 ft")
+	float bottomAvg95 = avg - (stdDev*2),
+	         topAvg95 = avg + (stdDev*2);
+
+	if(bottomAvg95 < 0)
+		bottomAvg95 = 0;
+	
+	double solveRatio = (double)count / (double)maxCount;
+	double solvePerc = (int)(solveRatio * 100);
+	
+	QString results = QString("Accuracy (Error): \n   Min: %2 ft\n   Max: %3 ft\n   Std dev: %4 ft\n    Avg: %1 ft\n   95% Radius: %5 ft - %6 ft\n    # Solutions: %7/%8 %9%\n\nSummary: #%9%: %1/%4 (%5-%6)")
 		.arg((int)avg)
 		.arg((int)min)
 		.arg((int)max)
-		.arg(standard_deviation);
+		.arg(stdDev)
+		.arg((int)bottomAvg95)
+		.arg((int)topAvg95)
+		.arg(count)
+		.arg(maxCount)
+		.arg(solvePerc);
 		
-	qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): avg error:"<<avg<<"ft, min:"<<min<<"ft, max:"<<max<<"ft, std dev:"<<standard_deviation<<"ft";
+	qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error stats: min:"<<min<<"ft, max:"<<max<<"ft, std dev:"<<stdDev<<"ft, avg:"<<avg<<"ft, 95% radius:"<<bottomAvg95<<"-"<<topAvg95<<"ft, # solutions:"<<count<<"/"<<maxCount<<", "<<solvePerc<<"%";
+	qDebug() << "\tSummary: "<<solvePerc<<"%: "<<avg<<"/"<<stdDev<<" ("<<bottomAvg95<<"/"<<topAvg95<<")\n";
+	
+	QApplication::processEvents();
 	
 	QMessageBox::information(0, "Accuracy Results", results);
 

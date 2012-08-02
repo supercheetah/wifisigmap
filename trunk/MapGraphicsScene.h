@@ -313,7 +313,7 @@ private slots:
 	
 	void scanFinished(QList<WifiDataResult>);
 	
-	void updateUserLocationOverlay();
+	void updateUserLocationOverlay(double rxGain=3., bool renderImage=true);
 	void updateApLocationOverlay();
 	
 	void updateSignalMarkers();
