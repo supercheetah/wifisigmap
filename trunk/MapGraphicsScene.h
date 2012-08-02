@@ -371,7 +371,7 @@ protected:
 	
 	QPointF triangulateAp(QString apMac, SigMapValue *val0, SigMapValue *val1);
 	
-	
+	void updateDrivedLossFactor(MapApInfo *info0);	
 	
 protected:
 	QPointF m_pressPnt;

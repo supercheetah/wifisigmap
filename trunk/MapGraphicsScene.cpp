@@ -6,9 +6,11 @@
 #include "SigMapRenderer.h"
 #include "ImageUtils.h"
 
+#ifndef DEBUG
 #ifdef Q_OS_ANDROID
 #include <QSensor>
 #include <QSensorReading>
+#endif
 #endif
 
 #ifndef Q_OS_ANDROID
@@ -146,7 +148,8 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 	qDebug() << "MapGraphicsScene: Setup and ready to go.";
 	
-	QTimer::singleShot(1000, this, SLOT(debugTest()));
+	//QTimer::singleShot(1000, this, SLOT(debugTest()));
+	QTimer::singleShot(500, this, SLOT(testUserLocatorAccuracy()));
 	
 	#ifdef OPENCV_ENABLED
 	m_kalman.predictionBegin(0,0);
@@ -190,7 +193,7 @@ void MapGraphicsScene::debugTest()
 {
 	// Disable sensor testing for now - I'll work more on it later.
 	return;
-
+	#ifndef DEBUG
 	#ifdef Q_OS_ANDROID
 	QList<QByteArray> sensorList = QtMobility::QSensor::sensorTypes();
 	qDebug() << "Sensor list length: "<<sensorList.size();
@@ -239,6 +242,7 @@ void MapGraphicsScene::debugTest()
 	    qDebug() << "No geo source found";
 	*/
 
+	#endif
 	#endif
 }
 
@@ -443,6 +447,7 @@ QVector<float> getRotationMatrixFromVector(QVector<float> rotationVector, int de
 
 void MapGraphicsScene::sensorReadingChanged()
 {
+	#ifndef DEBUG
 	#ifdef Q_OS_ANDROID
 	QtMobility::QSensor *sensor = qobject_cast<QtMobility::QSensor*>(sender());
 	const QtMobility::QSensorReading *reading = sensor->reading();
@@ -543,6 +548,7 @@ void MapGraphicsScene::sensorReadingChanged()
 			qDebug() << "\t Value " << i << ":" << reading->value(i);
 		*/
 	}
+	#endif
 	#endif
 }
 
@@ -780,6 +786,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 	double max = 0.;
 	int count = 0;
 	QList<double> errs;
+	QList<int> bins;
+	double binSize = 10.;
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		QList<WifiDataResult> results = val->scanResults;
@@ -789,42 +797,56 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		
 		m_lastScanResults = results;
 		
+		// Do the location calculation and store the result in m_userLocation
 		updateUserLocationOverlay();
 		
 		QLineF errorLine(val->point, m_userLocation);
-		double len = errorLine.length(), lenFoot = len / m_pixelsPerFoot;
+		double len     = errorLine.length(),
+		       lenFoot = len / m_pixelsPerFoot;
 		qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error: "<< lenFoot<<"ft";
 		
 		QApplication::processEvents();
 		
 		if(!isnan(lenFoot))
 		{
-			sum += lenFoot;
+			int bin = (int)(lenFoot / binSize);
+			while(bins.size() <= bin)
+				bins << 0;
+			bins[bin] ++;
+			
+			sum   += lenFoot;
 			count ++;
 			
 			errs << lenFoot;
+			
+			if(lenFoot < min)
+				min = lenFoot;
+			if(lenFoot > max)
+				max = lenFoot;
 		}
-		if(lenFoot < min)
-			min = lenFoot;
-		if(lenFoot > max)
-			max = lenFoot;
 	}
+	
+	
 	
 	double avg = sum / count;
 	
 	// find the standard deviation
 	float numerator = 0;
 	float denominator = (float)count;
-
 	foreach(double len, errs)
-		numerator = numerator + pow((len - avg), 2);
+		numerator += pow((len - avg), 2);
+		
+	printf("\n\nBin(Ft),Count\n");
+	for(int bin=0; bin<bins.size(); bin++)
+		printf("%d,%d\n", (int)(bin * binSize), bins[bin]);
+	printf("\n\n");
 
-	float standard_deviation = sqrt (numerator/denominator);
+	float standard_deviation = sqrt(numerator/denominator);
 	
-	QString results = QString("Accuracy: Avg error: %1 ft, min: %2 ft, max: %3 ft, std dev: %4 ft")
-		.arg(avg)
-		.arg(min)
-		.arg(max)
+	QString results = QString("Accuracy (Error): \n   Avg: %1 ft\n   Min: %2 ft\n   Max: %3 ft\n   Std dev: %4 ft")
+		.arg((int)avg)
+		.arg((int)min)
+		.arg((int)max)
 		.arg(standard_deviation);
 		
 	qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): avg error:"<<avg<<"ft, min:"<<min<<"ft, max:"<<max<<"ft, std dev:"<<standard_deviation<<"ft";
