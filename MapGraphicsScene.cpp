@@ -11,6 +11,10 @@
 #include <QSensorReading>
 #endif
 
+#ifndef Q_OS_ANDROID
+#define ITEMS_SCALE_INVARIENT
+#endif
+
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
 //#define Q_OS_ANDROID
 
@@ -80,7 +84,7 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 
 	// Setup the "longpress" timer
 	connect(&m_longPressTimer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
-	m_longPressTimer.setInterval(1500);
+	m_longPressTimer.setInterval(1250);
 	m_longPressTimer.setSingleShot(true);
 	
 	// Setup the longpress "progress counter" (display progress to user)
@@ -120,8 +124,8 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	
 	// Load basic settings
 	QSettings settings("wifisigmap");
-	m_showMyLocation       = settings.value("showMyLocation", true).toBool();
-	m_autoGuessApLocations = settings.value("autoGuessApLocations", true).toBool();
+	m_showMyLocation       = settings.value("showMyLocation", false).toBool();
+	m_autoGuessApLocations = settings.value("autoGuessApLocations", false).toBool();
 
 	// Set defualt pixels per foot
 	setPixelsPerFoot(0.25/10);
@@ -130,7 +134,12 @@ MapGraphicsScene::MapGraphicsScene(MapWindow *map)
 	setDevice(settings.value("device", "").toString());
 
 	// Load last render mode
+	// Ignore settings JUST for DEBUGGING
+#ifdef Q_OS_ANDROID
+	m_renderMode = (RenderMode)0; //settings.value("rendermode", (int)DEFAULT_RENDER_MODE).toInt();
+#else
 	m_renderMode = (RenderMode)settings.value("rendermode", (int)DEFAULT_RENDER_MODE).toInt();
+#endif
 
 	// Ask MapRenderOpts to load itself from QSettings
 	m_renderOpts.loadFromQSettings();
@@ -568,6 +577,8 @@ void MapGraphicsScene::setMarkApMode(bool flag)
 
 void MapGraphicsScene::clear()
 {
+	m_currentMapFilename = "";
+
 	qDeleteAll(m_apInfo.values());
 	m_apInfo.clear();
 	m_sigValues.clear();
@@ -690,7 +701,9 @@ void MapGraphicsScene::addApMarker(QPointF point, QString mac)
 	markerGroup = tinted(markerGroup, baseColorForAp(mac));
 
 	QGraphicsPixmapItem *item = addPixmap(QPixmap::fromImage(markerGroup));
+#ifdef ITEMS_SCALE_INVARIENT
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+#endif
 	
 	double w2 = (double)(markerGroup.width())/2.;
 	double h2 = (double)(markerGroup.height())/2.;
@@ -1201,7 +1214,9 @@ SigMapValue *MapGraphicsScene::addSignalMarker(QPointF point, QList<WifiDataResu
 	// Optimize modes and tweak flags 
 	item->setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
  	item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+#ifdef ITEMS_SCALE_INVARIENT
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+#endif
 	item->setZValue(199);
 	
 	//item->setOpacity(0);
@@ -1639,6 +1654,7 @@ QPointF qPointFFromString(QString string)
 
 void MapGraphicsScene::saveResults(QString filename)
 {
+	m_currentMapFilename = filename;
 	QFileInfo info(filename);
 	if(info.exists() && !info.isWritable())
 	{
@@ -1734,6 +1750,9 @@ void MapGraphicsScene::loadResults(QString filename)
 	
 	clear(); // clear and reset the map
 	
+	// Set current filename after clear() because clear() clears m_currentMapFilename
+	m_currentMapFilename = filename;
+
 	// Load background file
 	QString bg = data.value("background").toString();
 	if(!bg.isEmpty())
@@ -1891,7 +1910,13 @@ void MapRenderOptions::loadFromQSettings()
 	QSettings settings("wifisigmap");
 	
 	cacheMapRender     	= settings.value("ropts-cacheMapRender", 	true).toBool();
+#ifdef Q_OS_ANDROID
+	// default to false for some debugging I'm working on
+	showReadingMarkers 	= false; //settings.value("ropts-showReadingMarkers", 	true).toBool();
+#else
 	showReadingMarkers 	= settings.value("ropts-showReadingMarkers", 	true).toBool();
+#endif
+
 	multipleCircles		= settings.value("ropts-multipleCircles", 	false).toBool();
 	fillCircles		= settings.value("ropts-fillCircles", 		true).toBool();
 	radialCircleSteps	= settings.value("ropts-radialCircleSteps", 	4 * 4 * 4).toInt();

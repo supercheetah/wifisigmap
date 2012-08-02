@@ -43,6 +43,8 @@ protected slots:
 	void showMainMenu();
 	void toggleMainMenu();
 
+	void autosave();
+
 private:
 	MapGraphicsView *m_gv;
 	MapGraphicsScene *m_scene;
@@ -55,6 +57,8 @@ private:
 	QToolButton *makeAndroidToolButton(QWidget *parent, QObject *obj, const char *slot, QString text, QString icon, int width=270);
 	
 	QWidget *m_mainMenuWidget;
+
+	QTimer m_autosaveTimer;
 };
 
 #endif

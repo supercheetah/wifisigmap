@@ -114,6 +114,10 @@ MapWindow::MapWindow(QWidget *parent)
 	setWindowTitle("WiFi Signal Mapper");
 	setWindowIcon(QPixmap(":/data/images/icon.png"));
 	setupUi();
+
+	connect(&m_autosaveTimer, SIGNAL(timeout()), this, SLOT(autosave()));
+	m_autosaveTimer.setInterval(30 * 1000);
+	m_autosaveTimer.start();
 	
 	QString lastFile = QSettings("wifisigmap").value("last-map-file","").toString();
 	if(!lastFile.isEmpty())
@@ -148,7 +152,7 @@ MapWindow::MapWindow(QWidget *parent)
 	if(parent)
 		parent->installEventFilter(this);
 	#endif
-	
+
 	// Just here for debugging
 	//showMainMenu();
 }
@@ -192,6 +196,7 @@ void MapWindow::setupUi()
 	m_scene = new MapGraphicsScene(this);
 	m_gv->setMapScene(m_scene);
 	
+	m_apButton = 0;
 	m_apAction = 0;
 	m_mainMenuWidget = 0;
 	
@@ -236,16 +241,16 @@ void MapWindow::setupUi()
 	
 	vbox->setContentsMargins(0,0,0,0);
 
-#if 0
 	QHBoxLayout *hbox;
 	hbox = new QHBoxLayout();
 
+#ifndef Q_OS_ANDROID
 	// Just for testing
 	makeButton(hbox, "Menu Button",  SLOT(toggleMainMenu()));
-	
-//	makeButton(hbox, "New",  SLOT(clearSlot()));
-// 	makeButton(hbox, "Load", SLOT(loadSlot()));
-// 	makeButton(hbox, "Save", SLOT(saveSlot()));
+#else
+	makeButton(hbox, "New",  SLOT(clearSlot()));
+	makeButton(hbox, "Load", SLOT(loadSlot()));
+	makeButton(hbox, "Save", SLOT(saveSlot()));
 	
 // 	#ifndef Q_OS_ANDROID
 // 	// Disable on android because until I rewrite the file browser dialog,
@@ -256,7 +261,24 @@ void MapWindow::setupUi()
 // 	makeButton2(m_gv, hbox, "+", SLOT(zoomIn()));
 // 	makeButton2(m_gv, hbox, "-", SLOT(zoomOut()));
 // 	
- 	vbox->addLayout(hbox);
+	m_apButton = new QPushButton("Mark AP");
+	m_apButton->setCheckable(true);
+	m_apButton->setChecked(false);
+	connect(m_apButton, SIGNAL(toggled(bool)), m_scene, SLOT(setMarkApMode(bool)));
+	hbox->addWidget(m_apButton);
+
+
+	#ifdef Q_OS_ANDROID
+	QString size = "64x64";
+	#else
+	QString size = "32x32";
+	#endif
+
+	QPushButton *prefs = new QPushButton(QPixmap(tr(":/data/images/%1/stock-preferences.png").arg(size)), "");
+	connect(prefs, SIGNAL(clicked()), this, SLOT(prefsSlot()));
+	hbox->addWidget(prefs);
+
+	vbox->addLayout(hbox);
 #endif
 
 	vbox->addWidget(m_gv);
@@ -362,6 +384,8 @@ void MapWindow::flagApModeCleared()
 	
 	if(m_apAction)
 		m_apAction->setChecked(false);
+	if(m_apButton)
+		m_apButton->setChecked(false);
 }
 
 void MapWindow::chooseBgSlot()
@@ -422,6 +446,9 @@ void MapWindow::loadSlot()
 // 			QMessageBox::critical(this,tr("File Does Not Exist"),tr("Sorry, but the file you chose does not exist. Please try again."));
 // 		}
 		setStatusMessage(tr("<font color='green'>Loaded %1</font>").arg(fileName), 3000);
+
+		if(!m_autosaveTimer.isActive())
+			m_autosaveTimer.start();
 	}
 }
 
@@ -453,6 +480,21 @@ void MapWindow::saveSlot()
 		setStatusMessage(tr("<font color='green'>Saved %1</font>").arg(fileName), 3000);
 	}
 
+}
+
+void MapWindow::autosave()
+{
+	QString fileName = m_scene->currentMapFilename();
+
+	if(!fileName.isEmpty())
+	{
+		qDebug() << "MapWindow::autosave(): Saving to: "<<fileName;
+		setStatusMessage(tr("Saving..."));
+		m_scene->saveResults(fileName);
+		setStatusMessage(tr("<font color='green'>Saved %1</font>").arg(fileName), 500);
+	}
+	else
+		qDebug() << "MapWindow::autosave(): Not autosaving, no file loaded.";
 }
 
 void MapWindow::clearSlot()
