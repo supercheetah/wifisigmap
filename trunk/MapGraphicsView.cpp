@@ -80,7 +80,10 @@ MapGraphicsView::MapGraphicsView()
 	setCacheMode(CacheBackground);
 	//setViewportUpdateMode(BoundingRectViewportUpdate);
 	//setRenderHint(QPainter::Antialiasing);
-	setTransformationAnchor(AnchorUnderMouse);
+	//setTransformationAnchor(AnchorUnderMouse);
+#ifdef Q_OS_ANDROID
+	setTransformationAnchor(QGraphicsView::AnchorViewCenter);
+#endif
 	setResizeAnchor(AnchorViewCenter);
 	setDragMode(QGraphicsView::ScrollHandDrag);
 

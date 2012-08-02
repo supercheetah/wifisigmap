@@ -424,7 +424,11 @@ void MapGraphicsScene::updateUserLocationOverlay()
 	}
 
 
+#ifdef Q_OS_ANDROID
+	QImage image(QSize(origSize.width()*1,origSize.height()*1), QImage::Format_ARGB32_Premultiplied);
+#else
 	QImage image(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
+#endif
 	QPointF offset = QPointF();
 
 	memset(image.bits(), 0, image.byteCount());
@@ -798,7 +802,11 @@ void MapGraphicsScene::updateUserLocationOverlay()
 //		memset(image.bits(), 0, image.byteCount());
 	QPainter p(&image);
 	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
+
+#ifndef Q_OS_ANDROID
+	// on Android, we don't use a "x2" size, so translate is not needed
 	p.translate(origSize.width()/2,origSize.height()/2);
+#endif
 
 	//QPainter p(&image);
 
