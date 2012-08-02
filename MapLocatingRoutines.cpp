@@ -398,6 +398,19 @@ int trilateration(vec3d *const result1, vec3d *const result2,
 
 QPointF operator*(const QPointF&a, const QPointF& b) { return QPointF(a.x()*b.x(), a.y()*b.y()); }
 
+void MapGraphicsScene::updateDrivedLossFactor(MapApInfo *info)
+{
+	if(info->lossFactor.isNull() ||
+	  (info->lossFactorKey > -1 && info->lossFactorKey != m_sigValues.size()))
+	{
+		QPointF lossFactor = deriveObservedLossFactor(info->mac);
+
+		// Store newly-derived loss factors into apInfo() for use in dBmToDistance()
+		info->lossFactor    = lossFactor;
+		info->lossFactorKey = m_sigValues.size();
+	}
+}
+
 void MapGraphicsScene::updateUserLocationOverlay()
 {
 	if(!m_showMyLocation)
@@ -1009,9 +1022,11 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QString ap0 = apsVisible[i];
 			QString ap1 = apsVisible[j];
 
-
 			MapApInfo *info0 = apInfo(ap0);
 			MapApInfo *info1 = apInfo(ap1);
+			
+			updateDrivedLossFactor(info0);
+			updateDrivedLossFactor(info1);
 
 			QPointF p0 = info0->point;
 			QPointF p1 = info1->point;
