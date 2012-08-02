@@ -341,18 +341,27 @@ void MapWindow::prefsSlot()
 
 void MapWindow::setStatusMessage(const QString& msg, int timeout)
 {
+	QString nonConstMsg = msg;
+	
 	#ifndef Q_OS_ANDROID
-	statusBar()->showMessage(msg, timeout);
+	if(Qt::mightBeRichText(nonConstMsg))
+	{
+		QTextDocument doc;
+		doc.setHtml(nonConstMsg);
+		nonConstMsg = doc.toPlainText();
+	}
+	
+	statusBar()->showMessage(nonConstMsg, timeout);
 	#endif
 	
 // 	#ifdef Q_OS_ANDROID
-// 	m_statusMsg->setText("<font size='-2'>"+msg+"</b>");
+// 	m_statusMsg->setText("<font size='-2'>"+nonConstMsg+"</b>");
 // 	#else
-// 	m_statusMsg->setText("<b>"+msg+"</b>");
+// 	m_statusMsg->setText("<b>"+nonConstMsg+"</b>");
 // 	#endif
 //
-	m_gv->setStatusMessage(msg);
-	//qDebug() << "MapWindow::setStatusMessage("<<msg<<","<<timeout<<")";
+	m_gv->setStatusMessage(nonConstMsg);
+	//qDebug() << "MapWindow::setStatusMessage("<<nonConstMsg<<","<<timeout<<")";
 
 	if(timeout > 0)
 	{

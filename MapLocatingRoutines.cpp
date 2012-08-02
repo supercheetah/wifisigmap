@@ -411,7 +411,7 @@ void MapGraphicsScene::updateDrivedLossFactor(MapApInfo *info)
 	}
 }
 
-void MapGraphicsScene::updateUserLocationOverlay()
+void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage)
 {
 	if(!m_showMyLocation)
 	{
@@ -436,16 +436,22 @@ void MapGraphicsScene::updateUserLocationOverlay()
 		return;
 	}
 
-
-#ifdef Q_OS_ANDROID
-	QImage image(QSize(origSize.width()*1,origSize.height()*1), QImage::Format_ARGB32_Premultiplied);
-#else
-	QImage image(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
-#endif
+	QImage image;
+	
+	if(renderImage)
+	{
+	
+	#ifdef Q_OS_ANDROID
+		image = QImage(QSize(origSize.width()*1,origSize.height()*1), QImage::Format_ARGB32_Premultiplied);
+	#else
+		image = QImage(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
+	#endif
+		memset(image.bits(), 0, image.byteCount());
+		//image.fill(QColor(255,0,0,50).rgba());
+	}
+	
 	QPointF offset = QPointF();
 
-	memset(image.bits(), 0, image.byteCount());
-	//image.fill(QColor(255,0,0,50).rgba());
 
 
 	/// JUST for debugging
@@ -813,17 +819,22 @@ void MapGraphicsScene::updateUserLocationOverlay()
 //		offset = QPointF();
 
 //		memset(image.bits(), 0, image.byteCount());
-	QPainter p(&image);
-	p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
-
-#ifndef Q_OS_ANDROID
-	// on Android, we don't use a "x2" size, so translate is not needed
-	p.translate(origSize.width()/2,origSize.height()/2);
-#endif
+	QPainter *p = 0;
+	
+	if(renderImage)
+	{
+		p = new QPainter(&image);
+		p->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::HighQualityAntialiasing);
+	
+	#ifndef Q_OS_ANDROID
+		// on Android, we don't use a "x2" size, so translate is not needed
+		p->translate(origSize.width()/2,origSize.height()/2);
+	#endif
+	}
 
 	//QPainter p(&image);
 
-	//p.setPen(Qt::black);
+	//p->setPen(Qt::black);
 
 //	QRectF rect(QPointF(0,0),itemWorldRect.size());
 // 	QRectF rect = itemWorldRect;
@@ -856,9 +867,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 	QStringList pairsTested;
 
-	QFont font = p.font();
-	font.setPointSizeF(6 * m_pixelsPerFoot);
-	p.setFont(font);
+	if(renderImage)
+	{
+		QFont font = p->font();
+		font.setPointSizeF(6 * m_pixelsPerFoot);
+		p->setFont(font);
+	}
 
 	QHash<QString,double> distOverride;
 
@@ -889,42 +903,45 @@ void MapGraphicsScene::updateUserLocationOverlay()
 
 		#ifdef VERBOSE_USER_GRAPHICS
 		// Render the estimated circles covered by these APs
-		if(!drawnFlag.contains(ap0))
+		if(renderImage)
 		{
-			drawnFlag.insert(ap0, true);
-
-			p.setPen(QPen(color0, penWidth));
-
-			if(isnan(r0))
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
-			else
-				p.drawEllipse(p0, r0, r0);
-		}
-
-		if(!drawnFlag.contains(ap1))
-		{
-			drawnFlag.insert(ap1, true);
-
-			p.setPen(QPen(color1, penWidth));
-
-			if(isnan(r1))
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p1/r1 - radius 1 is NaN";
-			else
-				p.drawEllipse(p1, r1, r1);
-
-		}
-
-		if(!drawnFlag.contains(ap2))
-		{
-			drawnFlag.insert(ap2, true);
-
-			p.setPen(QPen(color2, penWidth));
-
-			if(isnan(r2))
-				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p2/r2 - radius 2 is NaN";
-			else
-				p.drawEllipse(p2, r2, r2);
-
+			if(!drawnFlag.contains(ap0))
+			{
+				drawnFlag.insert(ap0, true);
+	
+				p->setPen(QPen(color0, penWidth));
+	
+				if(isnan(r0))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+				else
+					p->drawEllipse(p0, r0, r0);
+			}
+	
+			if(!drawnFlag.contains(ap1))
+			{
+				drawnFlag.insert(ap1, true);
+	
+				p->setPen(QPen(color1, penWidth));
+	
+				if(isnan(r1))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p1/r1 - radius 1 is NaN";
+				else
+					p->drawEllipse(p1, r1, r1);
+	
+			}
+	
+			if(!drawnFlag.contains(ap2))
+			{
+				drawnFlag.insert(ap2, true);
+	
+				p->setPen(QPen(color2, penWidth));
+	
+				if(isnan(r2))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<"->"<<ap2<<": - Can't render ellipse p2/r2 - radius 2 is NaN";
+				else
+					p->drawEllipse(p2, r2, r2);
+	
+			}
 		}
 		#endif
 
@@ -970,17 +987,20 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			goodPoint = line.pointAt(0.5);
 			
 
-			p.save();
-
-			#ifdef VERBOSE_USER_GRAPHICS
-			p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
-			p.setBrush(QColor(0,0,0,127));
-			p.drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
-
-			//qDrawTextO(p, (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
-			#endif
-
-			p.restore();
+			if(renderImage)
+			{
+				p->save();
+	
+				#ifdef VERBOSE_USER_GRAPHICS
+				p->setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
+				p->setBrush(QColor(0,0,0,127));
+				p->drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+	
+				//qDrawTextO((*p), (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+				#endif
+	
+				p->restore();
+			}
 
 			avgPoint += goodPoint;
 			count ++;
@@ -1038,13 +1058,12 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QPointF calcPoint/* = triangulate(ap0, apMacToDbm[ap0],
 							ap1, apMacToDbm[ap1])*/;
 
-			// We assume triangulate() already stored drived loss factor into apInfo()
-			double r0 = dBmToDistance(apMacToDbm[ap0], ap0) * m_pixelsPerMeter;
-			double r1 = dBmToDistance(apMacToDbm[ap1], ap1) * m_pixelsPerMeter;
+			double r0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain) * m_pixelsPerMeter;
+			double r1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain) * m_pixelsPerMeter;
 
 // 			QPointF lossModel(2.7, 2.9);
-// 			double r0 = dBmToDistance(apMacToDbm[ap0], lossModel, -60, info0->txPower, info0->txGain) * m_pixelsPerMeter;
-// 			double r1 = dBmToDistance(apMacToDbm[ap1], lossModel, -60, info1->txPower, info1->txGain) * m_pixelsPerMeter;
+// 			double r0 = dBmToDistance(apMacToDbm[ap0], lossModel, -60, info0->txPower, info0->txGain, rxGain) * m_pixelsPerMeter;
+// 			double r1 = dBmToDistance(apMacToDbm[ap1], lossModel, -60, info1->txPower, info1->txGain, rxGain) * m_pixelsPerMeter;
 
 			//n = dBm < -60 ? 2.7 : 1.75;
 			
@@ -1144,7 +1163,7 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 				else
 				if(!distOverride.contains(ap1))
 				{
-					r1 += errorDist * 1.0;
+					r1 += errorDist * 1.1;
 					distOverride[ap1] = r1;
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
@@ -1212,30 +1231,33 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			QColor color1 = baseColorForAp(ap1);
 
 			#ifdef VERBOSE_USER_GRAPHICS
-			// Render the estimated circles covered by these APs
-			if(!drawnFlag.contains(ap0))
+			if(renderImage)
 			{
-				drawnFlag.insert(ap0, true);
-
-				p.setPen(QPen(color0, penWidth));
-
-				if(isnan(r0))
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
-				else
-					p.drawEllipse(p0, r0, r0);
-			}
-
-			if(!drawnFlag.contains(ap1))
-			{
-				drawnFlag.insert(ap1, true);
-
-				p.setPen(QPen(color1, penWidth));
-
-				if(isnan(r1))
-					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
-				else
-					p.drawEllipse(p1, r1, r1);
-
+				// Render the estimated circles covered by these APs
+				if(!drawnFlag.contains(ap0))
+				{
+					drawnFlag.insert(ap0, true);
+	
+					p->setPen(QPen(color0, penWidth));
+	
+					if(isnan(r0))
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+					else
+						p->drawEllipse(p0, r0, r0);
+				}
+	
+				if(!drawnFlag.contains(ap1))
+				{
+					drawnFlag.insert(ap1, true);
+	
+					p->setPen(QPen(color1, penWidth));
+	
+					if(isnan(r1))
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+					else
+						p->drawEllipse(p1, r1, r1);
+	
+				}
 			}
 			#endif
 
@@ -1278,8 +1300,11 @@ void MapGraphicsScene::updateUserLocationOverlay()
 			else
 			{
 				#ifdef VERBOSE_USER_GRAPHICS
-				p.setPen(QPen(Qt::gray, penWidth));
-				p.drawLine(line);
+				if(renderImage)
+				{
+					p->setPen(QPen(Qt::gray, penWidth));
+					p->drawLine(line);
+				}
 				#endif
 
 				if(goodPoints.isEmpty())
@@ -1386,69 +1411,77 @@ void MapGraphicsScene::updateUserLocationOverlay()
 					userPoly << tmpPoint;
 
 					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<tmpPoint << " (from last intersection)";
-
-
-					p.save();
-
-		// 			p.setPen(QPen(color0, penWidth));
-		// 			p.drawLine(p0, calcPoint);
-		//
-		// 			p.setPen(QPen(color1, penWidth));
-		// 			p.drawLine(p1, calcPoint);
-
-					#ifdef VERBOSE_USER_GRAPHICS
-					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
-					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
-
-					qDrawTextO(p, (int)tmpPoint.x(), (int)tmpPoint.y(), QString("%1 - %2 (%3/%4) [a]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
-					#endif
-
-					p.restore();
-
+					
+					if(renderImage)
+					{
+	
+						p->save();
+	
+			// 			p->setPen(QPen(color0, penWidth));
+			// 			p->drawLine(p0, calcPoint);
+			//
+			// 			p->setPen(QPen(color1, penWidth));
+			// 			p->drawLine(p1, calcPoint);
+	
+						#ifdef VERBOSE_USER_GRAPHICS
+						p->setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
+						p->setBrush(QColor(0,0,0,127));
+						p->drawEllipse(tmpPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+	
+						qDrawTextO((*p), (int)tmpPoint.x(), (int)tmpPoint.y(), QString("%1 - %2 (%3/%4) [a]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+						#endif
+	
+						p->restore();
+					}
+					
 					avgPoint += tmpPoint;
 					count ++;
 				}
 
 				calcPoint = goodPoint;
 
+				if(renderImage)
+				{
+					if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
+					{
+					//	qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
+					}
+					else
+					{
+						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
+						//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
+	
+						userPoly << goodPoint;
+	
+						p->save();
+	
+			// 			p->setPen(QPen(color0, penWidth));
+			// 			p->drawLine(p0, calcPoint);
+			//
+			// 			p->setPen(QPen(color1, penWidth));
+			// 			p->drawLine(p1, calcPoint);
+	
+						#ifdef VERBOSE_USER_GRAPHICS
+						p->setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
+						p->setBrush(QColor(0,0,0,127));
+						p->drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
+	
+						qDrawTextO((*p), (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
+						#endif
+	
+						p->restore();
+					}
+				}
+
 				if(isnan(calcPoint.x()) || isnan(calcPoint.y()))
 				{
-				//	qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse - calcPoint is NaN";
-				}
-				else
-				{
-					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
-					//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
-
-					userPoly << goodPoint;
-
-					p.save();
-
-		// 			p.setPen(QPen(color0, penWidth));
-		// 			p.drawLine(p0, calcPoint);
-		//
-		// 			p.setPen(QPen(color1, penWidth));
-		// 			p.drawLine(p1, calcPoint);
-
-					#ifdef VERBOSE_USER_GRAPHICS
-					p.setPen(QPen(Qt::gray, 1. * m_pixelsPerFoot));
-					p.setBrush(QColor(0,0,0,127));
-					p.drawEllipse(goodPoint, 2 * m_pixelsPerFoot, 2* m_pixelsPerFoot);
-
-					qDrawTextO(p, (int)goodPoint.x(), (int)goodPoint.y(), QString("%1 - %2 (%3/%4) [b]").arg(info0->essid).arg(info1->essid).arg(i).arg(j));
-					#endif
-
-					p.restore();
-
-
 					avgPoint += calcPoint;
 					count ++;
 				}
 			}
 
-			//p.setPen(QPen(Qt::gray, penWidth));
-			//p.drawLine(p0, p1);
+			//p->setPen(QPen(Qt::gray, penWidth));
+			//p->drawLine(p0, p1);
 
 			//break;
 		}
@@ -1460,142 +1493,148 @@ void MapGraphicsScene::updateUserLocationOverlay()
 // 	avgPoint.setY( avgPoint.y() / count );
 	avgPoint /= count;
 
-
+	if(renderImage)
 	{
-		p.save();
-		p.setPen(QPen(Qt::black, 5));
-		p.setBrush(QColor(0,0,255,127));
-		p.drawPolygon(userPoly);
-
-		if(userPoly.size() >= 2)
 		{
-			double lenSum=0;
-			int lenCount=0;
-			for(int i=1; i<userPoly.size(); i++)
+			p->save();
+			p->setPen(QPen(Qt::black, 5));
+			p->setBrush(QColor(0,0,255,127));
+			p->drawPolygon(userPoly);
+	
+			if(userPoly.size() >= 2)
 			{
-				QLineF line(userPoly[i-1], userPoly[i]);
-
-				lenSum += line.length();
-				lenCount ++;
+				double lenSum=0;
+				int lenCount=0;
+				for(int i=1; i<userPoly.size(); i++)
+				{
+					QLineF line(userPoly[i-1], userPoly[i]);
+	
+					lenSum += line.length();
+					lenCount ++;
+				}
+	
+				lenSum /= lenCount;
+				qDebug() << "avg len: "<<lenSum;
 			}
-
-			lenSum /= lenCount;
-			qDebug() << "avg len: "<<lenSum;
+			
+			p->restore();
+			
+			
 		}
-		
-		p.restore();
-		
-		
-	}
 
-	penWidth = 20;
-
-// 	p.setPen(QPen(Qt::green, 10.));
-// 	p.setBrush(QColor(0,0,0,127));
-// 	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
-// 		p.drawEllipse(avgPoint, penWidth, penWidth);
-
-	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
-	{
-		p.setPen(QPen(Qt::red, 2. * m_pixelsPerFoot));
-
-		p.setBrush(QColor(0,0,0,127));
-		p.drawEllipse(avgPoint, penWidth, penWidth);
-
-		#ifdef OPENCV_ENABLED
-		m_kalman.predictionUpdate((float)avgPoint.x(), (float)avgPoint.y());
-
-		float x = avgPoint.x(), y = avgPoint.y();
-		m_kalman.predictionReport(x, y);
-		QPointF thisPredict(x,y);
-
-		p.setPen(QPen(Qt::blue, 2. * m_pixelsPerFoot));
-
-		p.setBrush(QColor(0,0,0,127));
-		p.drawEllipse(thisPredict, penWidth, penWidth);
-		
-		avgPoint = thisPredict;
-		#endif
+		penWidth = 20;
+	
+	// 	p->setPen(QPen(Qt::green, 10.));
+	// 	p->setBrush(QColor(0,0,0,127));
+	// 	if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+	// 		p->drawEllipse(avgPoint, penWidth, penWidth);
+	
+		if(!isnan(avgPoint.x()) && !isnan(avgPoint.y()))
+		{
+			p->setPen(QPen(Qt::red, 2. * m_pixelsPerFoot));
+	
+			p->setBrush(QColor(0,0,0,127));
+			p->drawEllipse(avgPoint, penWidth, penWidth);
+	
+			#ifdef OPENCV_ENABLED
+			m_kalman.predictionUpdate((float)avgPoint.x(), (float)avgPoint.y());
+	
+			float x = avgPoint.x(), y = avgPoint.y();
+			m_kalman.predictionReport(x, y);
+			QPointF thisPredict(x,y);
+	
+			p->setPen(QPen(Qt::blue, 2. * m_pixelsPerFoot));
+	
+			p->setBrush(QColor(0,0,0,127));
+			p->drawEllipse(thisPredict, penWidth, penWidth);
+			
+			avgPoint = thisPredict;
+			#endif
+		}
 	}
 	
 	m_userLocation = avgPoint;
 
 
 /*
-	p.setPen(QPen(Qt::blue,penWidth));
+	p->setPen(QPen(Qt::blue,penWidth));
 // 	QPointF s1 = line.p1() - itemWorldRect.topLeft();
 // 	QPointF s2 = line.p2() - itemWorldRect.topLeft();
 	QPointF s1 = line.p1();
 	QPointF s2 = line.p2();
 
-	//p.drawLine(s1,s2);
+	//p->drawLine(s1,s2);
 
 	QImage user(tr(":/data/images/%1/stock-media-rec.png").arg(size));
-	p.drawImage((s1+s2)/2., user.scaled(128,128));
+	p->drawImage((s1+s2)/2., user.scaled(128,128));
 
-	p.setBrush(Qt::blue);
-// 	p.drawRect(QRectF(s1.x()+3,s1.y()+3,6,6));
-// 	p.drawRect(QRectF(s2.x()-3,s2.y()-3,6,6));
+	p->setBrush(Qt::blue);
+// 	p->drawRect(QRectF(s1.x()+3,s1.y()+3,6,6));
+// 	p->drawRect(QRectF(s2.x()-3,s2.y()-3,6,6));
 
-	p.setBrush(QBrush());
-	//p.drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
-	p.setPen(QPen(Qt::white,penWidth));
-// 	p.drawEllipse(p0, r0,r0);
-	p.drawEllipse(p0, la,la);
-	p.setPen(QPen(Qt::red,penWidth));
-// 	p.drawEllipse(p1, r1,r1);
-	p.drawEllipse(p1, lb,lb);
-	p.setPen(QPen(Qt::green,penWidth));
+	p->setBrush(QBrush());
+	//p->drawEllipse(center + QPointF(5.,5.), center.x(), center.y());
+	p->setPen(QPen(Qt::white,penWidth));
+// 	p->drawEllipse(p0, r0,r0);
+	p->drawEllipse(p0, la,la);
+	p->setPen(QPen(Qt::red,penWidth));
+// 	p->drawEllipse(p1, r1,r1);
+	p->drawEllipse(p1, lb,lb);
+	p->setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
-		p.drawEllipse(p2, r2,r2);
+		p->drawEllipse(p2, r2,r2);
 
-	p.setPen(QPen(Qt::white,penWidth));
-	p.drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
-	p.setPen(QPen(Qt::red,penWidth));
-	p.drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
-	p.setPen(QPen(Qt::green,penWidth));
+	p->setPen(QPen(Qt::white,penWidth));
+	p->drawRect(QRectF(p0-QPointF(5,5), QSizeF(10,10)));
+	p->setPen(QPen(Qt::red,penWidth));
+	p->drawRect(QRectF(p1-QPointF(5,5), QSizeF(10,10)));
+	p->setPen(QPen(Qt::green,penWidth));
 	if(!p2.isNull())
-		p.drawRect(QRectF(p2-QPointF(5,5), QSizeF(10,10)));
+		p->drawRect(QRectF(p2-QPointF(5,5), QSizeF(10,10)));
 
-// 	p.setPen(QPen(Qt::red,penWidth));
-// 	p.drawLine(line);
-// 	p.drawLine(line2);
-// 	p.drawLine(line3);
+// 	p->setPen(QPen(Qt::red,penWidth));
+// 	p->drawLine(line);
+// 	p->drawLine(line2);
+// 	p->drawLine(line3);
 
 	penWidth *=2;
 
-	p.setPen(QPen(Qt::white,penWidth));
-	p.drawLine(realLine);
-	p.setPen(QPen(Qt::gray,penWidth));
-	p.drawLine(realLine2);
+	p->setPen(QPen(Qt::white,penWidth));
+	p->drawLine(realLine);
+	p->setPen(QPen(Qt::gray,penWidth));
+	p->drawLine(realLine2);
 
 	penWidth /=2;
-	p.setPen(QPen(Qt::darkGreen,penWidth));
-	p.drawLine(apLine);
-	p.setPen(QPen(Qt::darkYellow,penWidth));
-	p.drawLine(userLine);
-	p.setPen(QPen(Qt::darkRed,penWidth));
-	p.drawLine(userLine2);
+	p->setPen(QPen(Qt::darkGreen,penWidth));
+	p->drawLine(apLine);
+	p->setPen(QPen(Qt::darkYellow,penWidth));
+	p->drawLine(userLine);
+	p->setPen(QPen(Qt::darkRed,penWidth));
+	p->drawLine(userLine2);
 
-// 	p.setPen(QPen(Qt::darkYellow,penWidth));
-// 	p.drawRect(QRectF(calcPoint-QPointF(5,5), QSizeF(10,10)));
-// 	p.setPen(QPen(Qt::darkGreen,penWidth));
-// 	p.drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
+// 	p->setPen(QPen(Qt::darkYellow,penWidth));
+// 	p->drawRect(QRectF(calcPoint-QPointF(5,5), QSizeF(10,10)));
+// 	p->setPen(QPen(Qt::darkGreen,penWidth));
+// 	p->drawRect(QRectF(realPoint-QPointF(5,5), QSizeF(10,10)));
 
 */
-	p.end();
-
-	m_userItem->setPixmap(QPixmap::fromImage(image));
-	//m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
-	//m_userItem->setPos(itemWorldRect.center());
-	//m_userItem->setOffset(offset);
-	m_userItem->setOffset(-origSize.width()/2, -origSize.height()/2);
-	m_userItem->setPos(0,0);
-
-// 	m_userItem->setOffset(0,0); //-(image.width()/2), -(image.height()/2));
-// 	m_userItem->setPos(0,0); //itemWorldRect.center());
-
-	m_userItem->setVisible(true);
+	if(renderImage)
+	{
+		p->end();
+	
+		m_userItem->setPixmap(QPixmap::fromImage(image));
+		//m_userItem->setOffset(-(((double)image.width())/2.), -(((double)image.height())/2.));
+		//m_userItem->setPos(itemWorldRect.center());
+		//m_userItem->setOffset(offset);
+		m_userItem->setOffset(-origSize.width()/2, -origSize.height()/2);
+		m_userItem->setPos(0,0);
+	
+	// 	m_userItem->setOffset(0,0); //-(image.width()/2), -(image.height()/2));
+	// 	m_userItem->setPos(0,0); //itemWorldRect.center());
+	
+		m_userItem->setVisible(true);
+		
+	}
 
 	//m_mapWindow->setStatusMessage("Location Updated!", 100);
 
