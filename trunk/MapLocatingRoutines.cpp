@@ -1,7 +1,7 @@
 #include "MapGraphicsScene.h"
 #include "MapWindow.h"
 
-//#define VERBOSE_USER_GRAPHICS
+#define VERBOSE_USER_GRAPHICS
 
 QColor darkenColor(QColor color, double value)
 {
@@ -411,12 +411,12 @@ void MapGraphicsScene::updateDrivedLossFactor(MapApInfo *info)
 	}
 }
 
-void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage)
+QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage, QPointF truthTestPoint, QImage paintOnMe)
 {
-	if(!m_showMyLocation)
+	if(!m_showMyLocation && renderImage)
 	{
-		m_userItem->setVisible(false);
-		return;
+		//m_userItem->setVisible(false);
+		return QImage();
 	}
 
 	// We still can estimate location without any signal readings - we'll just use default loss factors
@@ -433,21 +433,25 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 	{
 		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Size too large, not updating: "<<origSize;
 		m_userItem->setVisible(false);
-		return;
+		return QImage();
 	}
 
 	QImage image;
 	
 	if(renderImage)
 	{
-	
-	#ifdef Q_OS_ANDROID
-		image = QImage(QSize(origSize.width()*1,origSize.height()*1), QImage::Format_ARGB32_Premultiplied);
-	#else
-		image = QImage(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
-	#endif
-		memset(image.bits(), 0, image.byteCount());
-		//image.fill(QColor(255,0,0,50).rgba());
+		if(!paintOnMe.isNull())
+			image = paintOnMe;
+		else
+		{
+		#ifdef Q_OS_ANDROID
+			image = QImage(QSize(origSize.width()*1,origSize.height()*1), QImage::Format_ARGB32_Premultiplied);
+		#else
+			image = QImage(QSize(origSize.width()*2,origSize.height()*2), QImage::Format_ARGB32_Premultiplied);
+		#endif
+			memset(image.bits(), 0, image.byteCount());
+			//image.fill(QColor(255,0,0,50).rgba());
+		}
 	}
 	
 	QPointF offset = QPointF();
@@ -466,7 +470,7 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 	{
 		qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two APs observed, unable to guess user location";
 		m_userItem->setVisible(false);
-		return;
+		return QImage();
 	}
 
 	// Build a hash table of MAC->Signal for eash access and a list of MACs in decending order of signal strength
@@ -515,7 +519,7 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 		//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): Less than two known APs marked AND visble, unable to guess user location";
 		//m_mapWindow->setStatusMessage("Need at least 2 APs visible to calculate location", 2000);
 		m_userItem->setVisible(false);
-		return;
+		return QImage();
 	}
 
 	//m_mapWindow->setStatusMessage("Calculating location...", 1000);
@@ -1023,6 +1027,69 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 	numAps = qMin(numAps, 3); // only consider the first 3 APs if more than 3
 
 	bool needFirstGoodPoint = false;
+	if(numAps == 2)
+	{
+		QString ap0 = apsVisible[0];
+		QString ap1 = apsVisible[1];
+	
+		avgPoint = triangulate(ap0, apMacToDbm[ap0],
+				       ap1, apMacToDbm[ap1]);
+		count = 1;
+		
+		double r0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain) * m_pixelsPerMeter;
+		double r1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain) * m_pixelsPerMeter;
+
+		
+		if(m_locationCheats.contains(ap0))
+			r0 = m_locationCheats[ap0];
+		if(m_locationCheats.contains(ap1))
+			r1 = m_locationCheats[ap1];
+		
+		QColor color0 = baseColorForAp(ap0);
+		QColor color1 = baseColorForAp(ap1);
+
+		#ifdef VERBOSE_USER_GRAPHICS
+		if(renderImage)
+		{
+			MapApInfo *info0 = apInfo(ap0);
+			MapApInfo *info1 = apInfo(ap1);
+			
+// 			updateDrivedLossFactor(info0);
+// 			updateDrivedLossFactor(info1);
+
+			QPointF p0 = info0->point;
+			QPointF p1 = info1->point;
+
+
+			// Render the estimated circles covered by these APs
+			if(!drawnFlag.contains(ap0))
+			{
+				drawnFlag.insert(ap0, true);
+
+				p->setPen(QPen(color0, penWidth));
+
+				if(isnan(r0))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 0 is NaN";
+				else
+					p->drawEllipse(p0, r0, r0);
+			}
+
+			if(!drawnFlag.contains(ap1))
+			{
+				drawnFlag.insert(ap1, true);
+
+				p->setPen(QPen(color1, penWidth));
+
+				if(isnan(r1))
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": - Can't render ellipse p0/r0 - radius 1 is NaN";
+				else
+					p->drawEllipse(p1, r1, r1);
+
+			}
+		}
+		#endif
+	}
+	else
 	for(int i=0; i<numAps; i++)
 	{
 		for(int j=0; j<numAps; j++)
@@ -1498,6 +1565,7 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 
 // 	avgPoint.setX( avgPoint.x() / count );
 // 	avgPoint.setY( avgPoint.y() / count );
+	qDebug() << "[user locate] pre divide: avgPoint:"<<avgPoint<<", count:"<<count;
 	avgPoint /= count;
 
 	if(renderImage)
@@ -1557,6 +1625,24 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 			
 			avgPoint = thisPredict;
 			#endif
+		}
+		
+		if(!truthTestPoint.isNull())
+		{
+			QLineF errorLine(truthTestPoint, avgPoint);
+			
+			p->setPen(QPen(Qt::cyan, m_pixelsPerFoot));
+			p->drawLine(errorLine);
+			
+			p->setPen(QPen(Qt::yellow, 2. * m_pixelsPerFoot));
+	
+			p->setBrush(QColor(0,0,0,127));
+			p->drawEllipse(truthTestPoint, penWidth, penWidth);
+			
+			qDebug() << "[user locate] avgPoint:"<<avgPoint<<", truthTestPoint:"<<truthTestPoint<<", errorLine length:"<<errorLine.length();
+			
+	
+			
 		}
 	}
 	
@@ -1642,6 +1728,8 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 		m_userItem->setVisible(true);
 		
 	}
+	
+	return image;
 
 	//m_mapWindow->setStatusMessage("Location Updated!", 100);
 
@@ -2341,6 +2429,12 @@ QPointF MapGraphicsScene::triangulate(QString ap0, int dBm0, QString ap1, int dB
 	double lc = apLine.length();
 	double la = dBmToDistance(dBm0, ap0) * m_pixelsPerMeter; // dBmToDistance returns meters, convert to pixels
 	double lb = dBmToDistance(dBm1, ap1) * m_pixelsPerMeter;
+	
+	if(m_locationCheats.contains(ap0))
+		la = m_locationCheats[ap0];
+	if(m_locationCheats.contains(ap1))
+		lb = m_locationCheats[ap1];
+	
 
 // 	qDebug() << "[dump1] "<<la<<lb<<lc;
 // 	qDebug() << "[dump2] "<<realAngle<<realAngle2<<apLine.angle();

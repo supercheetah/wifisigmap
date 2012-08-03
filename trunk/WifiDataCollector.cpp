@@ -49,23 +49,6 @@
 	#define DBM_MIN  -100
 #endif
 
-#ifdef Q_OS_WIN
-#define UNICODE
-
-#include <windows.h>
-#include <wlanapi.h>
-#include <objbase.h>
-#include <wtypes.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-
-// Need to link with Wlanapi.lib and Ole32.lib
-#pragma comment(lib, "wlanapi.lib")
-#pragma comment(lib, "ole32.lib")
-
-#endif
-
 static QHash<int,int> rssiLookup;
 
 void populateRssiLookup()
@@ -968,7 +951,7 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 				
 				int percent = (int)(value * 100);
 				int dBm = rssiLookup[percent];
-				qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", dBm:"<<dBm;
+				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", dBm:"<<dBm;
 				
 				values["signal level"] = QString("%1 dBm").arg(dBm);
 
