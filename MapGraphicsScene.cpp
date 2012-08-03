@@ -787,7 +787,7 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 
 void MapGraphicsScene::testUserLocatorAccuracy()
 {
-	return;
+	//return;
 	
 	/*
 	// Print a dump of the signal readings in CSV format,
@@ -825,7 +825,13 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 	QList<int> bins;
 	double binSize = 10.;
+	
+	int pointsTestedCount = 0;
 
+	QImage imageTmp;
+	
+	int numSigValues = m_sigValues.size();
+	
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		QList<WifiDataResult> results = val->scanResults;
@@ -834,20 +840,56 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qSort(results.begin(), results.end(), MapGraphicsScene_sort_WifiDataResult);
 		
 		m_lastScanResults = results;
+		
+		int apsUsed = 0;
 
 		foreach(WifiDataResult r, results)
 		{
 			QLineF line(val->point, apInfo(r.mac)->point);
 			
-			m_locationCheats[r.mac] = line.length()/* / m_pixelsPerMeter*/;
+			if(apInfo(r.mac)->marked)
+				apsUsed ++;
+			
+			//m_locationCheats[r.mac] = line.length();
 		}
 		
+		if(apsUsed < 3)
+		{
+			qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Skipping reading, apsUsed < 3";
+			continue;
+		}
+		
+// 		if(apsUsed > 2)
+// 		{
+// 			qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Skipping reading, apsUsed > 2";
+// 			continue;
+// 		}
+		
+		pointsTestedCount ++;
+		
 		// Do the location calculation and store the result in m_userLocation
-		updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
+		if(numSigValues < 50)
+		{
+			// Show images for small number of readings
+			bool old = m_showMyLocation;
+			m_showMyLocation = true;
+			
+			imageTmp = updateUserLocationOverlay(val->rxGain, true, val->point, imageTmp);
+			
+			m_showMyLocation = old;
+		}
+		else
+		{
+			updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
+		}
 		
 		QLineF errorLine(val->point, m_userLocation);
 		double len     = errorLine.length(),
 		       lenFoot = len / m_pixelsPerFoot;
+		
+		if(lenFoot < 0.0001)
+			lenFoot = 0;
+			
 		qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error: "<< lenFoot<<"ft";
 		
 		QApplication::processEvents();
@@ -869,6 +911,17 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			if(lenFoot > max)
 				max = lenFoot;
 		}
+		
+		// Halt in no solution and display an image
+// 		if((isnan(lenFoot) || lenFoot > 0))
+// 		{
+// 			m_showMyLocation = true;
+// 			updateUserLocationOverlay(val->rxGain, true, val->point); // render images
+// 			m_showMyLocation = false;
+// 			return; // halt, don't continue
+// 		}
+		
+		
 	}
 	
 	
@@ -899,7 +952,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 	if(bottomAvg95 < 0)
 		bottomAvg95 = 0;
 
-	int maxCount = m_sigValues.size();
+	//int maxCount = m_sigValues.size();
+	int maxCount = pointsTestedCount;
 	double solveRatio = (double)count / (double)maxCount;
 	double solvePerc = (int)(solveRatio * 100);
 	
