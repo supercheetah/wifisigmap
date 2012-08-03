@@ -71,12 +71,6 @@ signals:
 protected slots:
 	void scanWifi();
 
-	void scanProcError ( QProcess::ProcessError error );
-	void scanProcFinished ( int exitCode, QProcess::ExitStatus exitStatus );
-	void scanProcReadyReadStandardOutput ();
-	void scanProcStateChanged ( QProcess::ProcessState newState );
-	void scanProcReadyRead();
-
 protected:
 	void updateScanInterval();
 	

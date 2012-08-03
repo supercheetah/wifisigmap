@@ -787,6 +787,11 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 
 void MapGraphicsScene::testUserLocatorAccuracy()
 {
+	return;
+	
+	/*
+	// Print a dump of the signal readings in CSV format,
+	// suitable for importing into excel/oocalc for graphic/analysis
 	foreach(MapApInfo *info, m_apInfo.values())
 	{
 		QPointF pnt1 = info->point;
@@ -799,25 +804,28 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			
 			QPointF pnt2 = val->point;
 			QLineF line(pnt1, pnt2);
+
 			double len = line.length() / m_pixelsPerFoot;
 			double angle = line.angle();
+			
 			printf("%d,%f,%f,%f\n", (int)val->signalForAp(info->mac, true), val->signalForAp(info->mac),len,angle);
 		}
 	}
 
 	printf("\n\n");
-
 	//return;
-	
+	*/
 	
 	double sum = 0.;
 	double min = 999999999.;
 	double max = 0.;
 	int count = 0;
+
 	QList<double> errs;
+
 	QList<int> bins;
 	double binSize = 10.;
-	int maxCount = m_sigValues.size();
+
 	foreach(SigMapValue *val, m_sigValues)
 	{
 		QList<WifiDataResult> results = val->scanResults;
@@ -831,7 +839,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		{
 			QLineF line(val->point, apInfo(r.mac)->point);
 			
-			m_locationCheats[r.mac] = line.length() / m_pixelsPerMeter;
+			m_locationCheats[r.mac] = line.length()/* / m_pixelsPerMeter*/;
 		}
 		
 		// Do the location calculation and store the result in m_userLocation
@@ -872,12 +880,17 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 	float denominator = (float)count;
 	foreach(double len, errs)
 		numerator += pow((len - avg), 2);
-		
+
+	// Print bins out in CSV format for copying into excel/oocalc to graph/analyize/etc
+	/*
 	printf("\n\nBin(Ft),Count\n");
 	for(int bin=0; bin<bins.size(); bin++)
 		printf("%d,%d\n", (int)(bin * binSize), bins[bin]);
 	printf("\n\n");
+	*/
 
+	// TODO Generate our own simple graph in a QImage and display it in a dialog below
+	
 	float stdDev = sqrt(numerator/denominator);
 	
 	float bottomAvg95 = avg - (stdDev*2),
@@ -885,7 +898,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 	if(bottomAvg95 < 0)
 		bottomAvg95 = 0;
-	
+
+	int maxCount = m_sigValues.size();
 	double solveRatio = (double)count / (double)maxCount;
 	double solvePerc = (int)(solveRatio * 100);
 	
@@ -907,6 +921,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 	
 	QMessageBox::information(0, "Accuracy Results", results);
 
+	m_locationCheats.clear();
 }
 	
 	

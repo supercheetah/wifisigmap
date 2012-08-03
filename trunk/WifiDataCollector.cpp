@@ -222,7 +222,13 @@ QDebug operator<<(QDebug dbg, const WifiDataResult &ref)
 
 WifiDataCollector::WifiDataCollector()
 	: QObject()
-	, m_numScans(3)
+	, m_numScans(
+	#ifdef Q_OS_ANDROID
+		3
+	#else
+		1
+	#endif
+	)
 	, m_scanNum(0)
 	, m_continuousMode(true)
 	, m_scanProcessStarted(false)
@@ -235,8 +241,8 @@ WifiDataCollector::WifiDataCollector()
 	qRegisterMetaType<QList<WifiDataResult> >("QList<WifiDataResult> ");
 	
 	moveToThread(&m_scanThread);
-	connect(&m_scanTimer, SIGNAL(timeout()), this, SLOT(scanWifi()));
 	
+	connect(&m_scanTimer, SIGNAL(timeout()), this, SLOT(scanWifi()));
 	updateScanInterval();
 	
 	// TODO - move this to the main app, then if it returns false, ask the user if they want to continue anyway or exit.
@@ -250,43 +256,16 @@ WifiDataCollector::WifiDataCollector()
 		// Start a continous scan running (in the scan thread)
 		QTimer::singleShot(0, this, SLOT(startScan()));
 	}
-
-	/*
-	qRegisterMetaType<QProcess::ProcessError>("QProcess::ProcessError");
-	qRegisterMetaType<QProcess::ExitStatus>("QProcess::ExitStatus");
-	qRegisterMetaType<QProcess::ProcessState>("QProcess::ProcessState");
-	
-	connect(&m_scanProcess, SIGNAL(error(QProcess::ProcessError)), this, SLOT(scanProcError ( QProcess::ProcessError )));
-	connect(&m_scanProcess, SIGNAL(finished(int , QProcess::ExitStatus )), this, SLOT(scanProcFinished ( int , QProcess::ExitStatus )));
-	connect(&m_scanProcess, SIGNAL(readyReadStandardOutput ()), this, SLOT(scanProcReadyReadStandardOutput ()));
-	connect(&m_scanProcess, SIGNAL(stateChanged ( QProcess::ProcessState )), this, SLOT(scanProcStateChanged ( QProcess::ProcessState )));
-	connect(&m_scanProcess, SIGNAL(readyRead()), this, SLOT(scanProcReadyRead()));
-	*/
 }
 
 WifiDataCollector::~WifiDataCollector()
 {
-	//m_scanProcess.close();
 	if(m_scanPipe)
 	{
 		pclose(m_scanPipe);
 		m_scanPipe = 0;
 	}
-
 }
-
-void WifiDataCollector::scanProcError ( QProcess::ProcessError error )
-	{ qDebug() << "WifiDataCollector::scanProcError(): "<<error; }
-void WifiDataCollector::scanProcFinished ( int exitCode, QProcess::ExitStatus exitStatus )
-	{ qDebug() << "WifiDataCollector::scanProcFinished(): "<<exitCode<<", "<<exitStatus; }
-void WifiDataCollector::scanProcReadyReadStandardOutput ()
-	{ qDebug() << "WifiDataCollector::scanProcReadyReadStandardOutput()"; }
-void WifiDataCollector::scanProcStateChanged ( QProcess::ProcessState newState )
-	{ qDebug() << "WifiDataCollector::scanProcStateChanged(): "<<newState; }
-void WifiDataCollector::scanProcReadyRead ()
-	{ qDebug() << "WifiDataCollector::scanProcReadyRead()"; }
-
-
 
 void WifiDataCollector::setWlanDevice(QString dev)
 {
@@ -386,223 +365,12 @@ void WifiDataCollector::scanWifi()
 // QString debugTextFile)
 {
 #ifdef Q_OS_WIN
-	// The following code is copied verbatim from http://stackoverflow.com/a/3193613
-	// Will rework to populate m_scanResults soon, for now, just getting the code into place.
-
-	// Declare and initialize variables.
-
-	HANDLE hClient = NULL;
-	DWORD dwMaxClient = 2;      //
-	DWORD dwCurVersion = 0;
-	DWORD dwResult = 0;
-	DWORD dwRetVal = 0;
-	int iRet = 0;
-
-	WCHAR GuidString[39] = {0};
-
-	unsigned int i, j, k;
-
-	/* variables used for WlanEnumInterfaces  */
-
-	PWLAN_INTERFACE_INFO_LIST pIfList = NULL;
-	PWLAN_INTERFACE_INFO pIfInfo = NULL;
-
-	PWLAN_AVAILABLE_NETWORK_LIST pBssList = NULL;
-	PWLAN_AVAILABLE_NETWORK pBssEntry = NULL;
-
-	dwResult = WlanOpenHandle(dwMaxClient, NULL, &dwCurVersion, &hClient);
-	if (dwResult != ERROR_SUCCESS) {
-		wprintf(L"WlanOpenHandle failed with error: %u\n", dwResult);
-		return 1;
-		// You can use FormatMessage here to find out why the function failed
-	}
-
-	dwResult = WlanEnumInterfaces(hClient, NULL, &pIfList);
-	if (dwResult != ERROR_SUCCESS) {
-		wprintf(L"WlanEnumInterfaces failed with error: %u\n", dwResult);
-		return 1;
-		// You can use FormatMessage here to find out why the function failed
-	} else {
-		wprintf(L"Num Entries: %lu\n", pIfList->dwNumberOfItems);
-		wprintf(L"Current Index: %lu\n", pIfList->dwIndex);
-		for (i = 0; i < (int) pIfList->dwNumberOfItems; i++) {
-			pIfInfo = (WLAN_INTERFACE_INFO *) &pIfList->InterfaceInfo[i];
-			wprintf(L"  Interface Index[%u]:\t %lu\n", i, i);
-			iRet = StringFromGUID2(pIfInfo->InterfaceGuid, (LPOLESTR) &GuidString,
-				sizeof(GuidString)/sizeof(*GuidString));
-			// For c rather than C++ source code, the above line needs to be
-			// iRet = StringFromGUID2(&pIfInfo->InterfaceGuid, (LPOLESTR) &GuidString,
-			//     sizeof(GuidString)/sizeof(*GuidString));
-			if (iRet == 0)
-				wprintf(L"StringFromGUID2 failed\n");
-			else {
-				wprintf(L"  InterfaceGUID[%d]: %ws\n",i, GuidString);
-			}
-			wprintf(L"  Interface Description[%d]: %ws", i,
-				pIfInfo->strInterfaceDescription);
-			wprintf(L"\n");
-			wprintf(L"  Interface State[%d]:\t ", i);
-			switch (pIfInfo->isState) {
-			case wlan_interface_state_not_ready:
-				wprintf(L"Not ready\n");
-				break;
-			case wlan_interface_state_connected:
-				wprintf(L"Connected\n");
-				break;
-			case wlan_interface_state_ad_hoc_network_formed:
-				wprintf(L"First node in a ad hoc network\n");
-				break;
-			case wlan_interface_state_disconnecting:
-				wprintf(L"Disconnecting\n");
-				break;
-			case wlan_interface_state_disconnected:
-				wprintf(L"Not connected\n");
-				break;
-			case wlan_interface_state_associating:
-				wprintf(L"Attempting to associate with a network\n");
-				break;
-			case wlan_interface_state_discovering:
-				wprintf(L"Auto configuration is discovering settings for the network\n");
-				break;
-			case wlan_interface_state_authenticating:
-				wprintf(L"In process of authenticating\n");
-				break;
-			default:
-				wprintf(L"Unknown state %ld\n", pIfInfo->isState);
-				break;
-			}
-			wprintf(L"\n");
-
-			dwResult = WlanGetAvailableNetworkList(hClient,
-							 &pIfInfo->InterfaceGuid,
-							 0,
-							 NULL,
-							 &pBssList);
-
-			if (dwResult != ERROR_SUCCESS) {
-				wprintf(L"WlanGetAvailableNetworkList failed with error: %u\n",
-					dwResult);
-				dwRetVal = 1;
-				// You can use FormatMessage to find out why the function failed
-			} else {
-				wprintf(L"WLAN_AVAILABLE_NETWORK_LIST for this interface\n");
-
-				wprintf(L"  Num Entries: %lu\n\n", pBssList->dwNumberOfItems);
-
-				for (j = 0; j < pBssList->dwNumberOfItems; j++) {
-					pBssEntry = (WLAN_AVAILABLE_NETWORK *) & pBssList->Network[j];
-
-					wprintf(L"  Profile Name[%u]:  %ws\n", j, pBssEntry->strProfileName);
-
-					wprintf(L"  SSID[%u]:\t\t ", j);
-					if (pBssEntry->dot11Ssid.uSSIDLength == 0)
-						wprintf(L"\n");
-					else {
-						for (k = 0; k < pBssEntry->dot11Ssid.uSSIDLength; k++) {
-							wprintf(L"%c", (int) pBssEntry->dot11Ssid.ucSSID[k]);
-						}
-						wprintf(L"\n");
-					}
-
-					wprintf(L"  BSS Network type[%u]:\t ", j);
-					switch (pBssEntry->dot11BssType) {
-					case dot11_BSS_type_infrastructure   :
-						wprintf(L"Infrastructure (%u)\n", pBssEntry->dot11BssType);
-						break;
-					case dot11_BSS_type_independent:
-						wprintf(L"Infrastructure (%u)\n", pBssEntry->dot11BssType);
-						break;
-					default:
-						wprintf(L"Other (%lu)\n", pBssEntry->dot11BssType);
-						break;
-					}
-
-					wprintf(L"  Number of BSSIDs[%u]:\t %u\n", j, pBssEntry->uNumberOfBssids);
-
-					wprintf(L"  Connectable[%u]:\t ", j);
-					if (pBssEntry->bNetworkConnectable)
-						wprintf(L"Yes\n");
-					else
-						wprintf(L"No\n");
-
-					wprintf(L"  Signal Quality[%u]:\t %u\n", j, pBssEntry->wlanSignalQuality);
-
-					wprintf(L"  Security Enabled[%u]:\t ", j);
-					if (pBssEntry->bSecurityEnabled)
-						wprintf(L"Yes\n");
-					else
-						wprintf(L"No\n");
-
-					wprintf(L"  Default AuthAlgorithm[%u]: ", j);
-					switch (pBssEntry->dot11DefaultAuthAlgorithm) {
-					case DOT11_AUTH_ALGO_80211_OPEN:
-						wprintf(L"802.11 Open (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_80211_SHARED_KEY:
-						wprintf(L"802.11 Shared (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_WPA:
-						wprintf(L"WPA (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_WPA_PSK:
-						wprintf(L"WPA-PSK (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_WPA_NONE:
-						wprintf(L"WPA-None (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_RSNA:
-						wprintf(L"RSNA (%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					case DOT11_AUTH_ALGO_RSNA_PSK:
-						wprintf(L"RSNA with PSK(%u)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					default:
-						wprintf(L"Other (%lu)\n", pBssEntry->dot11DefaultAuthAlgorithm);
-						break;
-					}
-
-					wprintf(L"  Default CipherAlgorithm[%u]: ", j);
-					switch (pBssEntry->dot11DefaultCipherAlgorithm) {
-					case DOT11_CIPHER_ALGO_NONE:
-						wprintf(L"None (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					case DOT11_CIPHER_ALGO_WEP40:
-						wprintf(L"WEP-40 (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					case DOT11_CIPHER_ALGO_TKIP:
-						wprintf(L"TKIP (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					case DOT11_CIPHER_ALGO_CCMP:
-						wprintf(L"CCMP (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					case DOT11_CIPHER_ALGO_WEP104:
-						wprintf(L"WEP-104 (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					case DOT11_CIPHER_ALGO_WEP:
-						wprintf(L"WEP (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					default:
-						wprintf(L"Other (0x%x)\n", pBssEntry->dot11DefaultCipherAlgorithm);
-						break;
-					}
-
-					wprintf(L"\n");
-				}
-			}
-		}
-
-	}
-	if (pBssList != NULL) {
-		WlanFreeMemory(pBssList);
-		pBssList = NULL;
-	}
-
-	if (pIfList != NULL) {
-		WlanFreeMemory(pIfList);
-		pIfList = NULL;
-	}
-
-	return dwRetVal;
+	/// TODO Write adapter to read "netsh wlan show network" output.
+	// See:
+	//	- http://poshcode.org/2945
+	//	- http://defaultset.blogspot.com/2010/04/powershell-wireless-network-scan-script.html
+	//	- http://poshcode.org/?show=1731
+	return;
 #endif
 
 
@@ -756,6 +524,7 @@ double WifiDataCollector::dbmToPercent(int dbm)
 	const double dbmMin  = DBM_MIN + 100.;
 
 	double val = (dbmVal - dbmMin) / (dbmMax - dbmMin);
+	val = qMax(0., qMin(100., val)); // limit val to 0-100
 	return val;
 }
 
@@ -765,9 +534,7 @@ double WifiDataCollector::dbmToPercent(int dbm)
 */
 bool WifiDataCollector::auditIwlistBinary()
 {
-#ifndef Q_OS_ANDROID
-	return true;
-#else
+#ifdef Q_OS_ANDROID
 	// Extract ARM versions of iwconfig/iwlist and our iwscan.sh from internal Qt resource storage
 	if(!QFile::exists(IWCONFIG_BINARY))
 	{
@@ -835,10 +602,9 @@ bool WifiDataCollector::auditIwlistBinary()
 		system(qPrintable(QString("chmod 755 %1").arg(IWSCAN_SCRIPT)));
 		qDebug() << "WifiDataCollector::auditIwlistBinary(): Executed chmod 755" << IWSCAN_SCRIPT;
 	}
-
+#endif
 
 	return true;
-#endif
 }
 
 /*! \brief Read 'iwconfig' and find the first interface with wireless extensions */
@@ -1202,7 +968,7 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 				
 				int percent = (int)(value * 100);
 				int dBm = rssiLookup[percent];
-				//qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", dBm:"<<dBm;
+				qDebug() << "WifiDataCollector::parseRawBlock: [parse:sig:fakeDbm] line:"<<line<<", val0:"<<val0<<", val1:"<<val1<<", value:"<<value<<", dBm:"<<dBm;
 				
 				values["signal level"] = QString("%1 dBm").arg(dBm);
 
