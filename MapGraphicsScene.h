@@ -452,6 +452,8 @@ protected:
 	bool m_debugFirstScan;
 	
 	QPointF m_userLocation;
+
+	QHash<QString, double> m_locationCheats;
 };
 
 #endif
