@@ -1061,6 +1061,13 @@ void MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderImage
 			double r0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain) * m_pixelsPerMeter;
 			double r1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain) * m_pixelsPerMeter;
 
+			/*
+			if(m_locationCheats.contains(ap0))
+				r0 = m_locationCheats[ap0];
+			if(m_locationCheats.contains(ap1))
+				r1 = m_locationCheats[ap1];
+			*/
+
 // 			QPointF lossModel(2.7, 2.9);
 // 			double r0 = dBmToDistance(apMacToDbm[ap0], lossModel, -60, info0->txPower, info0->txGain, rxGain) * m_pixelsPerMeter;
 // 			double r1 = dBmToDistance(apMacToDbm[ap1], lossModel, -60, info1->txPower, info1->txGain, rxGain) * m_pixelsPerMeter;

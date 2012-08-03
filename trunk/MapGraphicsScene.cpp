@@ -14,7 +14,7 @@
 #endif
 
 #ifndef Q_OS_ANDROID
-#define ITEMS_SCALE_INVARIENT
+//#define ITEMS_SCALE_INVARIENT
 #endif
 
 ///// Just for testing on linux, defined after DEBUG_WIFI_FILE so we still can use cached data
@@ -787,6 +787,29 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 
 void MapGraphicsScene::testUserLocatorAccuracy()
 {
+	foreach(MapApInfo *info, m_apInfo.values())
+	{
+		QPointF pnt1 = info->point;
+		printf("\n\n%s,%s\n",qPrintable(info->mac),qPrintable(info->essid));
+		printf("dBm,Signal%%,Dist(Ft),Angle\n");
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(!val->hasAp(info->mac))
+				continue;
+			
+			QPointF pnt2 = val->point;
+			QLineF line(pnt1, pnt2);
+			double len = line.length() / m_pixelsPerFoot;
+			double angle = line.angle();
+			printf("%d,%f,%f,%f\n", (int)val->signalForAp(info->mac, true), val->signalForAp(info->mac),len,angle);
+		}
+	}
+
+	printf("\n\n");
+
+	//return;
+	
+	
 	double sum = 0.;
 	double min = 999999999.;
 	double max = 0.;
@@ -803,6 +826,13 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qSort(results.begin(), results.end(), MapGraphicsScene_sort_WifiDataResult);
 		
 		m_lastScanResults = results;
+
+		foreach(WifiDataResult r, results)
+		{
+			QLineF line(val->point, apInfo(r.mac)->point);
+			
+			m_locationCheats[r.mac] = line.length() / m_pixelsPerMeter;
+		}
 		
 		// Do the location calculation and store the result in m_userLocation
 		updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
