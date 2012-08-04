@@ -1212,6 +1212,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 			//const double overlap = 0.55;
 			if(dist > r0 + r1)
 			{
+// 				// If d > r0 + r1 then there are no solutions, the circles are separate.
 				// Distance still wrong, so force-set the proper distance
 				double errorDist = dist - (r0 + r1);
 
@@ -1237,7 +1238,9 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 // 				else
 				if(!distOverride.contains(ap1))
 				{
-					r1 += errorDist * 1.1;
+					//errorDist = fabs(r1 - r0) * (r1 > r0 ? -1 : 1) + dist;
+					r1 += errorDist;
+					
 					distOverride[ap1] = r1;
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
 				}
@@ -1250,12 +1253,15 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 			else
 			if(dist < fabs(r0 - r1))
 			{
+// 				// If d < |r0 - r1| then there are no solutions because one circle is contained within the other.
 				// Distance still wrong, so force-set the proper distance
 				double errorDist = fabs(r0 - r1) - dist;
 
 // 				if(!distOverride.contains(ap0) &&
 // 				   !distOverride.contains(ap1))
 // 				{
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): values prior to correction[case 0.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+//
 // 					if(r0 > r1)
 // 					{
 // 						r0 -= errorDist * overlap; // overlay a bit
@@ -1265,23 +1271,25 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 // 					{
 // 						r0 += errorDist * overlap; // overlay a bit
 // 						r1 -= errorDist * overlap;
-// 					
+//
 // 					}
-// 
+//
 // 					distOverride[ap0] = r0;
 // 					distOverride[ap1] = r1;
-// 
+//
 // 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 0.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 // 				}
 // 				else
 // 				if(!distOverride.contains(ap0))
 // 				{
+// 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): values prior to correction[case 1.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
+//
 // 					r0 += (r0 > r1 ? -1:+1) * errorDist * 1.1;
 // 					distOverride[ap0] = r0;
-// 					
+//
 // 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 1.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
 // 				}
-// 				else
+//  				else
 				if(!distOverride.contains(ap1))
 				{
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): values prior to correction[case 2.1]: "<<r0<<r1<<", errorDist: "<<errorDist;
@@ -1335,7 +1343,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 			}
 			#endif
 
-			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] i:"<<i<<", r0:"<<r0<<", r1:"<<r1;
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] i:"<<i<<", r0:"<<r0<<", r1:"<<r1;
 
 			// The revised idea here is this:
 			// Need at least three APs to find AP with intersection of circles:
@@ -1345,7 +1353,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 			// From there, the next (third) AP gets compared to goodPoints - the point closest goes into goodPoints, etc
 			// At end, good points forms the probability cluster of where the user probably is
 
-			//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] goodPoints:"<<goodPoints<<", idx:"<<i<<", numAps:"<<numAps;
 
 			QPointF goodPoint;
 
@@ -1366,9 +1374,11 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 
 			QLineF line(xi, yi, xi_prime, yi_prime);
 
+			qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] line: "<<line;
 
-			if(line.isNull())
+			if(line.p1().isNull() || line.p2().isNull())
 			{
+				qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:pre] line is Null";
 				continue;
 			}
 			else
@@ -1383,14 +1393,14 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 
 				if(goodPoints.isEmpty())
 				{
-					if(firstSet.isNull())
+					if(firstSet.p1().isNull() || firstSet.p2().isNull())
 					{
 						firstSet = line;
 						// If only intersecting two APs, then just just give the center of the line.
 						// Otherwise, leave blank and let the code below handle it the first time
-						goodPoint = numAps > 2 ? QPointF() : (line.p1() + line.p2()) / 2;
+						goodPoint = numAps > 2 ? QPointF() : line.pointAt(.5);
 
-						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint<<", numAps:"<<numAps;
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step1] firstSet:"<<firstSet<<", goodPoint:"<<goodPoint<<", numAps:"<<numAps;
 					}
 					else
 					{
@@ -1435,7 +1445,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 
 						goodPoint = good.p2();
 
-						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step2] firstSet:"<<firstSet<<", line:"<<line<<", goodPoints:"<<goodPoints;
 					}
 				}
 				else
@@ -1458,14 +1468,14 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 						goodPoints << line.p1();
 						goodPoint   = line.p1();
 
-						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 1<2 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
 					}
 					else
 					{
 						goodPoints << line.p2();
 						goodPoint   = line.p2();
 
-						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): [circle:step3] 2<1 ("<<goodAvg1<<":"<<goodAvg2<<"): line was: "<<line<<", goodPoints:"<<goodPoints;
 					}
 				}
 			}
@@ -1484,7 +1494,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 
 					userPoly << tmpPoint;
 
-					//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<tmpPoint << " (from last intersection)";
+					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<tmpPoint << " (from last intersection)";
 					
 					if(renderImage)
 					{
@@ -1522,7 +1532,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 					}
 					else
 					{
-						//qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
+						qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): "<<ap0<<"->"<<ap1<<": Point:" <<calcPoint;
 						//qDebug() << "\t color0:"<<color0.name()<<", color1:"<<color1.name()<<", r0:"<<r0<<", r1:"<<r1<<", p0:"<<p0<<", p1:"<<p1;
 	
 						userPoly << goodPoint;
@@ -2903,7 +2913,7 @@ double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCut
 	double logDist = (1/(10*n)) * (txPower - dBm + txGain + rxGain - Xa + 20*log10(m) - 20*log10(4*Pi));
 	double distMeters = pow(10, logDist); // distance in meters
 
-	qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist<<", lf:"<<lossFactor<<", sc:"<<shortCutoff;
+	//qDebug() << "MapGraphicsScene::dBmToDistance(): "<<dBm<<": meters:"<<distMeters<<", Debug: n:"<<n<<", txPower:"<<txPower<<", txGain:"<<txGain<<", rxGain:"<<rxGain<<", logDist:"<<logDist<<", lf:"<<lossFactor<<", sc:"<<shortCutoff;
 
 	return distMeters;
 }

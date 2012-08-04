@@ -868,7 +868,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		pointsTestedCount ++;
 		
 		// Do the location calculation and store the result in m_userLocation
-		if(numSigValues < 50)
+		if(numSigValues < 5)
 		{
 			// Show images for small number of readings
 			bool old = m_showMyLocation;
@@ -890,7 +890,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		if(lenFoot < 0.0001)
 			lenFoot = 0;
 			
-		qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error: "<< lenFoot<<"ft";
+		qDebug() << "\n\n\nMapGraphicsScene::testUserLocatorAccuracy(): Error: "<< lenFoot<<"ft";
 		
 		QApplication::processEvents();
 		
@@ -913,13 +913,13 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		}
 		
 		// Halt in no solution and display an image
-// 		if((isnan(lenFoot) || lenFoot > 0))
-// 		{
-// 			m_showMyLocation = true;
-// 			updateUserLocationOverlay(val->rxGain, true, val->point); // render images
-// 			m_showMyLocation = false;
-// 			return; // halt, don't continue
-// 		}
+		if((isnan(lenFoot))) // || lenFoot > 0))
+		{
+			m_showMyLocation = true;
+			updateUserLocationOverlay(val->rxGain, true, val->point); // render images
+			m_showMyLocation = false;
+			return; // halt, don't continue
+		}
 		
 		
 	}
