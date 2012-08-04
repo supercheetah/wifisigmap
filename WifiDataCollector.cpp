@@ -932,7 +932,12 @@ WifiDataResult WifiDataCollector::parseRawBlock(QString buffer)
 		{
 			QRegExp sigDbm("Signal level=(-?\\d+ dBm)", Qt::CaseInsensitive);
 			QRegExp sigLvl("Signal level=(\\d+)/(\\d+)", Qt::CaseInsensitive);
-			if(sigDbm.indexIn(line) > -1)
+			if(line.contains("Signal level:0 ")) // seen on some VERY low level readings, just a "0" given - no other info
+			{
+				values["signal level"] = QString("%1 dBm").arg(DBM_MIN);
+			}
+			else
+			if(sigDbm.indexIn(line) > -1) // this is the ideal situation - a raw dBm value
 			{
 				values["signal level"] = sigDbm.cap(1);
 				//qDebug() << "WifiDataCollector::parseRawBlock: Debug: Extracted value:"<<values["signal level"]<<"from line:"<<line;

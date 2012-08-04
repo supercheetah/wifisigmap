@@ -117,7 +117,7 @@ MapWindow::MapWindow(QWidget *parent)
 
 	connect(&m_autosaveTimer, SIGNAL(timeout()), this, SLOT(autosave()));
 	m_autosaveTimer.setInterval(30 * 1000);
-	m_autosaveTimer.start();
+	//m_autosaveTimer.start();
 	
 	QString lastFile = QSettings("wifisigmap").value("last-map-file","").toString();
 	if(!lastFile.isEmpty())
@@ -456,8 +456,8 @@ void MapWindow::loadSlot()
 // 		}
 		setStatusMessage(tr("<font color='green'>Loaded %1</font>").arg(fileName), 3000);
 
-		if(!m_autosaveTimer.isActive())
-			m_autosaveTimer.start();
+		//if(!m_autosaveTimer.isActive())
+		//	m_autosaveTimer.start();
 	}
 }
 
