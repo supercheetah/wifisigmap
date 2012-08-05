@@ -785,9 +785,132 @@ void MapGraphicsScene::scanFinished(QList<WifiDataResult> results)
 	//updateApLocationOverlay();
 }
 
+static QString MapGraphicsScene_sort_apMac2;
+
+bool MapGraphicsScene_sort_SigMapValue_bySignal2(SigMapValue *a, SigMapValue *b)
+{
+	QString apMac  = MapGraphicsScene_sort_apMac2;
+	if(!a || !b) return false;
+
+	double va = a && a->hasAp(apMac) ? a->signalForAp(apMac) : 0.;
+	double vb = b && b->hasAp(apMac) ? b->signalForAp(apMac) : 0.;
+	return vb < va;
+
+}
+
+
 void MapGraphicsScene::testUserLocatorAccuracy()
 {
 	//return;
+
+	//foreach(MapApInfo *info, m_apInfo.values())
+	//MapApInfo *info = m_apInfo["00:2D:08:0E:92:14"];
+	MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
+	//m_apInfo.values().first();
+	{
+
+		MapGraphicsScene_sort_apMac2 = info->mac;
+		qSort(m_sigValues.begin(), m_sigValues.end(), MapGraphicsScene_sort_SigMapValue_bySignal2);
+		
+		QPointF pnt1 = info->point;
+		printf("\n\n%s,%s\n",qPrintable(info->mac),qPrintable(info->essid));
+		//printf("dBm,Signal%%,Dist(Meters),Angle\n");
+
+		double rxGain = -3;
+
+		double lastError = 99999.;
+
+		double minTxDbm = 0;  // 1 milliwatt
+		double maxTxDbm = 30; // 1 watt
+
+		double txPower = 11.8; // initial guess
+		double txChangeInc = 0.1;
+		double txErrorMinSign = 0.;
+		
+		while(lastError > 1.)
+		{
+			int pointCount = 0;
+			double errorSum = 0.;
+			foreach(SigMapValue *val, m_sigValues)
+			{
+				if(!val->hasAp(info->mac))
+					continue;
+
+				QPointF pnt2 = val->point;
+				QLineF line(pnt1, pnt2);
+
+				double len = line.length() / m_pixelsPerMeter; //m_pixelsPerFoot;
+				double angle = line.angle();
+
+				int dBm = (int)val->signalForAp(info->mac, true);
+
+				//printf("%d,%f,%f,%f\n", dBm, val->signalForAp(info->mac),len,angle);
+
+//				double calcDist = dBmToDistance(dBm, info->mac, rxGain) * m_pixelsPerMeter;
+// 				double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, info->txPower, info->txGain, rxGain) * m_pixelsPerMeter;
+ 				double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, txPower, info->txGain, rxGain) * m_pixelsPerMeter;
+
+				double error = calcDist - len;
+				//double errorSq = error*error;
+				//errorSum += errorSq;
+				errorSum += error;
+
+				pointCount ++;
+			}
+
+			//double mse = errorSum / (double)pointCount;
+			//qDebug() << "MSE: " << mse;
+
+			double avgError = errorSum / (double)pointCount;
+			//qDebug() << "Avg Error: " << avgError;
+
+			qDebug() << "Avg Error: " << avgError<<", txPower: "<<txPower;
+
+			if(txErrorMinSign == 0 ||
+			   txErrorMinSign == 11)
+			{
+				// need to figure out which sign makes error go lower
+				if(txErrorMinSign == 0)
+				{
+					// First time, we just throw a dart at the board - then measure the change and decide on the appros sign
+					txPower += txChangeInc; // positive sign
+					txErrorMinSign = 11;
+				}
+				else
+				{
+					if(lastError < avgError)
+					{
+						// Error went *up* with a positive change, so sign should be -
+						txErrorMinSign = -1;
+					}
+					else
+					{
+						// Error went down with a positive change, so keep the sign positive
+						txErrorMinSign = +1;
+					}
+				}
+			}
+			else
+			{
+				if(lastError < avgError)
+				{
+					txPower += txChangeInc * txErrorMinSign * -1;
+				}
+				else
+				{
+					txPower += txChangeInc * txErrorMinSign;
+				}
+			}
+
+			
+			lastError = avgError;
+		}
+
+		//info->txPower = txPower;
+	}
+
+	//exit(-1);
+	
 	
 	/*
 	// Print a dump of the signal readings in CSV format,
@@ -970,11 +1093,13 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		
 	qDebug() << "MapGraphicsScene::testUserLocatorAccuracy(): Error stats: min:"<<min<<"ft, max:"<<max<<"ft, std dev:"<<stdDev<<"ft, avg:"<<avg<<"ft, 95% radius:"<<bottomAvg95<<"-"<<topAvg95<<"ft, # solutions:"<<count<<"/"<<maxCount<<", "<<solvePerc<<"%";
 	qDebug() << "\tSummary: "<<solvePerc<<"%: "<<avg<<"/"<<stdDev<<" ("<<bottomAvg95<<"/"<<topAvg95<<")\n";
-	
+
 	QApplication::processEvents();
 	
 	QMessageBox::information(0, "Accuracy Results", results);
-
+	
+	//exit(-1);
+	
 	m_locationCheats.clear();
 }
 	
