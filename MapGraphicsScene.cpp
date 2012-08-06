@@ -840,10 +840,7 @@ QDebug operator<<(QDebug dbg, const CostMinData &v);
 QDebug operator<<(QDebug dbg, const CostMinData *v);
 QDebug operator<<(QDebug dbg, const CostMinData *v)
 {
-	dbg.nospace()	<< "(";
-	dbg.nospace()	<< qPrintable(QString("%1=%2").arg(v->name).arg(v->value))
-			<< ")";
-
+	dbg.nospace() << *v;
         return dbg.nospace();
 }
 
@@ -879,10 +876,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 		//double rxGain = -3;
 
-		double lastError = 99999.;
-
-		double minTxDbm = 0;  // 1 milliwatt
-		double maxTxDbm = 30; // 1 watt
+// 		double minTxDbm = 0;  // 1 milliwatt
+// 		double maxTxDbm = 30; // 1 watt
 /*
 // 		double txGain = info->txGain; // initial guess
 // 		double txGainChangeInc = 0.1;
@@ -896,12 +891,12 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		double txPowerChangeInc = 0.1;
 		double txPowerErrorMinSign = 0.;*/
 		
-		CostMinData dTxPower  = CostMinData(info->txPower,	  "txPower");
-		CostMinData dTxGain   = CostMinData(info->txGain,	  "txGain");
-		CostMinData dRxGain   = CostMinData(3.0,		  "rxGain"); // guess
-		CostMinData dFactorX  = CostMinData(info->lossFactor.x(), "factorX", 0,0, 0.01);
-		CostMinData dFactorY  = CostMinData(info->lossFactor.y(), "factorY", 0,0, 0.01);
-		CostMinData dShortVal = CostMinData(info->shortCutoff,	  "shortVal");
+		CostMinData dTxPower  = CostMinData(info->txPower,	  "txPower",     0,   30, 0.001);//0.05);
+		CostMinData dTxGain   = CostMinData(info->txGain,	  "txGain",  -1000, 1000, 0.001);//0.05);
+		CostMinData dRxGain   = CostMinData(3.0,		  "rxGain",  -1000, 1000, 0.001); // guess
+		CostMinData dFactorX  = CostMinData(info->lossFactor.x(), "factorX", -1000, 1000, 0.001);
+		CostMinData dFactorY  = CostMinData(info->lossFactor.y(), "factorY", -1000, 1000, 0.001);
+		CostMinData dShortVal = CostMinData(info->shortCutoff,	  "shortVal", -150,  -10, 1.000);
 		
 	/*CostMinData(
 		double v,
@@ -915,11 +910,14 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		QList<CostMinData*> paramList = QList<CostMinData*>()
 			<< &dTxPower
 			<< &dTxGain
-// 			<< &dRxGain
+ 			<< &dRxGain
 			<< &dFactorX
 			<< &dFactorY
 			<< &dShortVal;
 
+// 		foreach(CostMinData *d, paramList)
+// 		{
+		double lastError = 99999.;
 		double lastError2 = 0.;
 		bool zigZag = false;
 		
@@ -975,6 +973,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 			double avgError = errorSum / (double)pointCount;
 			//qDebug() << "Avg Error: " << avgError;
+			qDebug() << "[costMinSearch] avgError: "<<avgError;
 
 			//qDebug() << "Avg Error: " << avgError<<", txGain: "<<txGain<< "(sum:"<<errorSum<<",count:"<<pointCount<<")";
 
@@ -1019,35 +1018,45 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			if(errorSignsGood)
 			{
 				if(lastError2 == avgError)
+				{
 					zigZag = true;
+					//qDebug() << " -------- Zig Zag";
+				}
 
 				if(lastError > 0.1 && !zigZag)
 				{
 					foreach(CostMinData *d, paramList)
 					{
+						double change = d->changeInc * d->errorMinSign;
 						if(lastError < avgError)
 						{
-							d->value += d->changeInc * d->errorMinSign * -1;
+							change *= -1;
+							//qDebug() << "****** Error UP!";
+						}
+						
+						double newVal = d->value + change;
+						
+						if(newVal >= d->min && newVal <= d->max)
+						{
+							d->value = newVal;
+							qDebug() << "[costMinSearch] [d param adj] " << d;
 						}
 						else
 						{
-							d->value += d->changeInc * d->errorMinSign;
+							qDebug() << "[costMinSearch] [d param adj] " << d << " - not adjusted, "<<newVal<<" would exceede constraints ("<<d->min<<"/"<<d->max<<")";
 						}
-
-						qDebug() << "[costMinSearch] [d param adj] " << d;
 					}
 				}
 
 				//qDebug() << "lastError:"<<lastError<<", lastError2:"<<lastError2<<", avgError:"<<avgError<<", zigZag:"<<zigZag;
-				qDebug() << "[costMinSearch] avgError: "<<avgError;
-
+				
 				lastError2 = lastError;
 			}
-
+			
 			
 			lastError = avgError;
 		}
-
+		
 		//info->txGain = dTxGain;
 		
 		qDebug() << "Last Error: " << lastError<<", values: ";
