@@ -801,17 +801,29 @@ bool MapGraphicsScene_sort_SigMapValue_bySignal2(SigMapValue *a, SigMapValue *b)
 
 class CostMinData {
 public:
-	CostMinData(double v, double c=0.1, double e=0)
+	CostMinData(
+		double v,
+		QString n = "",
+		double a = -9999.0,
+		double b =  9999.0,
+		double c =     0.1,
+		double e =     0.0)
 		: value(v)
+		, min(a)
+		, max(b)
 		, changeInc(c)
 		, errorMinSign(e)
+		, errorSignSet(false)
 		, error(0)
 		 {}
 		
 	double value;
+	QString name;
+	double min;
+	double max;
 	double changeInc;
 	double errorMinSign;
-	
+	bool errorSignSet;
 	double error;
 	
 	operator double() { return value; }
@@ -820,6 +832,26 @@ public:
 		return *this;
 	}
 };
+QDebug operator<<(QDebug dbg, const CostMinData &v);
+QDebug operator<<(QDebug dbg, const CostMinData *v);
+QDebug operator<<(QDebug dbg, const CostMinData *v)
+{
+	dbg.nospace()	<< "(";
+	dbg.nospace()	<< qPrintable(QString("%1=%2").arg(v->name).arg(v->value))
+			<< ")";
+
+        return dbg.nospace();
+}
+
+QDebug operator<<(QDebug dbg, const CostMinData &v)
+{
+	dbg.nospace()	<< "(";
+	dbg.nospace()	<< qPrintable(QString("%1=%2").arg(v.name).arg(v.value))
+			<< ")";
+
+        return dbg.nospace();
+}
+
 
 void MapGraphicsScene::testUserLocatorAccuracy()
 {
@@ -860,12 +892,12 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		double txPowerChangeInc = 0.1;
 		double txPowerErrorMinSign = 0.;*/
 		
-		CostMinData dTxPower  = info->txPower;
-		CostMinData dTxGain   = info->txGain;
-		CostMinData dRxGain   = 3.0; // guess
-		CostMinData dFactorX  = info->lossFactor.x();
-		CostMinData dFactorY  = info->lossFactor.y();
-		CostMinData dShortVal = info->shortCutoff;
+		CostMinData dTxPower  = CostMinData(info->txPower,	  "txPower");
+		CostMinData dTxGain   = CostMinData(info->txGain,	  "txGain");
+		CostMinData dRxGain   = CostMinData(3.0,		  "rxGain"); // guess
+		CostMinData dFactorX  = CostMinData(info->lossFactor.x(), "factorX");
+		CostMinData dFactorY  = CostMinData(info->lossFactor.y(), "factorY");
+		CostMinData dShortVal = CostMinData(info->shortCutoff,	  "shortVal");
 		
 		
 
@@ -935,31 +967,41 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 			//qDebug() << "Avg Error: " << avgError<<", txGain: "<<txGain<< "(sum:"<<errorSum<<",count:"<<pointCount<<")";
 
-			if(dTxGain.errorMinSign == 0 ||
-			   dTxGain.errorMinSign == 11)
+			bool errorSignsGood = true;
+			foreach(CostMinData *d, paramList)
 			{
-				// need to figure out which sign makes error go lower
-				if(dTxGain.errorMinSign == 0)
+				if(!d->errorSignSet)
 				{
-					// First time, we just throw a dart at the board - then measure the change and decide on the appros sign
-					dTxGain += dTxGain.changeInc; // positive sign
-					dTxGain.errorMinSign = 11;
-				}
-				else
-				{
-					if(lastError < avgError)
+					qDebug() << "[costMinSearch] d error sign not set: "<<d;
+					errorSignsGood = false;
+
+					// need to figure out which sign makes error go lower
+					if(d->errorMinSign == 0)
 					{
-						// Error went *up* with a positive change, so sign should be -
-						dTxGain.errorMinSign = -1;
+						// First time, we just throw a dart at the board - then measure the change and decide on the appros sign
+						d->value += d->changeInc; // positive sign
+						d->errorMinSign = 11;
+						break;
 					}
 					else
 					{
-						// Error went down with a positive change, so keep the sign positive
-						dTxGain.errorMinSign = +1;
+						if(lastError < avgError)
+						{
+							// Error went *up* with a positive change, so sign should be -
+							d->errorMinSign = -1;
+						}
+						else
+						{
+							// Error went down with a positive change, so keep the sign positive
+							d->errorMinSign = +1;
+						}
+						
+						d->errorSignSet = true;
 					}
 				}
 			}
-			else
+			
+			if(errorSignsGood)
 			{
 				if(lastError2 == avgError)
 					zigZag = true;
