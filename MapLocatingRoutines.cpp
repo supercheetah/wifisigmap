@@ -1263,7 +1263,7 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 				if(!distOverride.contains(ap1))
 				{
 					//errorDist = fabs(r1 - r0) * (r1 > r0 ? -1 : 1) + dist;
-					r1 += errorDist;
+					r1 += errorDist + 0.001;
 					
 					distOverride[ap1] = r1;
 					qDebug() << "MapGraphicsScene::updateUserLocationOverlay(): force-corrected the radius [case 2.0]: "<<r0<<r1<<", errorDist: "<<errorDist;
@@ -2829,10 +2829,10 @@ QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
 	// Use a reworked distance formula to calculate lossFactor for each point, then average together
 
 	double shortFactor = 0.,
-		longFactor  = 0.;
+		longFactor = 0.;
 
 	int    shortCount  = 0,
-		longCount   = 0;
+		longCount  = 0;
 
 	foreach(SigMapValue *val, m_sigValues)
 	{
@@ -2888,10 +2888,11 @@ QPointF MapGraphicsScene::deriveImpliedLossFactor(QString apMac)
 		longCount  = 1;
 	}
 
-	lossFactor = QPointF( longFactor /  longCount,
+	lossFactor = QPointF(    longFactor /  longCount,
 				shortFactor / shortCount);
 
 	// TODO calc MSE for the resultant N as error += ( (dBmToDistance(dBm, lossFactor)-realDist)^2 ) foreach reading; error/= readings
+	
 	return lossFactor;
 }
 
