@@ -803,11 +803,12 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 {
 	//return;
 
-	//foreach(MapApInfo *info, m_apInfo.values())
+	foreach(MapApInfo *info, m_apInfo.values())
 	//MapApInfo *info = m_apInfo["00:2D:08:0E:92:14"];
-	MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
+	//MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
 	//m_apInfo.values().first();
 	{
+		updateDrivedLossFactor(info);
 
 		MapGraphicsScene_sort_apMac2 = info->mac;
 		qSort(m_sigValues.begin(), m_sigValues.end(), MapGraphicsScene_sort_SigMapValue_bySignal2);
@@ -823,17 +824,30 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		double minTxDbm = 0;  // 1 milliwatt
 		double maxTxDbm = 30; // 1 watt
 
-		double txPower = 11.8; // initial guess
-		double txChangeInc = 0.1;
-		double txErrorMinSign = 0.;
+		double txGain = info->txGain; // initial guess
+		double txGainChangeInc = 0.1;
+		double txGainErrorMinSign = 0.;
+
+		double lastError2 = 0.;
+		bool zigZag = false;
 		
-		while(lastError > 1.)
+		while(lastError > 0.1 && !zigZag)
 		{
+			//zigZag = true;
 			int pointCount = 0;
 			double errorSum = 0.;
+
 			foreach(SigMapValue *val, m_sigValues)
 			{
 				if(!val->hasAp(info->mac))
+					continue;
+
+				int usableAps = 0;
+				foreach(WifiDataResult r, val->scanResults)
+					if(apInfo(r.mac)->marked)
+						usableAps ++;
+
+				if(usableAps < 3)
 					continue;
 
 				QPointF pnt2 = val->point;
@@ -848,14 +862,19 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 //				double calcDist = dBmToDistance(dBm, info->mac, rxGain) * m_pixelsPerMeter;
 // 				double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, info->txPower, info->txGain, rxGain) * m_pixelsPerMeter;
- 				double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, txPower, info->txGain, rxGain) * m_pixelsPerMeter;
+ 				//double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, txPower, info->txGain, rxGain) * m_pixelsPerMeter;
+				double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, info->txPower, txGain, rxGain);// * m_pixelsPerMeter
 
-				double error = calcDist - len;
+				double error = fabs(calcDist - len);
 				//double errorSq = error*error;
 				//errorSum += errorSq;
 				errorSum += error;
 
 				pointCount ++;
+
+				//printf("dbm:%d,val:%f,dist:%f,calc:%f,abs err:%f,pnt:%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist,error,pnt2.x(),pnt2.y());;
+
+				
 			}
 
 			//double mse = errorSum / (double)pointCount;
@@ -864,49 +883,109 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			double avgError = errorSum / (double)pointCount;
 			//qDebug() << "Avg Error: " << avgError;
 
-			qDebug() << "Avg Error: " << avgError<<", txPower: "<<txPower;
+			//qDebug() << "Avg Error: " << avgError<<", txGain: "<<txGain<< "(sum:"<<errorSum<<",count:"<<pointCount<<")";
 
-			if(txErrorMinSign == 0 ||
-			   txErrorMinSign == 11)
+			if(txGainErrorMinSign == 0 ||
+			   txGainErrorMinSign == 11)
 			{
 				// need to figure out which sign makes error go lower
-				if(txErrorMinSign == 0)
+				if(txGainErrorMinSign == 0)
 				{
 					// First time, we just throw a dart at the board - then measure the change and decide on the appros sign
-					txPower += txChangeInc; // positive sign
-					txErrorMinSign = 11;
+					txGain += txGainChangeInc; // positive sign
+					txGainErrorMinSign = 11;
 				}
 				else
 				{
 					if(lastError < avgError)
 					{
 						// Error went *up* with a positive change, so sign should be -
-						txErrorMinSign = -1;
+						txGainErrorMinSign = -1;
 					}
 					else
 					{
 						// Error went down with a positive change, so keep the sign positive
-						txErrorMinSign = +1;
+						txGainErrorMinSign = +1;
 					}
 				}
 			}
 			else
 			{
-				if(lastError < avgError)
+				if(lastError2 == avgError)
+					zigZag = true;
+
+				if(lastError > 0.1 && !zigZag)
 				{
-					txPower += txChangeInc * txErrorMinSign * -1;
+					if(lastError < avgError)
+					{
+						txGain += txGainChangeInc * txGainErrorMinSign * -1;
+					}
+					else
+					{
+						txGain += txGainChangeInc * txGainErrorMinSign;
+					}
 				}
-				else
-				{
-					txPower += txChangeInc * txErrorMinSign;
-				}
+
+				//qDebug() << "lastError:"<<lastError<<", lastError2:"<<lastError2<<", avgError:"<<avgError<<", zigZag:"<<zigZag;
+
+				lastError2 = lastError;
 			}
 
 			
 			lastError = avgError;
 		}
 
-		//info->txPower = txPower;
+		info->txGain = txGain;
+		
+		qDebug() << "Last Error: " << lastError<<", txGain: "<<txGain;
+
+		double finalSum = 0;
+		int pointCount = 0;
+		printf("%s,%s\n",qPrintable(info->mac),qPrintable(info->essid));
+		qDebug() << "ap location:" <<pnt1<<", ap:"<<info->mac;
+		//SigMapValue *val = testPoints[testPoints.size()/2];
+		QList<double> errs;
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(!val->hasAp(info->mac))
+				continue;
+
+			int usableAps = 0;
+			foreach(WifiDataResult r, val->scanResults)
+				if(apInfo(r.mac)->marked)
+					usableAps ++;
+
+			if(usableAps < 3)
+				continue;
+
+			QPointF pnt2 = val->point;
+			QLineF line(pnt1, pnt2);
+
+			double len = line.length() / m_pixelsPerMeter; //m_pixelsPerFoot;
+			double angle = line.angle();
+
+			int dBm = (int)val->signalForAp(info->mac, true);
+			//double calcDist = dBmToDistance(dBm, info->mac, rxGain);// * m_pixelsPerMeter;
+			double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, info->txPower, txGain, rxGain);// * m_pixelsPerMeter;
+			double error = fabs(calcDist - len);
+			printf("dbm:%d,val:%f,dist:%f,calc:%f,abs err:%f,pnt:%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist,error,pnt2.x(),pnt2.y());
+			finalSum += error;
+			pointCount ++;
+
+			errs << error;
+		}
+		double finalAvg = finalSum / (double)pointCount;
+
+		// find the standard deviation
+		float numerator = 0;
+		float denominator = (float)pointCount;
+		foreach(double len, errs)
+			numerator += pow((len - finalAvg), 2);
+
+		float stdDev = sqrt(numerator/denominator);
+
+	
+		qDebug() << "finalSum: "<<finalSum<<", finalAvg:"<<finalAvg<<", stdDev:"<<stdDev<<", pointCount:"<<pointCount;
 	}
 
 	//exit(-1);
@@ -934,11 +1013,11 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			printf("%d,%f,%f,%f\n", (int)val->signalForAp(info->mac, true), val->signalForAp(info->mac),len,angle);
 		}
 	}
-
-	printf("\n\n");
-	//return;
 	*/
 	
+	printf("\n\n");
+	//return;
+
 	double sum = 0.;
 	double min = 999999999.;
 	double max = 0.;
@@ -1003,7 +1082,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		}
 		else
 		{
-			updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
+			//updateUserLocationOverlay(val->rxGain, false); // false = dont update image (for faster testing)
+			updateUserLocationOverlay(val->rxGain, false, val->point); // false = dont update image (for faster testing)
 		}
 		
 		QLineF errorLine(val->point, m_userLocation);
@@ -1096,7 +1176,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 	QApplication::processEvents();
 	
-	QMessageBox::information(0, "Accuracy Results", results);
+	//QMessageBox::information(0, "Accuracy Results", results);
 	
 	//exit(-1);
 	

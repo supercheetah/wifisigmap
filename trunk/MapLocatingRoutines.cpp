@@ -1125,9 +1125,33 @@ QImage MapGraphicsScene::updateUserLocationOverlay(double rxGain, bool renderIma
 			QPointF calcPoint/* = triangulate(ap0, apMacToDbm[ap0],
 							ap1, apMacToDbm[ap1])*/;
 
-			double r0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain) * m_pixelsPerMeter;
-			double r1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain) * m_pixelsPerMeter;
+// 			double r0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain) * m_pixelsPerMeter;
+// 			double r1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain) * m_pixelsPerMeter;
 
+			double d0 = dBmToDistance(apMacToDbm[ap0], ap0, rxGain);
+			double d1 = dBmToDistance(apMacToDbm[ap1], ap1, rxGain);
+			double r0 = d0 * m_pixelsPerMeter;
+			double r1 = d1 * m_pixelsPerMeter;
+			
+			double t0 = QLineF(truthTestPoint, p0).length() / m_pixelsPerMeter;
+			double t1 = QLineF(truthTestPoint, p1).length() / m_pixelsPerMeter;
+
+// 			double t0 = QLineF(truthTestPoint, p0).length();
+// 			double t1 = QLineF(truthTestPoint, p1).length();
+
+			double e0 = d0 - t0;
+			double e1 = d1 - t1;
+
+// 			double e0 = r0 - t0;
+// 			double e1 = r1 - t1;
+
+			qDebug() << "[user locate] \t dbms: "<<apMacToDbm[ap0]<<" / "<<apMacToDbm[ap1];
+			qDebug() << "[user locate] \t dist: "<<d0<<" / "<<d1;
+			//qDebug() << "[user locate] \t pixs: "<<r0<<" / "<<r1;
+			qDebug() << "[user locate] \t true: "<<t0<<" / "<<t1;
+			qDebug() << "[user locate] \t errs: "<<e0<<" / "<<e1;
+			qDebug() << "[user locate] \t pnts: "<<p0<<" / "<<p1;
+			qDebug() << "[user locate] \t truthTestPoint: "<<truthTestPoint;
 			
 			if(m_locationCheats.contains(ap0))
 				r0 = m_locationCheats[ap0];
