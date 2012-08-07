@@ -815,7 +815,7 @@ public:
 		, changeInc(c)
 		, errorMinSign(e)
 		, errorSignSet(false)
-		, error(0)
+		, errorAmt(0)
 		 {
 			qDebug() << "CostMinData: Created new data object, name: "<<name<<", initial value:"<<value;
 
@@ -828,7 +828,7 @@ public:
 	double changeInc;
 	double errorMinSign;
 	bool errorSignSet;
-	double error;
+	double errorAmt;
 	
 	operator double() { return value; }
 	CostMinData & operator +=(double v) {
@@ -858,9 +858,9 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 {
 	//return;
 
-	foreach(MapApInfo *info, m_apInfo.values())
+	//foreach(MapApInfo *info, m_apInfo.values())
 	//MapApInfo *info = m_apInfo["00:2D:08:0E:92:14"];
-	///MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
+	MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
 	//MapApInfo *info = m_apInfo["58:6D:8F:9B:2B:07"];
 	
 	//m_apInfo.values().first();
@@ -1008,7 +1008,12 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 							d->errorMinSign = +1;
 						}
 
-						qDebug() << "[costMinSearch] [d err sign] " << d << " [step 2] sign:" << d->errorMinSign;
+						double errorDelta  = lastError  - avgError;
+						double errorChange = errorDelta / avgError;
+						qDebug() << "[costMinSearch] [d err sign] " << d << " [step 2] sign:" << d->errorMinSign << ", errorChange:"<<errorChange;
+						//qDebug() << "\terrorChange:"<<errorChange<<", delta:"<<errorDelta<<", lastError:"<<lastError<<", avgError:"<<avgError;
+						//printf("\terrorChange(f): %.80f\n", errorChange);
+						//exit(-1);
 						
 						d->errorSignSet = true;
 					}
@@ -1113,7 +1118,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qDebug() << "finalSum: "<<finalSum<<", finalAvg:"<<finalAvg<<", stdDev:"<<stdDev<<", pointCount:"<<pointCount;
 	}
 
-	//exit(-1);
+	exit(-1);
 	
 	
 	/*
