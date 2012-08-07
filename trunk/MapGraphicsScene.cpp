@@ -871,7 +871,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			//exit(-1);
 			return;
 		}
-		
+
 		updateDrivedLossFactor(info);
 
 		MapGraphicsScene_sort_apMac2 = info->mac;
@@ -879,25 +879,29 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		
 		QPointF pnt1 = info->point;
 		printf("\n\n%s,%s\n",qPrintable(info->mac),qPrintable(info->essid));
-		//printf("dBm,Signal%%,Dist(Meters),Angle\n");
+		printf("dBm,Signal%%,Dist(Meters),CalcDist(Meters)\n");
 
-		//double rxGain = -3;
+		foreach(SigMapValue *val, m_sigValues)
+		{
+			if(!val->hasAp(info->mac))
+				continue;
 
-// 		double minTxDbm = 0;  // 1 milliwatt
-// 		double maxTxDbm = 30; // 1 watt
-/*
-// 		double txGain = info->txGain; // initial guess
-// 		double txGainChangeInc = 0.1;
-// 		double txGainErrorMinSign = 0.;
+			QPointF pnt2 = val->point;
+			QLineF line(pnt1, pnt2);
 
-		double rxGain = 3.; // initial guess
-		double rxGainChangeInc = 0.1;
-		double rxGainErrorMinSign = 0.;
-		
-		double txPower = info->txPower; // initial guess
-		double txPowerChangeInc = 0.1;
-		double txPowerErrorMinSign = 0.;*/
-		
+			double len = line.length() / m_pixelsPerMeter; //m_pixelsPerFoot;
+			//double angle = line.angle();
+
+			int dBm = (int)val->signalForAp(info->mac, true);
+
+			double calcDist = dBmToDistance(dBm, info->mac, -3);// * m_pixelsPerMeter;
+
+			printf("%d,%f,%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist);
+		}
+
+		continue;
+
+
 		CostMinData dTxPower  = CostMinData(info->txPower,	  "txPower",     0,   30, 0.001);//0.05);
 		CostMinData dTxGain   = CostMinData(info->txGain,	  "txGain",  -1000, 1000, 0.001);//0.05);
 		CostMinData dRxGain   = CostMinData(3.0,		  "rxGain",  -1000, 1000, 0.001); // guess
@@ -905,14 +909,6 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		CostMinData dFactorY  = CostMinData(info->lossFactor.y(), "factorY", -1000, 1000, 0.001);
 		CostMinData dShortVal = CostMinData(info->shortCutoff,	  "shortVal", -150,  -10, 1.000);
 		
-	/*CostMinData(
-		double v,
-		QString n = "",
-		double a = -9999.0,
-		double b =  9999.0,
-		double c =     0.1,
-		double e =     0.0)
-	*/	
 
 		QList<CostMinData*> paramList = QList<CostMinData*>()
 			<< &dTxPower
@@ -922,8 +918,6 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			<< &dFactorY
 			<< &dShortVal;
 
-// 		foreach(CostMinData *d, paramList)
-// 		{
 		double lastError = 99999.;
 		double lastError2 = 0.;
 		bool zigZag = false;
@@ -933,7 +927,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		while(lastError > 0.1 && !zigZag)
 		{
 			epochCounter ++;
-			//zigZag = true;
+
 			int pointCount = 0;
 			double errorSum = 0.;
 
@@ -974,8 +968,6 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 				pointCount ++;
 
 				//printf("dbm:%d,val:%f,dist:%f,calc:%f,abs err:%f,pnt:%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist,error,pnt2.x(),pnt2.y());;
-
-				
 			}
 
 			//double mse = errorSum / (double)pointCount;
@@ -1134,7 +1126,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qDebug() << "finalSum: "<<finalSum<<", finalAvg:"<<finalAvg<<", stdDev:"<<stdDev<<", pointCount:"<<pointCount;
 	}
 
-	//exit(-1);
+	exit(-1);
 	
 	
 	/*
