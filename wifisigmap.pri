@@ -20,8 +20,8 @@ opencv: {
 		KalmanFilter.cpp
 }
 
-#SOURCES += devel/FANN-2.2.0-Source/src/doublefann.c
-#INCLUDEPATH += devel/FANN-2.2.0-Source/src
+INCLUDEPATH += 3rdparty/FANN-2.2.0-Source/src/include
+SOURCES     += 3rdparty/FANN-2.2.0-Source/src/doublefann.c
 
 # Input
 FORMS += OptionsDialog.ui
