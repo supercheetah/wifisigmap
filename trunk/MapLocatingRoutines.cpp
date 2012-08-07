@@ -400,6 +400,9 @@ QPointF operator*(const QPointF&a, const QPointF& b) { return QPointF(a.x()*b.x(
 
 void MapGraphicsScene::updateDrivedLossFactor(MapApInfo *info)
 {
+	if(!info)
+		return;
+		
 	if(info->lossFactor.isNull() ||
 	  (info->lossFactorKey > -1 && info->lossFactorKey != m_sigValues.size()))
 	{

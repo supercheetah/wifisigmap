@@ -858,13 +858,20 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 {
 	//return;
 
-	//foreach(MapApInfo *info, m_apInfo.values())
+	foreach(MapApInfo *info, m_apInfo.values())
 	//MapApInfo *info = m_apInfo["00:2D:08:0E:92:14"];
-	MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
+	//MapApInfo *info = m_apInfo["00:1A:70:59:5B:6F"];
 	//MapApInfo *info = m_apInfo["58:6D:8F:9B:2B:07"];
 	
 	//m_apInfo.values().first();
 	{
+		if(!info)
+		{
+			qDebug() << "Info null, not testing accuracy.";
+			//exit(-1);
+			return;
+		}
+		
 		updateDrivedLossFactor(info);
 
 		MapGraphicsScene_sort_apMac2 = info->mac;
@@ -921,8 +928,11 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		double lastError2 = 0.;
 		bool zigZag = false;
 		
+		int epochCounter = 0;
+		
 		while(lastError > 0.1 && !zigZag)
 		{
+			epochCounter ++;
 			//zigZag = true;
 			int pointCount = 0;
 			double errorSum = 0.;
@@ -973,7 +983,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 			double avgError = errorSum / (double)pointCount;
 			//qDebug() << "Avg Error: " << avgError;
-			qDebug() << "[costMinSearch] avgError: "<<avgError;
+			qDebug() << "[costMinSearch] avgError: "<<avgError<<", epochCounter:"<<epochCounter;
 
 			//qDebug() << "Avg Error: " << avgError<<", txGain: "<<txGain<< "(sum:"<<errorSum<<",count:"<<pointCount<<")";
 
@@ -988,11 +998,11 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 					if(d->errorMinSign == 0)
 					{
 						// First time, we just throw a dart at the board - then measure the change and decide on the appros sign
+						qDebug() << "[costMinSearch] [d err sign] " << d << " [step 1]";
+					
 						d->value += d->changeInc; // positive sign
 						d->errorMinSign = 11;
 
-						qDebug() << "[costMinSearch] [d err sign] " << d << " [step 1]";
-					
 						break;
 					}
 					else
@@ -1009,11 +1019,12 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 						}
 
 						double errorDelta  = lastError  - avgError;
-						double errorChange = errorDelta / avgError;
+						double errorChange = errorDelta / lastError * 1000.;
 						qDebug() << "[costMinSearch] [d err sign] " << d << " [step 2] sign:" << d->errorMinSign << ", errorChange:"<<errorChange;
+						d->errorAmt = errorChange;
 						//qDebug() << "\terrorChange:"<<errorChange<<", delta:"<<errorDelta<<", lastError:"<<lastError<<", avgError:"<<avgError;
 						//printf("\terrorChange(f): %.80f\n", errorChange);
-						//exit(-1);
+						
 						
 						d->errorSignSet = true;
 					}
@@ -1022,7 +1033,8 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			
 			if(errorSignsGood)
 			{
-				if(lastError2 == avgError)
+				//exit(-1);
+				if(lastError2 == avgError || (fabs(avgError - lastError) < 0.0001  && fabs(lastError - lastError2) < 0.0001))
 				{
 					zigZag = true;
 					//qDebug() << " -------- Zig Zag";
@@ -1032,7 +1044,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 				{
 					foreach(CostMinData *d, paramList)
 					{
-						double change = d->changeInc * d->errorMinSign;
+						double change = d->changeInc * d->errorAmt; //d->errorMinSign;
 						if(lastError < avgError)
 						{
 							change *= -1;
@@ -1050,10 +1062,14 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 						{
 							qDebug() << "[costMinSearch] [d param adj] " << d << " - not adjusted, "<<newVal<<" would exceede constraints ("<<d->min<<"/"<<d->max<<")";
 						}
+						
+						d->errorSignSet = false;
+						//d->errorMinSign = 0;
+						
 					}
 				}
 
-				//qDebug() << "lastError:"<<lastError<<", lastError2:"<<lastError2<<", avgError:"<<avgError<<", zigZag:"<<zigZag;
+				qDebug() << "\t lastError:"<<lastError<<", lastError2:"<<lastError2<<", avgError:"<<avgError<<", zigZag:"<<zigZag;
 				
 				lastError2 = lastError;
 			}
@@ -1064,7 +1080,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		
 		//info->txGain = dTxGain;
 		
-		qDebug() << "Last Error: " << lastError<<", values: ";
+		qDebug() << "Last Error: " << lastError<<", epochs: "<<epochCounter<<", values: ";
 		foreach(CostMinData *d, paramList)
 			qDebug() << "\t "<<d;
 
@@ -1118,7 +1134,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qDebug() << "finalSum: "<<finalSum<<", finalAvg:"<<finalAvg<<", stdDev:"<<stdDev<<", pointCount:"<<pointCount;
 	}
 
-	exit(-1);
+	//exit(-1);
 	
 	
 	/*
@@ -1306,7 +1322,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 
 	QApplication::processEvents();
 	
-	//QMessageBox::information(0, "Accuracy Results", results);
+	QMessageBox::information(0, "Accuracy Results", results);
 	
 	//exit(-1);
 	
