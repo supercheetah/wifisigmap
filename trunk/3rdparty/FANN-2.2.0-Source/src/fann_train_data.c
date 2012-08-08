@@ -41,6 +41,7 @@ FANN_EXTERNAL struct fann_train_data *FANN_API fann_read_train_from_file(const c
 
 	data = fann_read_train_from_fd(file, configuration_file);
 	fclose(file);
+	//printf("[debug] fann_read_train_from_file: First pair of inputs:  %f, %f\n", data->input[0][0], data->input[0][1]);
 	return data;
 }
 
@@ -871,6 +872,7 @@ struct fann_train_data *fann_read_train_from_fd(FILE * file, const char *filenam
 		return NULL;
 	}
 
+	//num_data = 3;
 	for(i = 0; i != num_data; i++)
 	{
 		for(j = 0; j != num_input; j++)
@@ -898,6 +900,9 @@ struct fann_train_data *fann_read_train_from_fd(FILE * file, const char *filenam
 		}
 		line++;
 	}
+	
+	//printf("[debug] fann_read_train_from_fd: FANNPRINTF: '%.20f'\n", 0.5);
+	//printf("[debug] fann_read_train_from_fd: First pair of inputs:  %f, %f\n", data->input[0][0], data->input[0][1]);
 	return data;
 }
 

@@ -19,7 +19,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include <stdio.h>
 
-#include "fann.h"
+#include "doublefann.h"
+
+//#include "fann.h"
+//#include "3rdparty/FANN-2.2.0-Source/src/doublefann.c"
 
 int main(int argc, char **argv)
 {
@@ -37,7 +40,7 @@ int main(int argc, char **argv)
 	struct fann *ann;
 	struct fann_train_data *data;
 
-	printf("Creating network.\n");
+	//printf("Creating network.\n");
 
 	ann = fann_create_from_file(argv[2]);
 
@@ -47,12 +50,13 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	fann_print_connections(ann);
-	fann_print_parameters(ann);
+// 	fann_print_connections(ann);
+// 	fann_print_parameters(ann);
 
-	printf("Testing network.\n");
+	printf("Loading data...\n");
 
 	data = fann_read_train_from_file(argv[1]);
+	printf("[debug] main: First pair of inputs:  %f, %f\n", data->input[0][0], data->input[0][1]);
 
 //	for(i = 0; i < fann_length_train_data(data); i++)
 	for(i = 0; i < 3; i++)
@@ -72,13 +76,20 @@ int main(int argc, char **argv)
 #else*/
 
 
-// 		printf("Distance test (%d dBm,%f%%) -> %f meters, should be %f meters, difference=%f meters\n",
-// 			   (int)(data->input[i][0] * 150 - 150), data->input[i][1], calc_out[0] * 1000, data->output[i][0] * 1000,
-// 			   fann_abs(calc_out[0] - data->output[i][0]));
+		printf("Distance test (%d dBm,%f%%) -> %f meters, should be %f meters, difference=%f meters\n",
+			   (int)(data->input[i][0] * 150 - 150), data->input[i][1], calc_out[0] * 1000, data->output[i][0] * 1000,
+			   fann_abs(calc_out[0] - data->output[i][0]) * 1000);
 			   
-		printf("XOR test (%f, %f) -> %f, should be %f, difference=%f\n",
-			   data->input[i][0], data->input[i][1], calc_out[0], data->output[i][0],
-			   (float) fann_abs(calc_out[0] - data->output[i][0]));
+			   
+// 		printf("XOR test (%f, %f) -> %f, should be %f, difference=%f\n",
+// 			   data->input[i][0], data->input[i][1], calc_out[0], data->output[i][0],
+// 			   (float) fann_abs(calc_out[0] - data->output[i][0]));
+
+// 		printf("Data set #%d:\n", i);
+// 		printf("\t Inputs:  %f, %f\n", data->input[i][0], data->input[i][1]);
+// 		//calc_out[0], 
+// 		printf("\t Outputs: %f\n",     data->output[i][0]);
+		//	   (float) fann_abs(calc_out[0] - data->output[i][0]
 //#endif
 	}
 
