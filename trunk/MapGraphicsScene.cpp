@@ -6,6 +6,9 @@
 #include "SigMapRenderer.h"
 #include "ImageUtils.h"
 
+#include "3rdparty/FANN-2.2.0-Source/src/include/doublefann.h"
+
+
 #ifndef DEBUG
 #ifdef Q_OS_ANDROID
 #include <QSensor>
@@ -899,6 +902,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 			printf("%d,%f,%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist);
 		}
 
+#if 0
 		continue;
 
 
@@ -1075,6 +1079,15 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qDebug() << "Last Error: " << lastError<<", epochs: "<<epochCounter<<", values: ";
 		foreach(CostMinData *d, paramList)
 			qDebug() << "\t "<<d;
+#endif
+
+		fann_type *calc_out;
+		fann_type input[3];
+
+		QString macSans = info->mac;
+		macSans = macSans.replace(":","");
+		QString netFile = QString("signals-%1.net").arg(macSans);
+		struct fann *ann = fann_create_from_file(qPrintable(netFile));
 
 		double finalSum = 0;
 		int pointCount = 0;
@@ -1102,9 +1115,18 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 // 			double angle = line.angle();
 
 			int dBm = (int)val->signalForAp(info->mac, true);
-			//double calcDist = dBmToDistance(dBm, info->mac, rxGain);// * m_pixelsPerMeter;
+			double calcDist = dBmToDistance(dBm, info->mac, -3);// * m_pixelsPerMeter;
 			//double calcDist = dBmToDistance(dBm, info->lossFactor, info->shortCutoff, info->txPower, dTxGain, rxGain);// * m_pixelsPerMeter;
-			double calcDist = dBmToDistance(dBm, QPointF(dFactorX,dFactorY), dShortVal, dTxPower, dTxGain, dRxGain);// * m_pixelsPerMeter
+			//double calcDist = dBmToDistance(dBm, QPointF(dFactorX,dFactorY), dShortVal, dTxPower, dTxGain, dRxGain);// * m_pixelsPerMeter
+
+			input[0] = ((double)dBm + 150.) / 150.;
+			input[1] = val->signalForAp(info->mac);
+			input[2] = calcDist;
+			
+			calc_out = fann_run(ann, input);
+
+			calcDist = (double)calc_out[0];
+
 			double error = fabs(calcDist - len);
 			printf("dbm:%d,val:%f,dist:%f,calc:%f,abs err:%f,pnt:%f,%f\n", dBm, val->signalForAp(info->mac),len,calcDist,error,pnt2.x(),pnt2.y());
 			finalSum += error;
