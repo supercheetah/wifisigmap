@@ -37,12 +37,16 @@ foreach my $line (@input_data)
 		$calc = $calc / 1000;
 		$dist = $dist / 1000;
 		
-		push @{$ap_data{$cur_mac}}, [ [ $dbm, $sig, $calc ], [ $dist ] ];
+		#push @{$ap_data{$cur_mac}}, [ [ $dbm, $sig, $calc ], [ $dist ] ];
+		#push @{$ap_data{$cur_mac}}, [ [ $dbm ], [ $dist ] ];
+		push @{$ap_data{$cur_mac}}, [ [ $dbm, $sig ], [ $dist ] ];
 	}
 }
 
 use Data::Dumper;
 #die Dumper \%ap_data;
+my $TRAIN_CMD = './train_net';
+
 foreach my $ap (keys %ap_data)
 {
 	my @data = @{$ap_data{$ap}};
@@ -72,5 +76,14 @@ foreach my $ap (keys %ap_data)
 	close(FILE);
 	
 	print "Wrote ".scalar(@data)." lines to $out_file\n";
+
+	if(-f $TRAIN_CMD && -x $TRAIN_CMD)
+	{
+		my $net_file = "signals-$mac_sans.net";
+		print "Training $net_file\n";
+		system("$TRAIN_CMD $out_file $net_file");
+
+		exit(-1); # just testing...
+	}
 }
 

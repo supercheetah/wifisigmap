@@ -863,6 +863,7 @@ struct fann_train_data *fann_read_train_from_fd(FILE * file, const char *filenam
 		return NULL;
 	}
 	line++;
+	//printf("[debug] fann_read_train_from_fd(%s): num_data:%u, num_input:%u, num_output:%u\n", filename, num_data, num_input, num_output);
 
 	data = fann_create_train(num_data, num_input, num_output);
 	if(data == NULL)
@@ -880,6 +881,7 @@ struct fann_train_data *fann_read_train_from_fd(FILE * file, const char *filenam
 				fann_destroy_train(data);
 				return NULL;
 			}
+			//printf("[debug] read input[%d][%d]: %f\n", i,j, data->input[i][j]);
 		}
 		line++;
 
@@ -891,6 +893,8 @@ struct fann_train_data *fann_read_train_from_fd(FILE * file, const char *filenam
 				fann_destroy_train(data);
 				return NULL;
 			}
+
+			//printf("[debug] read output[%d][%d]: %f\n", i,j, data->output[i][j]);
 		}
 		line++;
 	}

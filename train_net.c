@@ -27,11 +27,11 @@ int main(int argc, char **argv)
 		exit(-1);
 		
 	}
-	const unsigned int num_input = 3;
+	const unsigned int num_input = 2;
 	const unsigned int num_output = 1;
 	const unsigned int num_layers = 3;
-	const unsigned int num_neurons_hidden = 20;
-	const float desired_error = (const float) 0.0001;
+	const unsigned int num_neurons_hidden = 64;
+	const float desired_error = (const float) 0.001;
 	const unsigned int max_epochs = 500000;
 	const unsigned int epochs_between_reports = 1000;
 
@@ -40,7 +40,39 @@ int main(int argc, char **argv)
 	fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC);
 	fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC);
 
-	fann_train_on_file(ann, argv[1], max_epochs, epochs_between_reports, desired_error);
+// 	fann_set_activation_steepness_hidden(ann, 1);
+// 	fann_set_activation_steepness_output(ann, 1);
+
+// 	fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC);
+// 	fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC);
+
+	fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
+	fann_set_bit_fail_limit(ann, 0.01f);
+
+	fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
+
+
+	
+	//fann_train_on_file(ann, argv[1], max_epochs, epochs_between_reports, desired_error);
+
+	struct fann_train_data *data;
+	data = fann_read_train_from_file(argv[1]);
+	fann_init_weights(ann, data);
+
+	printf("Training network on data from %s.\n", argv[1]);
+	fann_train_on_data(ann, data, max_epochs, epochs_between_reports, desired_error);
+
+// 	printf("Testing network. %f\n", fann_test_data(ann, data));
+// 
+// 	unsigned int i = 0;
+// 	fann_type *calc_out;
+// 	for(i = 0; i < fann_length_train_data(data); i++)
+// 	{
+// 		calc_out = fann_run(ann, data->input[i]);
+// 		printf("Distance test (%d dBm,%f%%) -> %f meters, should be %f meters, difference=%f meters\n",
+// 			   (int)(data->input[i][0] * 150 - 150), data->input[i][1], calc_out[0] * 1000, data->output[i][0] * 1000,
+// 			   fann_abs(calc_out[0] - data->output[i][0]));
+// 	}
 
 	fann_save(ann, argv[2]);
 
