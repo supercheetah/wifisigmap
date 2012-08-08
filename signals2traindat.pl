@@ -83,7 +83,7 @@ foreach my $ap (keys %ap_data)
 		print "Training $net_file\n";
 		system("$TRAIN_CMD $out_file $net_file");
 
-		exit(-1); # just testing...
+		#exit(-1); # just testing...
 	}
 }
 

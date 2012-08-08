@@ -1155,7 +1155,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		qDebug() << "finalSum: "<<finalSum<<", finalAvg:"<<finalAvg<<", stdDev:"<<stdDev<<", pointCount:"<<pointCount;
 	}
 
-	exit(-1);
+	//exit(-1);
 	
 	
 	/*
@@ -1283,7 +1283,7 @@ void MapGraphicsScene::testUserLocatorAccuracy()
 		}
 		
 		// Halt in no solution and display an image
-		if((isnan(lenFoot))) // || lenFoot > 0))
+		if(0 && (isnan(lenFoot))) // || lenFoot > 0))
 		{
 			m_showMyLocation = true;
 			updateUserLocationOverlay(val->rxGain, true, val->point); // render images
