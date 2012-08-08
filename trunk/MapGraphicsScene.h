@@ -1,6 +1,8 @@
 #ifndef MapGraphicsScene_H
 #define MapGraphicsScene_H
 
+#include "3rdparty/FANN-2.2.0-Source/src/include/doublefann.h"
+
 #include <QtGui>
 
 #ifdef Q_OS_ANDROID
@@ -164,6 +166,7 @@ public:
 		, lossFactorKey(0) // init to 0, not -1, because -1 means user specified lossFactor,
 		// but 0 means auto calculate (and store points used in lossFactoryKey to regenerate if # points changes)
 		, shortCutoff(-49)
+		, ann(0)
 		{
 			#ifdef OPENCV_ENABLED
 			kalman.predictionBegin(0,0);
@@ -197,6 +200,7 @@ public:
 	KalmanFilter locationGuessKalman;
 	#endif
 
+	struct fann *ann;
 };
 
 class MapRenderOptions

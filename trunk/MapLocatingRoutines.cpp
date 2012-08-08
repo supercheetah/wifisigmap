@@ -2907,7 +2907,23 @@ double MapGraphicsScene::dBmToDistance(int dBm, QString apMac, double gRx)
 	int cutoff = info->shortCutoff;
 	double pTx = info->txPower;
 	double gTx = info->txGain;
-	return dBmToDistance(dBm, n, cutoff, pTx, gTx, gRx);
+	double calcDist = dBmToDistance(dBm, n, cutoff, pTx, gTx, gRx);
+
+	if(info->ann)
+	{
+		fann_type *calc_out;
+		fann_type input[3];
+
+		input[0] = ((double)dBm + 150.) / 150.;
+		input[1] = WifiDataCollector::dbmToPercent(dBm);
+		//input[2] = calcDist / 1000.;
+
+		calc_out = fann_run(info->ann, input);
+
+		calcDist = (double)calc_out[0] * 1000.;
+	}
+
+	return calcDist;
 }
 
 double MapGraphicsScene::dBmToDistance(int dBm, QPointF lossFactor, int shortCutoff, double txPower, double txGain,  double rxGain)
